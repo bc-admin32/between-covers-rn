@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { apiGet, apiPatch } from '../../../lib/api';
-import { spacing, radius, colors } from '../../../lib/theme';
+import { apiGet } from '../../../lib/api';
+import { spacing, colors } from '../../../lib/theme';
 
 const DEFAULT_PHOTO = 'https://cdn.betweencovers.app/default_profile_image.jpg';
 
