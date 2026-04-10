@@ -109,7 +109,16 @@ export default function LoginScreen() {
   async function handleSocialLogin(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple') {
   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   const url = buildCognitoUrl(provider);
-  await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
+  const result = await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
+
+  if (result.type === 'success' && result.url) {
+    const match = result.url.match(/[?&]code=([^&]+)/);
+    const code = match?.[1];
+    console.log('CODE:', code);
+    if (code) {
+      router.push({ pathname: '/(auth)/redirect', params: { code } } as any);
+    }
+  }
 }
 
   if (checking) {
