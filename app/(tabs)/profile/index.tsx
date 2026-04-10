@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { apiGet } from '../../../lib/api';
-import { spacing, colors } from '../../../lib/theme';
+import { apiGet, apiPatch } from '../../../lib/api';
+import { spacing, radius, colors } from '../../../lib/theme';
 
 const DEFAULT_PHOTO = 'https://cdn.betweencovers.app/default_profile_image.jpg';
 
@@ -58,8 +59,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [uploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  const [localPhotoUrl] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -81,7 +82,53 @@ export default function ProfileScreen() {
   }, []);
 
   const handlePhotoUpload = async () => {
-    // Photo upload requires a new build
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access to your photo library.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    setLocalPhotoUrl(asset.uri);
+    setUploadStatus('uploading');
+
+    try {
+      const contentType = 'image/jpeg';
+      const { uploadUrl, fileKey } = await apiPatch('/profile', {
+        action: 'REQUEST_PHOTO_UPLOAD',
+        contentType,
+      });
+
+      const fileData = await fetch(asset.uri);
+      const blob = await fileData.blob();
+
+      const s3Res = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: blob,
+      });
+
+      if (!s3Res.ok) throw new Error('Upload failed');
+
+      const confirm = await apiPatch('/profile', { fileKey });
+      setUser((prev: any) => ({ ...prev, photoUrl: confirm.photoUrl }));
+      setLocalPhotoUrl(null);
+      setUploadStatus('success');
+      setTimeout(() => setUploadStatus('idle'), 3000);
+    } catch {
+      setLocalPhotoUrl(null);
+      setUploadStatus('error');
+      setTimeout(() => setUploadStatus('idle'), 4000);
+    }
   };
 
   const handleLogout = async () => {
@@ -129,12 +176,24 @@ export default function ProfileScreen() {
             )}
 
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
-              <View style={styles.avatarWrapper}>
+              <View style={[styles.avatarWrapper, uploadStatus === 'error' && styles.avatarWrapperError, uploadStatus === 'success' && styles.avatarWrapperSuccess]}>
                 <Image source={{ uri: photoToShow }} style={styles.avatar} />
+                {uploadStatus === 'uploading' && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color="#fff" size="small" />
+                  </View>
+                )}
               </View>
-              <View style={styles.cameraButton}>
-                <Text style={styles.cameraButtonText}>📷</Text>
+              <View style={[styles.cameraButton, uploadStatus === 'error' && { backgroundColor: '#B83255' }, uploadStatus === 'success' && { backgroundColor: '#6B9AB8' }]}>
+                <Text style={styles.cameraButtonText}>
+                  {uploadStatus === 'uploading' ? '…' : uploadStatus === 'success' ? '✓' : uploadStatus === 'error' ? '!' : '📷'}
+                </Text>
               </View>
+              {uploadStatus !== 'idle' && (
+                <Text style={[styles.uploadStatusText, uploadStatus === 'error' && { color: '#B83255' }]}>
+                  {uploadStatus === 'uploading' ? 'Saving…' : uploadStatus === 'success' ? 'Photo saved ✓' : 'Upload failed — try again'}
+                </Text>
+              )}
             </TouchableOpacity>
 
             <Text style={styles.displayName}>{user.displayName ?? ''}</Text>
@@ -196,6 +255,8 @@ const styles = StyleSheet.create({
   foundingBadge: { fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase', color: '#B83255' },
   avatarContainer: { alignItems: 'center', gap: spacing.sm },
   avatarWrapper: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: '#C0C8D0', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 32, elevation: 8 },
+  avatarWrapperError: { borderColor: '#B83255' },
+  avatarWrapperSuccess: { borderColor: '#6B9AB8' },
   avatar: { width: 96, height: 96 },
   avatarOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(107,154,184,0.3)', alignItems: 'center', justifyContent: 'center' },
   cameraButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },

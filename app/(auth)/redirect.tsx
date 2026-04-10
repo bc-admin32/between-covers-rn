@@ -78,8 +78,6 @@ export default function RedirectScreen() {
         }
 
         const result = await resolveRes.json();
-console.log('Resolve result:', JSON.stringify(result));
-console.log('nextRoute:', result?.nextRoute);
 
         setStatus(`Routing to ${result?.nextRoute}…`);
 
