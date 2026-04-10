@@ -14,15 +14,19 @@ export default function RedirectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [status, setStatus] = useState('Signing you in…');
 
   useEffect(() => {
     const run = async () => {
       try {
         const code = params.code as string;
+        
         if (!code) {
           setErrorCode('REDIRECT_NO_CODE');
           return;
         }
+
+        setStatus('Exchanging token…');
 
         const tokenRes = await fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
           method: 'POST',
@@ -48,10 +52,11 @@ export default function RedirectScreen() {
           return;
         }
 
+        setStatus('Saving credentials…');
+
         await SecureStore.setItemAsync('bc_id_token', idToken);
         await SecureStore.setItemAsync('bc_access_token', accessToken);
 
-        // Save for biometric login
         try {
           const compatible = await LocalAuthentication.hasHardwareAsync();
           const enrolled = await LocalAuthentication.isEnrolledAsync();
@@ -59,6 +64,8 @@ export default function RedirectScreen() {
             await SecureStore.setItemAsync('bc_biometric_enabled', 'true');
           }
         } catch {}
+
+        setStatus('Resolving account…');
 
         const resolveRes = await fetch(`${API_BASE}/auth/resolve`, {
           method: 'POST',
@@ -72,18 +79,20 @@ export default function RedirectScreen() {
 
         const result = await resolveRes.json();
 
+        setStatus(`Routing to ${result?.nextRoute}…`);
+
         if (result?.nextRoute?.startsWith('/')) {
           router.replace(result.nextRoute as any);
         } else {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');
         }
-      } catch {
-        setErrorCode('REDIRECT_UNEXPECTED_ERROR');
+      } catch (err: any) {
+        setErrorCode(`REDIRECT_UNEXPECTED_ERROR: ${err?.message}`);
       }
     };
 
     run();
-  }, []);
+  }, [params.code]);
 
   if (errorCode) {
     return (
@@ -98,7 +107,7 @@ export default function RedirectScreen() {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.signingIn}>Signing you in…</Text>
+      <Text style={styles.signingIn}>{status}</Text>
     </View>
   );
 }
@@ -138,5 +147,7 @@ const styles = StyleSheet.create({
   errorCode: {
     fontSize: 12,
     color: '#6b7280',
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });

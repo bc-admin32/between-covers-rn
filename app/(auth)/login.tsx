@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 import { colors, spacing, radius } from '../../lib/theme';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -29,6 +30,41 @@ export default function LoginScreen() {
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [checking, setChecking] = useState(true);
 
+ useEffect(() => {
+  Linking.getInitialURL().then((url) => {
+    console.log('Initial URL:', url);
+  });
+
+  const sub = Linking.addEventListener('url', ({ url }) => {
+    console.log('Deep link received:', url);
+  });
+
+  return () => sub.remove();
+}, []);
+  useEffect(() => {
+  const handleDeepLink = ({ url }: { url: string }) => {
+  console.log('GOT URL:', url);
+  if (url.includes('redirect')) {
+    try {
+      const code = new URL(url).searchParams.get('code');
+      console.log('CODE:', code);
+      if (code) {
+        router.push(`/(auth)/redirect?code=${code}` as any);
+      }
+    } catch (e) {
+      console.log('URL parse error:', e);
+    }
+  }
+};
+
+  const subscription = Linking.addEventListener('url', handleDeepLink);
+
+  Linking.getInitialURL().then((url) => {
+    if (url) handleDeepLink({ url });
+  });
+
+  return () => subscription.remove();
+}, []);
   useEffect(() => {
     async function checkBiometric() {
       try {

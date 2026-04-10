@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "betweencovers",
+    "scheme": "com.betweencovers.app",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
