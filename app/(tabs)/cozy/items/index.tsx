@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
-import * as Clipboard from 'expo-clipboard';
+// import * as Clipboard from 'expo-clipboard';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 
@@ -46,10 +46,9 @@ function PromoCode({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    await Clipboard.setStringAsync(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  setCopied(true);
+  setTimeout(() => setCopied(false), 2000);
+}
 
   return (
     <View style={styles.promoContainer}>
