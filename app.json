@@ -29,11 +29,13 @@
       }
     },
     "plugins": [
-      "expo-router",
-      "expo-font",
-      "expo-secure-store",
-      "expo-video"
-    ],
+  "expo-router",
+  "expo-font",
+  "expo-secure-store",
+  "expo-video",
+  "expo-image-picker",
+  "expo-clipboard"
+],
     "experiments": {
       "typedRoutes": true
     },
