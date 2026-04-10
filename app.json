@@ -33,8 +33,7 @@
   "expo-font",
   "expo-secure-store",
   "expo-video",
-  "expo-image-picker",
-  "expo-clipboard"
+  "expo-image-picker"
 ],
     "experiments": {
       "typedRoutes": true
