@@ -1,26 +1,37 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../../lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  HouseSimple,
+  HeartStraight,
+  Book,
+  Chats,
+  User,
+} from 'phosphor-react-native';
+
 const ACTIVE_COLOR = '#B83255';
-const INACTIVE_COLOR = '#6A5969';
+const INACTIVE_COLOR = '#8C7B8C';
+const ICON_SIZE = 22;
 
-const ICONS: Record<string, { active: string; inactive: string }> = {
-  home:    { active: '⌂',  inactive: '⌂'  },
-  cozy:    { active: '♥',  inactive: '♡'  },
-  library: { active: '☰',  inactive: '☰'  },
-  lounge:  { active: '◉',  inactive: '○'  },
-  profile: { active: '◈',  inactive: '◇'  },
-};
+type IconName = 'home' | 'cozy' | 'library' | 'lounge' | 'profile';
 
-function TabIcon({ name, focused }: { name: keyof typeof ICONS; focused: boolean }) {
-  const icon = ICONS[name];
+function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
+  const color = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
+  const weight = focused ? 'fill' : 'regular';
+
+  const icon = {
+    home:    <HouseSimple  size={ICON_SIZE} color={color} weight={weight} />,
+    cozy:    <HeartStraight size={ICON_SIZE} color={color} weight={weight} />,
+    library: <Book          size={ICON_SIZE} color={color} weight={weight} />,
+    lounge:  <Chats         size={ICON_SIZE} color={color} weight={weight} />,
+    profile: <User          size={ICON_SIZE} color={color} weight={weight} />,
+  }[name];
+
   return (
     <View style={[styles.iconContainer, focused && styles.iconActive]}>
-      <Text style={[styles.iconText, { color: focused ? ACTIVE_COLOR : INACTIVE_COLOR }]}>
-        {focused ? icon.active : icon.inactive}
-      </Text>
+      {icon}
     </View>
   );
 }
@@ -106,23 +117,22 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   iconActive: {
     backgroundColor: '#fff',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-  },
-  iconText: {
-    fontSize: 20,
-    lineHeight: 22,
+    shadowColor: '#B83255',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 6,
   },
   loungeWrapper: {
     position: 'relative',
