@@ -109,38 +109,46 @@ export default function ProfileScreen() {
       {
         text: 'Take Photo',
         onPress: async () => {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const ImagePicker = require('expo-image-picker');
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert('Permission Required', 'Please allow camera access in Settings to take a photo.');
-            return;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const ImagePicker = require('expo-image-picker');
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Please allow camera access in Settings to take a photo.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled) await uploadPhoto(result.assets[0]);
+          } catch {
+            Alert.alert('Not Available', 'Photo upload requires a new app build. Check back soon.');
           }
-          const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled) await uploadPhoto(result.assets[0]);
         },
       },
       {
         text: 'Choose from Library',
         onPress: async () => {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const ImagePicker = require('expo-image-picker');
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
-            return;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const ImagePicker = require('expo-image-picker');
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled) await uploadPhoto(result.assets[0]);
+          } catch {
+            Alert.alert('Not Available', 'Photo upload requires a new app build. Check back soon.');
           }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled) await uploadPhoto(result.assets[0]);
         },
       },
       { text: 'Cancel', style: 'cancel' },
