@@ -39,8 +39,7 @@
   }],
   "expo-secure-store",
   "expo-video",
-  "expo-image-picker",
-  "react-native-webview"
+  "expo-image-picker"
 ],
     "experiments": {
       "typedRoutes": true
