@@ -16,7 +16,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.betweencovers.app",
-      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
