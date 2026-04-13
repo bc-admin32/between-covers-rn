@@ -50,7 +50,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom }],
+        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }],
         tabBarShowLabel: false,
         tabBarItemStyle: styles.tabBarItem,
       }}
@@ -104,8 +104,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    position: 'absolute',
-    backgroundColor: 'transparent',
+    backgroundColor: '#F0EDE4',
     borderTopWidth: 0,
     elevation: 0,
     height: 88,
