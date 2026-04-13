@@ -84,9 +84,11 @@ export default function LibraryScreen() {
 
         {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.title}>
-            {loaded ? (userName ? `${userName}'s Library` : 'My Library') : ''}
-          </Text>
+          {loaded && (
+            <Text style={styles.title}>
+              {userName ? `${userName}'s Library` : 'My Library'}
+            </Text>
+          )}
           <Text style={styles.subtitle}>Your personal collection</Text>
         </View>
 
@@ -253,7 +255,7 @@ function FilterPill({ label, count, active, onPress }: {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
   header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg },
-  title: { fontSize: 30, color: '#B83255', fontStyle: 'italic', fontWeight: '700' },
+  title: { fontSize: 38, color: '#B83255', fontFamily: 'DancingScript_700Bold' },
   subtitle: { fontSize: 11, color: 'rgba(106,89,105,0.7)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginVertical: spacing.sm },
   filterRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: spacing.sm },
