@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, Image, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert, Animated,
+  StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
+import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -100,11 +101,6 @@ export default function BookDetailsScreen() {
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
   const [savingRating, setSavingRating] = useState(false);
 
-  // One scale Animated.Value per verdict button
-  const verdictAnims = useRef(
-    Object.fromEntries(VERDICTS.map((v) => [v, new Animated.Value(1)]))
-  ).current;
-
   useEffect(() => {
     async function load() {
       try {
@@ -169,12 +165,6 @@ export default function BookDetailsScreen() {
     if (value === 'chefs_kiss') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     else if (value === 'trash') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     else await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Bounce the selected button
-    Animated.sequence([
-      Animated.spring(verdictAnims[value], { toValue: 1.3, useNativeDriver: true, speed: 40, bounciness: 12 }),
-      Animated.spring(verdictAnims[value], { toValue: 1,   useNativeDriver: true, speed: 20, bounciness: 4  }),
-    ]).start();
 
     setUserCommunityRating(value);
     setSavingRating(true);
@@ -332,20 +322,10 @@ export default function BookDetailsScreen() {
             </View>
 
             <Text style={styles.sectionLabel}>{userCommunityRating ? 'Your Verdict' : "What's the Verdict?"}</Text>
-
-            <View style={styles.verdictRow}>
-              {VERDICTS.map((v) => (
-                <Animated.View key={v} style={{ flex: 1, transform: [{ scale: verdictAnims[v] }] }}>
-                  <TouchableOpacity
-                    style={[styles.verdictButton, userCommunityRating === v && styles.verdictButtonActive]}
-                    onPress={() => handleVerdictChange(v)}
-                    disabled={savingRating}
-                  >
-                    <Text style={styles.verdictEmoji}>{VERDICT_DISPLAY[v].emoji}</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              ))}
-            </View>
+            <VerdictRating
+              value={userCommunityRating}
+              onChange={savingRating ? undefined : handleVerdictChange}
+            />
           </View>
 
           <View style={styles.divider} />

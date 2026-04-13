@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
+import { MovieDetailSheet } from './media/index';
 import { apiGet } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 
@@ -216,6 +217,8 @@ export default function CozyScreen() {
   const [data, setData] = useState<CozyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeRecipe, setActiveRecipe] = useState<VisualItem | null>(null);
+  const [activeMovie, setActiveMovie] = useState<VisualItem | null>(null);
+  const [movieSheetOpen, setMovieSheetOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -250,8 +253,8 @@ export default function CozyScreen() {
     }
 
     if (category === 'watch') {
-      const url = item.platforms?.[0]?.deepLink || item.deepLink || item.affiliateLink;
-      if (url) openLink(url);
+      setActiveMovie(item);
+      setMovieSheetOpen(true);
       return;
     }
 
@@ -284,6 +287,14 @@ export default function CozyScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {activeRecipe && (
         <RecipeModal item={activeRecipe} onClose={() => setActiveRecipe(null)} />
+      )}
+      {activeMovie && (
+        <MovieDetailSheet
+          item={activeMovie}
+          visible={movieSheetOpen}
+          onClose={() => { setMovieSheetOpen(false); setTimeout(() => setActiveMovie(null), 350); }}
+          onRatingUpdate={() => {}}
+        />
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>

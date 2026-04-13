@@ -94,11 +94,13 @@ function KissParticle({
   );
 }
 
-// ─── Trash particle (crumpled-paper circle) ──────────────────────────────────
+// ─── Trash particle (crumpled paper ball with word) ──────────────────────────
+
+const TRASH_WORDS = ['skip', 'nope', 'meh', 'bye', 'hard\npass', 'ugh', 'next'];
 
 function TrashParticle({
-  originX, originY, spec,
-}: { originX: number; originY: number; spec: ParticleSpec }) {
+  originX, originY, spec, word,
+}: { originX: number; originY: number; spec: ParticleSpec; word: string }) {
   const x       = useRef(new Animated.Value(0)).current;
   const y       = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
@@ -136,10 +138,19 @@ function TrashParticle({
       width:        spec.size,
       height:       spec.size,
       borderRadius: r,
-      backgroundColor: '#9ca3af',
+      backgroundColor: '#F5F3F0',
+      borderWidth: 1,
+      borderColor: '#D4CFC9',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
       opacity,
       transform: [{ translateX: x }, { translateY: y }, { rotate: rotateStr }, { scale }],
-    }} />
+    }}>
+      <Text style={{ fontSize: spec.size * 0.26, color: '#9ca3af', fontWeight: '700', textAlign: 'center', lineHeight: spec.size * 0.3 }} numberOfLines={2}>
+        {word}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -182,7 +193,7 @@ function ParticleOverlay({
         {specs.map((spec, i) =>
           isKiss
             ? <KissParticle  key={i} originX={state.originX} originY={state.originY} spec={spec} />
-            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} />
+            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} word={TRASH_WORDS[i % TRASH_WORDS.length]} />
         )}
 
         {/* Shaking trash can overlaid at origin */}

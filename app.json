@@ -17,7 +17,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.betweencovers.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Between Covers uses your camera to update your profile photo.",
+        "NSPhotoLibraryUsageDescription": "Between Covers uses your photo library to update your profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "Between Covers saves your photo to your library."
       }
     },
     "android": {
@@ -36,7 +39,8 @@
   }],
   "expo-secure-store",
   "expo-video",
-  "expo-image-picker"
+  "expo-image-picker",
+  "react-native-webview"
 ],
     "experiments": {
       "typedRoutes": true

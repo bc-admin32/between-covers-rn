@@ -75,7 +75,9 @@ const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: str
   chefs_kiss: { emoji: '💋', label: "say Chef's Kiss", color: '#B83255' },
 };
 
-function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
+export { VisualItem, RatingSummary };
+
+export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   item: VisualItem; visible: boolean; onClose: () => void;
   onRatingUpdate: (movieId: string, ratingSummary: RatingSummary | null) => void;
 }) {
