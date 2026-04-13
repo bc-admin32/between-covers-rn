@@ -1,9 +1,29 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+const ACTIVE_COLOR = '#B83255';
+const INACTIVE_COLOR = '#6A5969';
+
+const ICONS: Record<string, { active: string; inactive: string }> = {
+  home:    { active: '⌂',  inactive: '⌂'  },
+  cozy:    { active: '♥',  inactive: '♡'  },
+  library: { active: '☰',  inactive: '☰'  },
+  lounge:  { active: '◉',  inactive: '○'  },
+  profile: { active: '◈',  inactive: '◇'  },
+};
+
+function TabIcon({ name, focused }: { name: keyof typeof ICONS; focused: boolean }) {
+  const icon = ICONS[name];
+  return (
+    <View style={[styles.iconContainer, focused && styles.iconActive]}>
+      <Text style={[styles.iconText, { color: focused ? ACTIVE_COLOR : INACTIVE_COLOR }]}>
+        {focused ? icon.active : icon.inactive}
+      </Text>
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const [hasLiveEvent, setHasLiveEvent] = useState(false);
@@ -11,9 +31,7 @@ export default function TabLayout() {
 
   useEffect(() => {
     apiGet<{ events: { status: string }[] }>('/live?status=ACTIVE')
-      .then((res) => {
-        setHasLiveEvent(res.events.some((e) => e.status === 'ACTIVE'));
-      })
+      .then((res) => setHasLiveEvent(res.events.some((e) => e.status === 'ACTIVE')))
       .catch(() => {});
   }, []);
 
@@ -22,16 +40,15 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom }],
-        tabBarActiveTintColor: '#B83255',
-        tabBarInactiveTintColor: '#6A5969',
         tabBarShowLabel: false,
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />
+            <TabIcon name="home" focused={focused} />
           ),
         }}
       />
@@ -39,7 +56,7 @@ export default function TabLayout() {
         name="cozy"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'heart' : 'heart-outline'} focused={focused} />
+            <TabIcon name="cozy" focused={focused} />
           ),
         }}
       />
@@ -47,7 +64,7 @@ export default function TabLayout() {
         name="library"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'book' : 'book-outline'} focused={focused} />
+            <TabIcon name="library" focused={focused} />
           ),
         }}
       />
@@ -55,8 +72,8 @@ export default function TabLayout() {
         name="lounge"
         options={{
           tabBarIcon: ({ focused }) => (
-            <View>
-              <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />
+            <View style={styles.loungeWrapper}>
+              <TabIcon name="lounge" focused={focused} />
               {hasLiveEvent && !focused && <View style={styles.dot} />}
             </View>
           ),
@@ -66,23 +83,11 @@ export default function TabLayout() {
         name="profile"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />
+            <TabIcon name="profile" focused={focused} />
           ),
         }}
       />
     </Tabs>
-  );
-}
-
-function TabIcon({ name, focused }: { name: any; focused: boolean }) {
-  return (
-    <View style={[styles.iconContainer, focused && styles.iconActive]}>
-      <Ionicons
-        name={name}
-        size={22}
-        color={focused ? '#B83255' : '#6A5969'}
-      />
-    </View>
   );
 }
 
@@ -93,6 +98,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     elevation: 0,
     height: 88,
+  },
+  tabBarItem: {
+    overflow: 'visible',
   },
   iconContainer: {
     width: 48,
@@ -111,6 +119,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     shadowOpacity: 0.18,
     shadowRadius: 16,
+  },
+  iconText: {
+    fontSize: 20,
+    lineHeight: 22,
+  },
+  loungeWrapper: {
+    position: 'relative',
   },
   dot: {
     position: 'absolute',

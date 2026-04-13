@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, Image, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, ActivityIndicator, Alert, Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -100,6 +100,11 @@ export default function BookDetailsScreen() {
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
   const [savingRating, setSavingRating] = useState(false);
 
+  // One scale Animated.Value per verdict button
+  const verdictAnims = useRef(
+    Object.fromEntries(VERDICTS.map((v) => [v, new Animated.Value(1)]))
+  ).current;
+
   useEffect(() => {
     async function load() {
       try {
@@ -164,6 +169,13 @@ export default function BookDetailsScreen() {
     if (value === 'chefs_kiss') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     else if (value === 'trash') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     else await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Bounce the selected button
+    Animated.sequence([
+      Animated.spring(verdictAnims[value], { toValue: 1.3, useNativeDriver: true, speed: 40, bounciness: 12 }),
+      Animated.spring(verdictAnims[value], { toValue: 1,   useNativeDriver: true, speed: 20, bounciness: 4  }),
+    ]).start();
+
     setUserCommunityRating(value);
     setSavingRating(true);
     try {
@@ -323,14 +335,15 @@ export default function BookDetailsScreen() {
 
             <View style={styles.verdictRow}>
               {VERDICTS.map((v) => (
-                <TouchableOpacity
-                  key={v}
-                  style={[styles.verdictButton, userCommunityRating === v && styles.verdictButtonActive]}
-                  onPress={() => handleVerdictChange(v)}
-                  disabled={savingRating}
-                >
-                  <Text style={styles.verdictEmoji}>{VERDICT_DISPLAY[v].emoji}</Text>
-                </TouchableOpacity>
+                <Animated.View key={v} style={{ flex: 1, transform: [{ scale: verdictAnims[v] }] }}>
+                  <TouchableOpacity
+                    style={[styles.verdictButton, userCommunityRating === v && styles.verdictButtonActive]}
+                    onPress={() => handleVerdictChange(v)}
+                    disabled={savingRating}
+                  >
+                    <Text style={styles.verdictEmoji}>{VERDICT_DISPLAY[v].emoji}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
               ))}
             </View>
           </View>
@@ -364,7 +377,7 @@ export default function BookDetailsScreen() {
       {/* IRIS FAB */}
       <TouchableOpacity
         style={[styles.irisFab, { bottom: 100 + insets.bottom }]}
-        onPress={() => router.push(`/(tabs)/lounge?from=library&bookTitle=${encodeURIComponent(work.title)}&author=${encodeURIComponent(work.primaryAuthor)}` as any)}
+        onPress={() => router.push(`/iris/chat?from=library/details&bookTitle=${encodeURIComponent(work.title)}&author=${encodeURIComponent(work.primaryAuthor)}` as any)}
       >
         <Image
           source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
@@ -433,7 +446,7 @@ const styles = StyleSheet.create({
   ratingCount: { fontSize: 11, color: '#A9C0D4', marginTop: 6 },
   ratingEmpty: { fontSize: 18, fontStyle: 'italic', color: '#A9C0D4' },
   verdictRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  verdictButton: { flex: 1, height: 48, borderRadius: radius.md, backgroundColor: 'rgba(15,42,72,0.05)', alignItems: 'center', justifyContent: 'center' },
+  verdictButton: { height: 48, borderRadius: radius.md, backgroundColor: 'rgba(15,42,72,0.05)', alignItems: 'center', justifyContent: 'center' },
   verdictButtonActive: { backgroundColor: 'rgba(184,50,85,0.15)', borderWidth: 1.5, borderColor: '#B83255' },
   verdictEmoji: { fontSize: 22 },
   purchaseSection: { marginBottom: spacing.md },

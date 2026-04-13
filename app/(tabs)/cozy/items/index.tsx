@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
-  StyleSheet, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator, Image, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,9 +73,6 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
       <View style={styles.recipeSheet}>
         <View style={styles.sheetHandle} />
-        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
-          <Text style={styles.sheetCloseText}>✕</Text>
-        </TouchableOpacity>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.recipeContent}>
           {item.imageUrl && (
@@ -111,6 +108,11 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
 
           <View style={{ height: spacing.xl }} />
         </ScrollView>
+
+        {/* Rendered after ScrollView so it sits on top in the hit-test order */}
+        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
+          <Text style={styles.sheetCloseText}>✕</Text>
+        </TouchableOpacity>
       </View>
     </Modal>
   );
@@ -154,7 +156,7 @@ export default function CozyItemsScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
             <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
           <View>
@@ -226,7 +228,10 @@ export default function CozyItemsScreen() {
                       style={[styles.ctaButton, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
                       onPress={() => {
                         if (isRecipe) { setActiveRecipe(item); return; }
-                        if (actionLink) WebBrowser.openBrowserAsync(actionLink);
+                        if (actionLink) {
+                          const isSpotify = actionLink.includes('spotify.com') || actionLink.startsWith('spotify:');
+                          isSpotify ? Linking.openURL(actionLink) : WebBrowser.openBrowserAsync(actionLink);
+                        }
                       }}
                       disabled={!isRecipe && !actionLink}
                     >

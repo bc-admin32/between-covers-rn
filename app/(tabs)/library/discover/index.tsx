@@ -98,7 +98,7 @@ export default function LibraryDiscoverScreen() {
         </View>
         <TouchableOpacity
           style={styles.irisButton}
-          onPress={() => router.push('/(tabs)/lounge?from=library/discover' as any)}
+          onPress={() => router.push('/iris/chat?from=library/discover' as any)}
         >
           <Image
             source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}

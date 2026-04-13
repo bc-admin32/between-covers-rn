@@ -289,7 +289,7 @@ export default function IrisThoughtsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EDE9DF' },
+  container: { flex: 1, backgroundColor: '#F0EDE4' },
   header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexShrink: 0 },
   headerTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, color: '#6A5550', textAlign: 'center' },
   backLinkText: { fontSize: 14, color: '#B83255', textDecorationLine: 'underline' },
   loadingText: { fontSize: 14, color: '#B09A7E', marginTop: spacing.sm },
-  composer: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#EDE9DF', paddingTop: spacing.sm },
+  composer: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4', paddingTop: spacing.sm },
   emojiTray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
   emojiButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center' },
   emojiText: { fontSize: 18 },

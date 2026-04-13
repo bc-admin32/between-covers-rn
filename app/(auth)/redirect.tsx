@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { normalizeRoute } from '../../lib/routes';
 import { colors } from '../../lib/theme';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -82,7 +83,7 @@ export default function RedirectScreen() {
         setStatus(`Routing to ${result?.nextRoute}…`);
 
         if (result?.nextRoute?.startsWith('/')) {
-          router.replace(result.nextRoute as any);
+          router.replace(normalizeRoute(result.nextRoute) as any);
         } else {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');
         }

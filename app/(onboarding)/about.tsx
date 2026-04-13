@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { apiPost } from '../../lib/api';
+import { normalizeRoute } from '../../lib/routes';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { radius, spacing } from '../../lib/theme';
 
 export default function AboutScreen() {
@@ -32,7 +33,7 @@ export default function AboutScreen() {
     try {
       const res = await apiPost('/onboarding/submit', { step: 'L9Com', value: 'ACK' });
       if (res?.nextRoute) {
-        router.replace(res.nextRoute as any);
+        router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
     } catch {}
@@ -66,7 +67,7 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   video: { ...StyleSheet.absoluteFillObject },
   buttonContainer: {
     position: 'absolute',
@@ -89,9 +90,9 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
     color: '#180448',
     letterSpacing: 0.5,
+    fontFamily: 'DancingScript_700Bold',
   },
 });

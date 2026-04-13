@@ -146,7 +146,7 @@ export default function LoungeArchiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EDE9DF' },
+  container: { flex: 1, backgroundColor: '#F0EDE4' },
   scrollContent: { paddingBottom: 100 },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },

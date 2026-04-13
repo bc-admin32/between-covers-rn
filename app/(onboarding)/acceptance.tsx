@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiPost } from '../../lib/api';
+import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -27,7 +28,7 @@ export default function AcceptanceScreen() {
     try {
       const res = await apiPost('/onboarding/submit', { step: 'L2Acc' });
       if (res?.nextRoute) {
-        router.replace(res.nextRoute as any);
+        router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
     } catch {}

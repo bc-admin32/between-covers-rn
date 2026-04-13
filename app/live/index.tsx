@@ -213,7 +213,7 @@ export default function LiveEventsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EDE9DF' },
+  container: { flex: 1, backgroundColor: '#F1F4F8' },
   scrollContent: { paddingBottom: spacing.xl },
   loadingText: { fontSize: 14, color: '#B09A7E', marginTop: spacing.sm },
   header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },

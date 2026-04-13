@@ -30,7 +30,11 @@
     },
     "plugins": [
   "expo-router",
-  "expo-font",
+  ["expo-font", {
+    "fonts": [
+      "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"
+    ]
+  }],
   "expo-secure-store",
   "expo-video",
   "expo-image-picker"

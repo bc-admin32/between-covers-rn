@@ -7,10 +7,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { apiGet, apiPost } from '../../../lib/api';
+import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
 
 const CACHE_KEY = 'bc_home_cache';
+const BG_CACHE_KEY = 'bc_home_bg';
+const DEFAULT_BG = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/loc_default.jpg';
 
 type LiveEvent = {
   eventId: string;
@@ -35,16 +38,42 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
+  const [bgUrl, setBgUrl] = useState(DEFAULT_BG);
+
+  // Restore the user's last known background immediately from cache
+  // so returning users never see the default background flash.
+  useEffect(() => {
+    SecureStore.getItemAsync(BG_CACHE_KEY).then((cached) => {
+      if (cached) setBgUrl(cached);
+    });
+  }, []);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [watched, setWatched] = useState(false);
   const markedRef = useRef(false);
+  const overlayOpenRef = useRef(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const player = useVideoPlayer(
     data?.irisDaily?.videoUrl ?? '',
     (p) => { p.loop = false; }
   );
+
+  // Keep ref in sync so the playingChange listener always reads fresh state
+  useEffect(() => { overlayOpenRef.current = overlayOpen; }, [overlayOpen]);
+
+  // Auto-close the video overlay when the clip finishes playing naturally
+  useEffect(() => {
+    const sub = player.addListener('playingChange', ({ isPlaying }: { isPlaying: boolean }) => {
+      if (!isPlaying && overlayOpenRef.current) {
+        setOverlayOpen(false);
+        setWatched(true);
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
 
   useEffect(() => {
     Animated.loop(
@@ -57,6 +86,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const load = async () => {
+      setLoadError(false);
       try {
         const cached = await SecureStore.getItemAsync(CACHE_KEY);
         if (cached) {
@@ -65,15 +95,22 @@ export default function HomeScreen() {
         }
         const json = await apiGet<HomeData>('/home/resolve');
         if (json.nextRoute?.startsWith('/')) {
-          router.replace(json.nextRoute as any);
+          router.replace(normalizeRoute(json.nextRoute) as any);
           return;
         }
         setData(json);
+        // Update and persist the background from the live API response.
+        if (json.background?.imageUrl) {
+          setBgUrl(json.background.imageUrl);
+          SecureStore.setItemAsync(BG_CACHE_KEY, json.background.imageUrl).catch(() => {});
+        }
         await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(json));
-      } catch {}
+      } catch {
+        setLoadError(true);
+      }
     };
     load();
-  }, []);
+  }, [retryCount]);
 
   useEffect(() => {
     apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
@@ -84,11 +121,25 @@ export default function HomeScreen() {
       .catch(() => {});
   }, []);
 
-  if (!data) {
+  if (!data && loadError) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#B83255" />
+        <Text style={styles.errorText}>Couldn't load your home right now.</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => setRetryCount((c) => c + 1)}
+        >
+          <Text style={styles.retryText}>Try Again</Text>
+        </TouchableOpacity>
       </View>
+    );
+  }
+
+  if (!data) {
+    return (
+      <ImageBackground source={{ uri: DEFAULT_BG }} style={styles.loading} imageStyle={{ opacity: 0.75 }}>
+        <ActivityIndicator color="#B83255" />
+      </ImageBackground>
     );
   }
 
@@ -124,7 +175,7 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground
-      source={{ uri: data.background.imageUrl }}
+      source={{ uri: bgUrl }}
       style={styles.container}
       imageStyle={{ opacity: 0.75 }}
     >
@@ -170,7 +221,7 @@ export default function HomeScreen() {
               ) : watched ? (
                 <TouchableOpacity
                   style={styles.irisButton}
-                  onPress={() => router.push('/(tabs)/lounge' as any)}
+                  onPress={() => router.push('/iris/chat' as any)}
                 >
                   <Image
                     source={{ uri: iris.staticImageUrl ?? 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
@@ -195,7 +246,7 @@ export default function HomeScreen() {
           {iris.mode === 'static' && (
             <TouchableOpacity
               style={styles.irisButton}
-              onPress={() => router.push('/(tabs)/lounge' as any)}
+              onPress={() => router.push('/iris/chat' as any)}
             >
               <Image
                 source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
@@ -213,7 +264,10 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6E6EA' },
-  loading: { flex: 1, backgroundColor: '#F6E6EA', alignItems: 'center', justifyContent: 'center' },
+  loading: { flex: 1, backgroundColor: '#F6E6EA', alignItems: 'center', justifyContent: 'center', gap: 16 },
+  errorText: { fontSize: 15, color: '#6A5969', textAlign: 'center', paddingHorizontal: 32 },
+  retryButton: { paddingHorizontal: 28, paddingVertical: 10, borderRadius: 999, backgroundColor: '#B83255' },
+  retryText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   content: { flex: 1, alignItems: 'center' },
   greeting: {
     fontSize: 34,
@@ -223,7 +277,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
-    fontStyle: 'italic',
+    fontFamily: 'DancingScript_400Regular',
   },
   center: {
     flex: 1,

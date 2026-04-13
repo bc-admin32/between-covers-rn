@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../../lib/api';
 import { spacing, colors } from '../../../lib/theme';
 
+const API_BASE = 'https://api.betweencovers.app';
+
 const DEFAULT_PHOTO = 'https://cdn.betweencovers.app/default_profile_image.jpg';
 
 const GENRE_LABELS: Record<string, string> = {
@@ -78,8 +80,71 @@ export default function ProfileScreen() {
     load();
   }, []);
 
+  const uploadPhoto = async (asset: any) => {
+    try {
+      const token = await SecureStore.getItemAsync('bc_id_token');
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: asset.uri,
+        type: asset.mimeType ?? 'image/jpeg',
+        name: 'photo.jpg',
+      } as any);
+      const res = await fetch(`${API_BASE}/profile/photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setUser((prev: any) => ({ ...prev, photoUrl: data.photoUrl }));
+      await SecureStore.setItemAsync('bc_profile_cache', JSON.stringify({ ...user, photoUrl: data.photoUrl }));
+    } catch {
+      Alert.alert('Upload Failed', 'Could not update your photo. Please try again.');
+    }
+  };
+
   const handlePhotoUpload = async () => {
-    // Photo upload available after next build
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Update Photo', 'Choose how to add your photo', [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const ImagePicker = require('expo-image-picker');
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Please allow camera access in Settings to take a photo.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled) await uploadPhoto(result.assets[0]);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const ImagePicker = require('expo-image-picker');
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled) await uploadPhoto(result.assets[0]);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleLogout = async () => {

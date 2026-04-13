@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { apiPost } from '../../lib/api';
+import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 
 export default function WelcomeScreen() {
@@ -30,7 +32,7 @@ export default function WelcomeScreen() {
     try {
       const res = await apiPost('/onboarding/submit', { step: 'L1Wel' });
       if (res?.nextRoute) {
-        router.replace(res.nextRoute as any);
+        router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
     } catch {}
@@ -70,7 +72,7 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   video: { flex: 1 },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -121,7 +123,7 @@ const styles = StyleSheet.create({
   },
   continueText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontFamily: 'DancingScript_700Bold',
   },
 });

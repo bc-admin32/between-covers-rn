@@ -3,9 +3,9 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } fr
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { normalizeRoute } from '../../lib/routes';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
 import { colors, spacing, radius } from '../../lib/theme';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -30,41 +30,6 @@ export default function LoginScreen() {
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [checking, setChecking] = useState(true);
 
- useEffect(() => {
-  Linking.getInitialURL().then((url) => {
-    console.log('Initial URL:', url);
-  });
-
-  const sub = Linking.addEventListener('url', ({ url }) => {
-    console.log('Deep link received:', url);
-  });
-
-  return () => sub.remove();
-}, []);
-  useEffect(() => {
-  const handleDeepLink = ({ url }: { url: string }) => {
-  console.log('GOT URL:', url);
-  if (url.includes('redirect')) {
-    try {
-      const code = new URL(url).searchParams.get('code');
-      console.log('CODE:', code);
-      if (code) {
-        router.push(`/(auth)/redirect?code=${code}` as any);
-      }
-    } catch (e) {
-      console.log('URL parse error:', e);
-    }
-  }
-};
-
-  const subscription = Linking.addEventListener('url', handleDeepLink);
-
-  Linking.getInitialURL().then((url) => {
-    if (url) handleDeepLink({ url });
-  });
-
-  return () => subscription.remove();
-}, []);
   useEffect(() => {
     async function checkBiometric() {
       try {
@@ -72,8 +37,12 @@ export default function LoginScreen() {
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         if (compatible && enrolled) {
           setBiometricAvailable(true);
+          // Only show the Face ID button when the user has completed a full auth
+          // flow before. bc_biometric_enabled is set in redirect.tsx after a
+          // successful token exchange — stale/partial tokens won't trigger it.
+          const biometricEnabled = await SecureStore.getItemAsync('bc_biometric_enabled');
           const idToken = await SecureStore.getItemAsync('bc_id_token');
-          if (idToken) setHasSavedCredentials(true);
+          if (idToken && biometricEnabled === 'true') setHasSavedCredentials(true);
         }
       } catch {} finally {
         setChecking(false);
@@ -101,16 +70,22 @@ export default function LoginScreen() {
       });
       const data = await res.json();
       if (data?.nextRoute?.startsWith('/')) {
-        router.replace(data.nextRoute as any);
+        router.replace(normalizeRoute(data.nextRoute) as any);
       }
     } catch {}
   }
 
   async function handleSocialLogin(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple') {
-  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  const url = buildCognitoUrl(provider);
-  await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
-}
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const url = buildCognitoUrl(provider);
+    const result = await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
+    if (result.type === 'success') {
+      try {
+        const code = new URL(result.url).searchParams.get('code');
+        if (code) router.push(`/(auth)/redirect?code=${code}` as any);
+      } catch {}
+    }
+  }
 
   if (checking) {
     return (

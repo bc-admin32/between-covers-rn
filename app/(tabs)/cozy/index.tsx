@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image,
+  View, Text, TouchableOpacity, ScrollView, Modal,
+  StyleSheet, ActivityIndicator, Image, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import * as Haptics from 'expo-haptics';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
-import { getPlatform } from '../../../lib/platforms';
-import VerdictRating, { Verdict } from '../../../components/rating/VerdictRating';
 
 const CACHE_KEY = 'bc_cozy_cache';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+
+/* ─── TYPES ─── */
 
 type BookItem = {
   workId: string;
@@ -55,6 +54,8 @@ type CozyData = {
   };
 };
 
+/* ─── HELPERS ─── */
+
 function getDailyBookSlice(books: BookItem[]): BookItem[] {
   if (!books || books.length === 0) return [];
   const now = new Date();
@@ -62,8 +63,7 @@ function getDailyBookSlice(books: BookItem[]): BookItem[] {
   const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
   const totalGroups = Math.ceil(books.length / 3);
   const groupIndex = dayOfYear % totalGroups;
-  const startIdx = groupIndex * 3;
-  return books.slice(startIdx, startIdx + 3);
+  return books.slice(groupIndex * 3, groupIndex * 3 + 3);
 }
 
 function resolveLifestyleItems(sections: CozyData['sections']): VisualItem[] {
@@ -76,6 +76,86 @@ function resolveLifestyleItems(sections: CozyData['sections']): VisualItem[] {
   ].filter(Array.isArray) as VisualItem[][];
   return candidates.reduce<VisualItem[]>((best, cur) => (cur.length >= best.length ? cur : best), []);
 }
+
+function isPromoActive(endDate?: string): boolean {
+  if (!endDate) return false;
+  return new Date() <= new Date(endDate);
+}
+
+function openLink(url: string) {
+  const isHttp = url.startsWith('http://') || url.startsWith('https://');
+  isHttp
+    ? WebBrowser.openBrowserAsync(url).catch(() => {})
+    : Linking.openURL(url).catch(() => {});
+}
+
+/* ─── PROMO CODE ─── */
+
+function PromoCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <View style={styles.promoContainer}>
+      <View style={styles.promoText}>
+        <Text style={styles.promoLabel}>Use code</Text>
+        <Text style={styles.promoCode} numberOfLines={1}>{code}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.promoCopyButton, copied && styles.promoCopyButtonActive]}
+        onPress={() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      >
+        <Text style={[styles.promoCopyText, copied && styles.promoCopyTextActive]}>
+          {copied ? 'Copied!' : 'Copy'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* ─── RECIPE MODAL ─── */
+
+function RecipeModal({ item, onClose }: { item: VisualItem; onClose: () => void }) {
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <View style={styles.recipeSheet}>
+        <View style={styles.sheetHandle} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.recipeContent}>
+          {item.imageUrl && (
+            <View style={styles.recipeImage}>
+              <Image source={{ uri: item.imageUrl }} style={styles.recipeImageImg} resizeMode="cover" />
+            </View>
+          )}
+          <Text style={styles.recipeLabel}>🍽️ Recipe</Text>
+          <Text style={styles.recipeTitle}>{item.title}</Text>
+          <View style={styles.recipeDivider} />
+          {item.description
+            ? <Text style={styles.recipeBody}>{item.description}</Text>
+            : <Text style={styles.recipeEmpty}>Recipe details coming soon.</Text>
+          }
+          {item.promo?.discountCode && isPromoActive(item.promo?.endDate) && (
+            <View style={{ marginTop: spacing.lg }}>
+              <PromoCode code={item.promo.discountCode} />
+            </View>
+          )}
+          {item.affiliateLink && (
+            <TouchableOpacity
+              style={styles.shopButton}
+              onPress={() => WebBrowser.openBrowserAsync(item.affiliateLink!)}
+            >
+              <Text style={styles.shopButtonText}>Shop Ingredients →</Text>
+            </TouchableOpacity>
+          )}
+          <View style={{ height: spacing.xl }} />
+        </ScrollView>
+        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
+          <Text style={styles.sheetCloseText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+/* ─── SHARED COMPONENTS ─── */
 
 function Divider() {
   return (
@@ -112,23 +192,30 @@ function SmallBookCard({ book, onPress }: { book: BookItem; onPress: () => void 
   );
 }
 
-function MediaCard({ item, onPress }: { item: VisualItem; onPress: () => void }) {
+// Unified card — same layout for both Visual Escapes and Cozy Lifestyle Picks.
+// Category label + title only; no platform logos, no streaming badges.
+function ItemCard({ item, onPress }: { item: VisualItem; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.mediaCard} onPress={onPress}>
-      <View style={styles.mediaCover}>
-        <Image source={{ uri: item.imageUrl }} style={styles.mediaCoverImage} />
+    <TouchableOpacity style={styles.itemCard} onPress={onPress}>
+      <View style={styles.itemCover}>
+        <Image source={{ uri: item.imageUrl }} style={styles.itemCoverImage} />
       </View>
-      {item.category && <Text style={styles.mediaCategory}>{item.category}</Text>}
-      <Text style={styles.mediaTitle} numberOfLines={2}>{item.title}</Text>
+      {item.category && (
+        <Text style={styles.itemCategory}>{item.category}</Text>
+      )}
+      <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
     </TouchableOpacity>
   );
 }
+
+/* ─── MAIN SCREEN ─── */
 
 export default function CozyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<CozyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeRecipe, setActiveRecipe] = useState<VisualItem | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -149,15 +236,34 @@ export default function CozyScreen() {
     load();
   }, []);
 
-  const handleItemPress = async (item: VisualItem) => {
+  // Mirrors the web handleItemClick — category drives the action
+  const handleItemClick = (item: VisualItem) => {
     const category = item.category?.toLowerCase();
-    if (category === 'recipe') return;
+
+    if (category === 'recipe') { setActiveRecipe(item); return; }
     if (category === 'event') { router.push('/(tabs)/cozy/events' as any); return; }
 
-    const pl = item.platforms?.[0];
-    const url = pl?.deepLink || getPlatform(pl?.platformId ?? '')?.baseUrl
-      || item.spotifyLink || item.deepLink || item.affiliateLink;
-    if (url) await WebBrowser.openBrowserAsync(url);
+    if (category === 'view') {
+      const url = item.deepLink || item.affiliateLink;
+      if (url) openLink(url);
+      return;
+    }
+
+    if (category === 'watch') {
+      const url = item.platforms?.[0]?.deepLink || item.deepLink || item.affiliateLink;
+      if (url) openLink(url);
+      return;
+    }
+
+    if (category === 'playlist') {
+      const url = item.spotifyLink || item.platforms?.[0]?.deepLink || item.deepLink || item.affiliateLink;
+      if (url) openLink(url);
+      return;
+    }
+
+    // Default: open best available link
+    const url = item.platforms?.[0]?.deepLink || item.deepLink || item.affiliateLink;
+    if (url) openLink(url);
   };
 
   if (loading) {
@@ -176,6 +282,10 @@ export default function CozyScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {activeRecipe && (
+        <RecipeModal item={activeRecipe} onClose={() => setActiveRecipe(null)} />
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* HEADER */}
@@ -279,10 +389,10 @@ export default function CozyScreen() {
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
               {visual.map((item, i) => (
-                <MediaCard
+                <ItemCard
                   key={item?.sk ?? i}
                   item={item}
-                  onPress={() => handleItemPress(item)}
+                  onPress={() => handleItemClick(item)}
                 />
               ))}
             </ScrollView>
@@ -298,10 +408,10 @@ export default function CozyScreen() {
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
               {lifestyle.map((item, i) => (
-                <MediaCard
+                <ItemCard
                   key={item?.sk ?? i}
                   item={item}
-                  onPress={() => handleItemPress(item)}
+                  onPress={() => handleItemClick(item)}
                 />
               ))}
             </ScrollView>
@@ -356,9 +466,35 @@ const styles = StyleSheet.create({
   smallBookCoverImage: { width: '100%', height: '100%' },
   smallBookTitle: { marginTop: 10, fontSize: 13, fontWeight: '400', color: '#0F2A48', lineHeight: 18 },
   smallBookAuthor: { fontSize: 11, color: '#6A5969', marginTop: 3, fontWeight: '300' },
-  mediaCard: { width: 120, flexShrink: 0, backgroundColor: '#fff', borderRadius: 16, padding: 12, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#f0ede4' },
-  mediaCover: { width: '100%', height: 100, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E6EAF0' },
-  mediaCoverImage: { width: '100%', height: '100%' },
-  mediaCategory: { marginTop: 8, fontSize: 9, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: '#9c8f7e' },
-  mediaTitle: { marginTop: 3, fontSize: 13, fontWeight: '400', color: '#0F2A48', lineHeight: 18 },
+  // Unified item card — same layout for both Visual Escapes and Cozy Lifestyle Picks
+  itemCard: { width: 120, flexShrink: 0, backgroundColor: '#fff', borderRadius: 16, padding: 12, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#f0ede4' },
+  itemCover: { width: '100%', height: 100, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E6EAF0' },
+  itemCoverImage: { width: '100%', height: '100%' },
+  itemCategory: { marginTop: 8, fontSize: 9, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: '#9c8f7e' },
+  itemTitle: { marginTop: 3, fontSize: 13, fontWeight: '400', color: '#0F2A48', lineHeight: 18 },
+  // Recipe modal
+  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,42,72,0.5)', zIndex: 40 },
+  recipeSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FDFAF6', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%', zIndex: 50 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#D7E2E9', alignSelf: 'center', marginTop: 12 },
+  sheetClose: { position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
+  sheetCloseText: { fontSize: 14, color: '#0F2A48', fontWeight: '600' },
+  recipeContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  recipeImage: { marginHorizontal: -spacing.lg, marginBottom: spacing.md, aspectRatio: 16 / 9, overflow: 'hidden', borderRadius: 16 },
+  recipeImageImg: { width: '100%', height: '100%' },
+  recipeLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 6 },
+  recipeTitle: { fontSize: 26, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 32, marginBottom: spacing.md },
+  recipeDivider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginBottom: spacing.lg },
+  recipeBody: { fontSize: 14, fontWeight: '300', color: '#3d352e', lineHeight: 25 },
+  recipeEmpty: { fontSize: 14, fontStyle: 'italic', color: '#9c8f7e' },
+  shopButton: { marginTop: spacing.lg, paddingVertical: 14, borderRadius: 999, backgroundColor: '#0F2A48', alignItems: 'center' },
+  shopButtonText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  // Promo code
+  promoContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fde8ed', borderRadius: 8, padding: 6, marginTop: 4 },
+  promoText: { flex: 1 },
+  promoLabel: { fontSize: 9, fontWeight: '700', color: '#B83255', letterSpacing: 0.6, textTransform: 'uppercase', lineHeight: 14 },
+  promoCode: { fontSize: 12, fontWeight: '700', color: '#B83255' },
+  promoCopyButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#B83255', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  promoCopyButtonActive: { backgroundColor: '#B83255' },
+  promoCopyText: { fontSize: 10, fontWeight: '600', color: '#B83255' },
+  promoCopyTextActive: { color: '#fff' },
 });

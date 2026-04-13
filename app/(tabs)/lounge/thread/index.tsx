@@ -147,7 +147,7 @@ export default function LoungeThreadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const threadId = id ? decodeURIComponent(id) : null;
+  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -404,7 +404,7 @@ export default function LoungeThreadScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EDE9DF' },
+  container: { flex: 1, backgroundColor: '#F0EDE4' },
   header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexShrink: 0 },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
   backArrow: { fontSize: 20, color: '#6A5550' },
@@ -461,12 +461,12 @@ const styles = StyleSheet.create({
   editCancelText: { fontSize: 11, fontWeight: '600', color: '#6A5550' },
   editSaveButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#B83255' },
   editSaveText: { fontSize: 11, fontWeight: '600', color: '#fff' },
-  closedBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, alignItems: 'center', gap: spacing.xs, borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#EDE9DF' },
+  closedBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, alignItems: 'center', gap: spacing.xs, borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4' },
   closedPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(196,168,130,0.15)', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(196,168,130,0.3)' },
   closedEmoji: { fontSize: 16 },
   closedText: { fontSize: 13, color: '#B09A7E' },
   closedSubtext: { fontSize: 11, color: '#C4A882' },
-  composer: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#EDE9DF', paddingTop: spacing.sm },
+  composer: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4', paddingTop: spacing.sm },
   replyingToBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   replyingToText: { fontSize: 11, color: '#C4A882' },
   replyingToName: { fontWeight: '600', color: '#B83255' },

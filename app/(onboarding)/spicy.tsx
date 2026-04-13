@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { apiPost } from '../../lib/api';
+import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
+
 
 
 const SPICE_LEVELS = [
@@ -40,7 +42,7 @@ export default function SpicyScreen() {
     try {
       const res = await apiPost('/onboarding/submit', { step: 'L8Spi', value });
       if (res?.nextRoute) {
-        router.replace(res.nextRoute as any);
+        router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
     } catch {}
@@ -80,7 +82,7 @@ export default function SpicyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   video: { ...StyleSheet.absoluteFillObject },
   optionsContainer: {
     position: 'absolute',

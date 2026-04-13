@@ -154,7 +154,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>💬 Chiming in</Text>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => router.push(`/(tabs)/lounge/thread?id=${encodeURIComponent(primary.threadId)}` as any)}
+                onPress={() => router.push({ pathname: '/(tabs)/lounge/thread', params: { id: primary.threadId } } as any)}
               >
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
@@ -173,7 +173,7 @@ export default function LoungeScreen() {
             <Text style={styles.cardDescription}>{secondary.description}</Text>
             <TouchableOpacity
               style={styles.outlineButton}
-              onPress={() => router.push(`/(tabs)/lounge/thread?id=${encodeURIComponent(secondary.threadId)}` as any)}
+              onPress={() => router.push({ pathname: '/(tabs)/lounge/thread', params: { id: secondary.threadId } } as any)}
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
@@ -191,11 +191,13 @@ export default function LoungeScreen() {
               </View>
             </View>
             <Text style={styles.cardDescription}>{iris.body}</Text>
-            <View style={styles.cardFooter}>
+            <View style={styles.irisCardFooter}>
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => iris?.threadId && router.push(`/(tabs)/lounge/thread?id=${encodeURIComponent(iris.threadId)}` as any)}
+                style={styles.irisCtaButton}
+                onPress={() => iris?.threadId
+                  ? router.push({ pathname: '/(tabs)/lounge/thread', params: { id: iris.threadId } } as any)
+                  : undefined}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
@@ -333,7 +335,7 @@ export default function LoungeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EDE9DF' },
+  container: { flex: 1, backgroundColor: '#F0EDE4' },
   scrollContent: { paddingBottom: spacing.xl },
   header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
   weekLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: '#C4A882', fontWeight: '600', marginBottom: spacing.sm },
@@ -353,6 +355,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 23, color: '#1A1A2E', fontStyle: 'italic', fontWeight: '600', lineHeight: 28, marginBottom: spacing.sm },
   cardDescription: { fontSize: 13, color: '#6A5550', lineHeight: 20, marginBottom: spacing.md },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  irisCardFooter: { flexDirection: 'column', gap: spacing.sm, marginTop: spacing.xs },
+  irisCtaButton: { backgroundColor: '#B83255', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, alignSelf: 'flex-start' },
   cardFooterNote: { fontSize: 11, color: '#B09A7E' },
   primaryButton: { backgroundColor: '#B83255', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10 },
   primaryButtonDisabled: { backgroundColor: '#D4B5BF' },
@@ -379,7 +383,7 @@ const styles = StyleSheet.create({
   pollResultLabelSelected: { color: '#B83255', fontWeight: '700' },
   pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E' },
   pollResultPctSelected: { color: '#B83255' },
-  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#EDE9DF', overflow: 'hidden' },
+  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden' },
   pollBarFill: { height: 8, borderRadius: 4 },
   pollVoteCount: { textAlign: 'center', fontSize: 11, color: '#B09A7E', marginTop: spacing.md },
   monthlyCard: { backgroundColor: '#1A1A2E', borderColor: '#C4A882' },

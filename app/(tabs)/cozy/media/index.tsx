@@ -91,6 +91,7 @@ function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
     setDetail(null);
     apiGet(`/cozy/media/${item.movieId}`)
       .then((res: any) => {
+        console.log('[VisualEscapes] platforms from API:', JSON.stringify(res.movie?.platforms));
         setDetail(res.movie);
         setRatingSummary(res.ratingSummary);
         setUserRating(res.userRating);
@@ -128,9 +129,6 @@ function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
       <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={onClose} />
       <View style={styles.sheet}>
         <View style={styles.sheetHandle} />
-        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
-          <Text style={styles.sheetCloseText}>✕</Text>
-        </TouchableOpacity>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
           {/* COVER + INFO */}
@@ -269,6 +267,11 @@ function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
           <View style={{ height: spacing.xl }} />
         </ScrollView>
+
+        {/* Rendered after ScrollView so it sits on top in the hit-test order */}
+        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
+          <Text style={styles.sheetCloseText}>✕</Text>
+        </TouchableOpacity>
       </View>
     </Modal>
   );
@@ -304,7 +307,7 @@ export default function CozyMediaScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
             <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
           <View>

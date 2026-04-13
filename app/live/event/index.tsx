@@ -339,7 +339,7 @@ export default function LiveEventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1A1A2E' },
+  container: { flex: 1, backgroundColor: '#F1F4F8' },
   loadingText: { fontSize: 14, color: '#B09A7E', marginTop: spacing.sm },
   errorText: { fontSize: 14, color: 'rgba(253,250,246,0.6)', textAlign: 'center' },
   backLink: { marginTop: spacing.md },

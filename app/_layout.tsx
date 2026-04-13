@@ -3,10 +3,22 @@ import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import * as Font from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
 
 export default function RootLayout() {
   const router = useRouter();
+
+  useEffect(() => {
+    Font.loadAsync({
+      ...Ionicons.font,
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      DancingScript_400Regular: require('@expo-google-fonts/dancing-script/400Regular/DancingScript_400Regular.ttf'),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      DancingScript_700Bold: require('@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf'),
+    }).catch((e) => console.warn('[fonts] load error:', e));
+  }, []);
 
   useEffect(() => {
     const handleDeepLink = ({ url }: { url: string }) => {

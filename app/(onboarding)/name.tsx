@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { apiPost } from '../../lib/api';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { normalizeRoute } from '../../lib/routes';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 
 export default function NameScreen() {
@@ -29,7 +31,7 @@ export default function NameScreen() {
     try {
       const res = await apiPost('/onboarding/submit', { step: 'L3Nam', value });
       if (res?.nextRoute) {
-        router.replace(res.nextRoute as any);
+        router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
     } catch {}
@@ -39,7 +41,8 @@ export default function NameScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <VideoView
         player={player}
@@ -48,7 +51,10 @@ export default function NameScreen() {
         nativeControls={false}
       />
 
-      <View style={[styles.inputContainer, { bottom: insets.bottom + 16 }]}>
+      {/* Spacer pushes input to the bottom; KAV lifts it above the keyboard */}
+      <View style={styles.spacer} />
+
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.inputRow}>
           <TextInput
             value={name}
@@ -58,7 +64,6 @@ export default function NameScreen() {
             placeholderTextColor="#9ca3af"
             style={styles.input}
             returnKeyType="done"
-            autoFocus
           />
           <TouchableOpacity
             onPress={handleSubmit}
@@ -74,14 +79,13 @@ export default function NameScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7E4EA' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   video: {
     ...StyleSheet.absoluteFillObject,
   },
+  spacer: { flex: 1 },
   inputContainer: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
+    paddingHorizontal: 20,
     zIndex: 30,
   },
   inputRow: {

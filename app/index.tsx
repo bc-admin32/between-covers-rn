@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { normalizeRoute } from '../lib/routes';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -39,7 +40,7 @@ export default function SplashScreen() {
         const result = await res.json();
 
         if (result?.nextRoute?.startsWith('/')) {
-          router.replace(result.nextRoute as any);
+          router.replace(normalizeRoute(result.nextRoute) as any);
         } else {
           router.replace('/(auth)/login');
         }
@@ -53,7 +54,6 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.overlay} />
       <Image
         source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/logo-shadow.png' }}
         style={styles.logo}
@@ -65,14 +65,10 @@ export default function SplashScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F2A48',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(178,54,86,0.27)',
   },
   logo: {
     width: 220,
