@@ -17,6 +17,10 @@ export default function RootLayout() {
       DancingScript_400Regular: require('@expo-google-fonts/dancing-script/400Regular/DancingScript_400Regular.ttf'),
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       DancingScript_700Bold: require('@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf'),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Cormorant_700Bold: require('@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf'),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Cormorant_700Bold_Italic: require('@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf'),
     }).catch((e) => console.warn('[fonts] load error:', e));
   }, []);
 

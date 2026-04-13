@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, Alert,
+  StyleSheet, ActivityIndicator, Image, Alert, NativeModules,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,6 +105,10 @@ export default function ProfileScreen() {
 
   const handlePhotoUpload = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!NativeModules.ExponentImagePicker) {
+      Alert.alert('Coming Soon', 'Photo upload will be available in the next app build.');
+      return;
+    }
     Alert.alert('Update Photo', 'Choose how to add your photo', [
       {
         text: 'Take Photo',
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
   avatar: { width: 96, height: 96 },
   cameraButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   cameraButtonText: { fontSize: 13 },
-  displayName: { fontSize: 38, fontStyle: 'italic', color: '#F0EDE4', lineHeight: 44 },
+  displayName: { fontSize: 42, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 48 },
   nameDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)' },
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   vibeCard: { marginHorizontal: spacing.lg, backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.07)', marginBottom: spacing.lg },
