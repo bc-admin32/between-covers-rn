@@ -188,22 +188,31 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
           ]),
         ]).start();
       } else {
-        // Wig swirls from trash button to center, lands, holds, fades
+        // Wig thrown from trash button — arcs up then lands at center, right-side up
+        const startY = wigY._value;
         Animated.sequence([
-          // Launch: fly + spin to center
           Animated.parallel([
-            Animated.timing(wigOp,     { toValue: 1,  duration: 80,  useNativeDriver: true }),
-            Animated.timing(wigX,      { toValue: 0,  duration: 650, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-            Animated.timing(wigY,      { toValue: 0,  duration: 650, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-            Animated.timing(wigScale,  { toValue: 1.15, duration: 650, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-            Animated.timing(wigRotate, { toValue: 2.5, duration: 650, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+            // Appear immediately
+            Animated.timing(wigOp,    { toValue: 1,   duration: 60,  useNativeDriver: true }),
+            // X: straight across to center
+            Animated.timing(wigX,     { toValue: 0,   duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+            // Y: arc — up first, then land at center
+            Animated.sequence([
+              Animated.timing(wigY,   { toValue: startY - 220, duration: 280, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+              Animated.timing(wigY,   { toValue: 0,            duration: 320, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
+            ]),
+            // Scale up as it flies in
+            Animated.timing(wigScale, { toValue: 1.1, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+            // Exactly 2 full rotations = 720° → lands right-side up
+            Animated.timing(wigRotate, { toValue: 2, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
           ]),
-          // Land: bounce settle
-          Animated.timing(wigScale, { toValue: 1.0, duration: 150, useNativeDriver: true, easing: Easing.out(Easing.back(2)) }),
-          // Hold for a beat
+          // Landing bounce
+          Animated.timing(wigScale, { toValue: 1.15, duration: 120, useNativeDriver: true }),
+          Animated.timing(wigScale, { toValue: 1.0,  duration: 120, useNativeDriver: true }),
+          // Hold
           Animated.delay(750),
-          // Fade out
-          Animated.timing(wigOp, { toValue: 0, duration: 350, useNativeDriver: true }),
+          // Fade
+          Animated.timing(wigOp, { toValue: 0, duration: 300, useNativeDriver: true }),
         ]).start();
       }
     }, 900);
