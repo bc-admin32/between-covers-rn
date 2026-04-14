@@ -9,13 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { spacing } from '../../lib/theme';
 
-const DOC_LABELS: Record<string, string> = {
-  'terms-of-use':          'Terms of Service',
-  'privacy-policy':        'Privacy Policy',
-  'community-guidelines':  'Community Guidelines',
-  'reporting-enforcement': 'Reporting & Enforcement',
-};
-
 const DOC_URLS: Record<string, string> = {
   'terms-of-use':          'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/terms-of-use.html',
   'privacy-policy':        'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/privacy-policy.html',
@@ -41,9 +34,8 @@ export default function LegalDocumentScreen() {
   const params  = useLocalSearchParams<{ doc?: string }>();
   const webViewRef = useRef<WebView>(null);
 
-  const doc   = NORMALIZE[params.doc ?? ''] ?? params.doc ?? '';
-  const label = DOC_LABELS[doc] ?? 'Legal';
-  const url   = DOC_URLS[doc];
+  const doc = NORMALIZE[params.doc ?? ''] ?? params.doc ?? '';
+  const url = DOC_URLS[doc];
 
   const handleShouldStartLoadWithRequest = useCallback((request: any) => {
     const reqUrl: string = request.url;
@@ -61,7 +53,6 @@ export default function LegalDocumentScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <CaretLeft size={20} color="#0F2A48" weight="bold" />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{label}</Text>
       </View>
 
       {!url ? (
@@ -107,7 +98,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,42,72,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
-  title:          { flex: 1, fontSize: 16, fontWeight: '700', color: '#0F2A48' },
   webView:        { flex: 1, backgroundColor: '#F0EDE4' },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0EDE4' },
   center:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },
