@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, Alert, NativeModules,
+  StyleSheet, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { apiGet } from '../../../lib/api';
+import * as ImagePicker from 'expo-image-picker';
+import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, colors } from '../../../lib/theme';
-
-const API_BASE = 'https://api.betweencovers.app';
 
 const DEFAULT_PHOTO = 'https://cdn.betweencovers.app/default_profile_image.jpg';
 
@@ -60,6 +59,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -80,83 +80,55 @@ export default function ProfileScreen() {
     load();
   }, []);
 
-  const uploadPhoto = async (asset: any) => {
+  const uploadPhoto = async () => {
     try {
-      const token = await SecureStore.getItemAsync('bc_id_token');
-      const formData = new FormData();
-      formData.append('photo', {
-        uri: asset.uri,
-        type: asset.mimeType ?? 'image/jpeg',
-        name: 'photo.jpg',
-      } as any);
-      const res = await fetch(`${API_BASE}/profile/photo`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setUser((prev: any) => ({ ...prev, photoUrl: data.photoUrl }));
-      await SecureStore.setItemAsync('bc_profile_cache', JSON.stringify({ ...user, photoUrl: data.photoUrl }));
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      setUploading(true);
+
+      // Step 1 — get presigned upload URL
+      const urlRes = await apiGet<{ uploadUrl: string; key: string }>(
+        '/profile/photo/upload-url'
+      );
+
+      // Step 2 — PUT image directly to S3
+      const imageResponse = await fetch(asset.uri);
+      const blob = await imageResponse.blob();
+
+      const uploadRes = await fetch(urlRes.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': asset.mimeType ?? 'image/jpeg' },
+        body: blob,
+      });
+
+      if (!uploadRes.ok) throw new Error('S3 upload failed');
+
+      // Step 3 — confirm upload and save URL to profile
+      const confirmRes = await apiPost<{ photoUrl: string }>(
+        '/profile/photo/confirm',
+        { key: urlRes.key }
+      );
+
+      setUser((prev: any) => prev ? { ...prev, photoUrl: confirmRes.photoUrl } : prev);
+      await SecureStore.setItemAsync('bc_profile_cache', JSON.stringify({ ...user, photoUrl: confirmRes.photoUrl }));
     } catch {
       Alert.alert('Upload Failed', 'Could not update your photo. Please try again.');
+    } finally {
+      setUploading(false);
     }
   };
 
   const handlePhotoUpload = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (!NativeModules.ExponentImagePicker) {
-      Alert.alert('Coming Soon', 'Photo upload will be available in the next app build.');
-      return;
-    }
-    Alert.alert('Update Photo', 'Choose how to add your photo', [
-      {
-        text: 'Take Photo',
-        onPress: async () => {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const ImagePicker = require('expo-image-picker');
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission Required', 'Please allow camera access in Settings to take a photo.');
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            });
-            if (!result.canceled) await uploadPhoto(result.assets[0]);
-          } catch {
-            Alert.alert('Not Available', 'Photo upload requires a new app build. Check back soon.');
-          }
-        },
-      },
-      {
-        text: 'Choose from Library',
-        onPress: async () => {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const ImagePicker = require('expo-image-picker');
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission Required', 'Please allow photo library access in Settings.');
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            });
-            if (!result.canceled) await uploadPhoto(result.assets[0]);
-          } catch {
-            Alert.alert('Not Available', 'Photo upload requires a new app build. Check back soon.');
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    await uploadPhoto();
   };
 
   const handleLogout = async () => {
@@ -266,7 +238,7 @@ const styles = StyleSheet.create({
   vibeCard: { marginHorizontal: spacing.lg, backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.07)', marginBottom: spacing.lg },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg },
   sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.1)' },
-  sectionLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
+  sectionLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
   genreTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: spacing.lg },
   genreTag: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: '#F1F4F8', borderWidth: 1, borderColor: 'rgba(15,42,72,0.1)' },
   genreTagText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: '#0F2A48' },

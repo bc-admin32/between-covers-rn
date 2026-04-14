@@ -6,7 +6,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { spacing, radius } from '../../../../../lib/theme';
+import { spacing } from '../../../../../lib/theme';
 
 const DOC_LABELS: Record<string, string> = {
   'terms-of-use':          'Terms of Service',
@@ -54,18 +54,14 @@ export default function LegalDocumentScreen() {
   }, [url]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile/legal' as any)}
-        >
-          <Text style={styles.backArrow}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.titleText}>{label}</Text>
-        <View style={styles.titleDivider} />
-      </View>
-      <View style={styles.curve} />
+    <View style={styles.container}>
+      {/* Floating back button */}
+      <TouchableOpacity
+        style={[styles.backButton, { top: insets.top + 12 }]}
+        onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile/legal' as any)}
+      >
+        <Text style={styles.backArrow}>←</Text>
+      </TouchableOpacity>
 
       {!url ? (
         <View style={styles.center}>
@@ -95,12 +91,8 @@ export default function LegalDocumentScreen() {
 
 const styles = StyleSheet.create({
   container:      { flex: 1, backgroundColor: '#F0EDE4' },
-  header:         { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
-  backButton:     { marginBottom: spacing.lg },
-  backArrow:      { fontSize: 20, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  titleText:      { fontSize: 28, fontStyle: 'italic', color: '#F0EDE4', lineHeight: 34 },
-  titleDivider:   { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 10 },
-  curve:          { height: 20, backgroundColor: '#F0EDE4', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
+  backButton:     { position: 'absolute', left: spacing.md, zIndex: 10, padding: 8 },
+  backArrow:      { fontSize: 22, color: '#0F2A48', fontWeight: '600' },
   webView:        { flex: 1, backgroundColor: '#F0EDE4' },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0EDE4' },
   center:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },

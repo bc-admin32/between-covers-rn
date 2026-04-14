@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.06)' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg },
   cardHeaderLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.08)' },
-  cardHeaderTitle: { fontSize: 9, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
+  cardHeaderTitle: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
   cardHeaderTitleDanger: { color: '#B83255' },
   cardContent: { gap: spacing.md },
   field: { gap: 6 },

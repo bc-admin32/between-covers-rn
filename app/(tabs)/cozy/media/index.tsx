@@ -5,13 +5,23 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { getPlatform } from '../../../../lib/platforms';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+
+const openSpotify = async (url: string) => {
+  const spotifyUri = url
+    .replace('https://open.spotify.com/', 'spotify:')
+    .replace('/playlist/', ':playlist:')
+    .replace('/track/', ':track:')
+    .replace('/album/', ':album:');
+  const canOpen = await Linking.canOpenURL(spotifyUri);
+  await Linking.openURL(canOpen ? spotifyUri : url);
+};
 
 type PlatformLink = { platformId: string; deepLink: string };
 
@@ -206,7 +216,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                     <TouchableOpacity
                       key={i}
                       style={styles.platformButton}
-                      onPress={() => url && WebBrowser.openBrowserAsync(url)}
+                      onPress={() => url && openSpotify(url)}
                       disabled={!url}
                     >
                       {platform?.logoUrl ? (

@@ -21,6 +21,8 @@ export default function RootLayout() {
       Cormorant_700Bold: require('@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf'),
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       Cormorant_700Bold_Italic: require('@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf'),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Lato_700Bold: require('@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf'),
     }).catch((e) => console.warn('[fonts] load error:', e));
   }, []);
 

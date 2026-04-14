@@ -68,6 +68,7 @@ export default function LoungeScreen() {
           setLoading(false);
         }
         const res = await apiGet<LoungeData>('/lounge/resolve');
+        console.log('[lounge] raw response:', JSON.stringify(res, null, 2));
         setData(res);
         await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(res));
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
@@ -154,7 +155,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>💬 Chiming in</Text>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => router.push({ pathname: '/(tabs)/lounge/thread', params: { id: primary.threadId } } as any)}
+                onPress={() => { console.log('[lounge] primary thread pressed — full object:', JSON.stringify(primary), '| threadId:', primary.threadId); router.push({ pathname: '/(tabs)/lounge/thread', params: { id: primary.threadId } } as any); }}
               >
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
@@ -173,7 +174,7 @@ export default function LoungeScreen() {
             <Text style={styles.cardDescription}>{secondary.description}</Text>
             <TouchableOpacity
               style={styles.outlineButton}
-              onPress={() => router.push({ pathname: '/(tabs)/lounge/thread', params: { id: secondary.threadId } } as any)}
+              onPress={() => { console.log('[lounge] secondary thread pressed — full object:', JSON.stringify(secondary), '| threadId:', secondary.threadId); router.push({ pathname: '/(tabs)/lounge/thread', params: { id: secondary.threadId } } as any); }}
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
@@ -195,9 +196,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
                 style={styles.irisCtaButton}
-                onPress={() => iris?.threadId
-                  ? router.push({ pathname: '/(tabs)/lounge/thread', params: { id: iris.threadId } } as any)
-                  : undefined}
+                onPress={() => { console.log('[lounge] iris thread pressed — full object:', JSON.stringify(iris), '| threadId:', iris?.threadId); iris?.threadId ? router.push({ pathname: '/(tabs)/lounge/thread', params: { id: iris.threadId } } as any) : undefined; }}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
