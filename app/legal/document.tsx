@@ -3,10 +3,11 @@ import {
   View, Text, TouchableOpacity,
   StyleSheet, ActivityIndicator, Linking,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { spacing } from '../../../../../lib/theme';
+import { spacing } from '../../lib/theme';
 
 const DOC_LABELS: Record<string, string> = {
   'terms-of-use':          'Terms of Service',
@@ -22,7 +23,8 @@ const DOC_URLS: Record<string, string> = {
   'reporting-enforcement': 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/reporting-enforcement.html',
 };
 
-const SHORT_PATH: Record<string, string> = {
+// Accept both short and full key forms
+const NORMALIZE: Record<string, string> = {
   'terms':                 'terms-of-use',
   'terms-of-use':          'terms-of-use',
   'privacy':               'privacy-policy',
@@ -39,7 +41,7 @@ export default function LegalDocumentScreen() {
   const params  = useLocalSearchParams<{ doc?: string }>();
   const webViewRef = useRef<WebView>(null);
 
-  const doc   = SHORT_PATH[params.doc ?? ''] ?? params.doc ?? '';
+  const doc   = NORMALIZE[params.doc ?? ''] ?? params.doc ?? '';
   const label = DOC_LABELS[doc] ?? 'Legal';
   const url   = DOC_URLS[doc];
 
@@ -54,19 +56,18 @@ export default function LegalDocumentScreen() {
   }, [url]);
 
   return (
-    <View style={styles.container}>
-      {/* Floating back button */}
-      <TouchableOpacity
-        style={[styles.backButton, { top: insets.top + 12 }]}
-        onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile/legal' as any)}
-      >
-        <Text style={styles.backArrow}>←</Text>
-      </TouchableOpacity>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <CaretLeft size={20} color="#0F2A48" weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.title} numberOfLines={1}>{label}</Text>
+      </View>
 
       {!url ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>Document not found.</Text>
-          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile/legal' as any)}>
+          <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.goBackText}>← Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -91,11 +92,25 @@ export default function LegalDocumentScreen() {
 
 const styles = StyleSheet.create({
   container:      { flex: 1, backgroundColor: '#F0EDE4' },
-  backButton:     { position: 'absolute', left: spacing.md, zIndex: 10, padding: 8 },
-  backArrow:      { fontSize: 22, color: '#0F2A48', fontWeight: '600' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(15,42,72,0.1)',
+    backgroundColor: '#F0EDE4',
+  },
+  backButton: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(15,42,72,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title:          { flex: 1, fontSize: 16, fontWeight: '700', color: '#0F2A48' },
   webView:        { flex: 1, backgroundColor: '#F0EDE4' },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0EDE4' },
   center:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },
   errorText:      { fontSize: 14, color: '#9c8f7e', textAlign: 'center' },
-  goBackText:     { fontSize: 13, color: '#6B9AB8', textDecorationLine: 'underline', marginTop: 4 },
+  goBackText:     { fontSize: 13, color: '#6B9AB8', textDecorationLine: 'underline' },
 });

@@ -38,7 +38,7 @@ export default function LegalScreen() {
             <TouchableOpacity
               key={item.doc}
               style={[styles.row, index !== 0 && styles.rowBorder]}
-              onPress={() => router.push(`/(tabs)/profile/legal/document?doc=${item.doc}` as any)}
+              onPress={() => router.push(`/legal/document?doc=${item.doc}` as any)}
             >
               <Text style={styles.rowIcon}>{item.icon}</Text>
               <Text style={styles.rowLabel}>{item.label}</Text>
