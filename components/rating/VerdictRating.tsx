@@ -206,9 +206,9 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
           Animated.timing(wigOp, { toValue: 0, duration: 350, useNativeDriver: true }),
         ]).start();
       }
-    }, 400);
+    }, 900);
 
-    const doneTimer = setTimeout(onDone, 2200);
+    const doneTimer = setTimeout(onDone, 2700);
     return () => { clearTimeout(heroTimer); clearTimeout(doneTimer); };
   }, []);
 
