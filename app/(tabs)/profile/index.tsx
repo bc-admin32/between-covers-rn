@@ -9,7 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost, apiPatch } from '../../../lib/api';
 import { spacing, colors } from '../../../lib/theme';
 
 const DEFAULT_PHOTO = 'https://cdn.betweencovers.app/default_profile_image.jpg';
@@ -94,13 +94,15 @@ export default function ProfileScreen() {
       const asset = result.assets[0];
       setUploading(true);
 
-      // Step 1 — get presigned upload URL
-      const urlRes = await apiGet<{ uploadUrl: string; key: string }>(
-        '/profile/image-upload-url'
+      const contentType = asset.mimeType ?? 'image/jpeg';
+
+      // Step 1 — request presigned upload URL (matches web: PATCH /profile)
+      const { uploadUrl, fileKey } = await apiPatch<{ uploadUrl: string; fileKey: string }>(
+        '/profile',
+        { action: 'REQUEST_PHOTO_UPLOAD', contentType }
       );
 
-      // Step 2 — Read file as blob via XHR (more reliable than fetch on RN for local URIs)
-      const contentType = asset.mimeType ?? 'image/jpeg';
+      // Step 2 — read file as blob via XHR (reliable for local URIs on RN)
       const blob = await new Promise<Blob>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.onload = () => resolve(xhr.response);
@@ -110,8 +112,8 @@ export default function ProfileScreen() {
         xhr.send();
       });
 
-      // Step 2b — PUT directly to S3 presigned URL
-      const uploadRes = await fetch(urlRes.uploadUrl, {
+      // Step 3 — PUT directly to S3
+      const uploadRes = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': contentType },
         body: blob,
@@ -119,10 +121,10 @@ export default function ProfileScreen() {
 
       if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`);
 
-      // Step 3 — confirm upload and save URL to profile
-      const confirmRes = await apiPost<{ photoUrl: string }>(
-        '/profile/photo/confirm',
-        { key: urlRes.key }
+      // Step 4 — confirm upload (matches web: PATCH /profile with fileKey)
+      const confirmRes = await apiPatch<{ photoUrl: string }>(
+        '/profile',
+        { fileKey }
       );
 
       setUser((prev: any) => prev ? { ...prev, photoUrl: confirmRes.photoUrl } : prev);
