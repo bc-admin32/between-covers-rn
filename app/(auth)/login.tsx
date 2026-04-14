@@ -59,9 +59,13 @@ export default function LoginScreen() {
     });
     if (!result.success) return;
 
-    const idToken = await SecureStore.getItemAsync('bc_id_token');
+    const rawToken = await SecureStore.getItemAsync('bc_id_token');
     const accessToken = await SecureStore.getItemAsync('bc_access_token');
+    const idToken = rawToken?.trim() ?? null;
     if (!idToken || !accessToken) return;
+    // Reject malformed tokens before they hit the API
+    const jwtRe = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
+    if (!jwtRe.test(idToken)) return;
 
     try {
       const res = await fetch(`${API_BASE}/auth/resolve`, {

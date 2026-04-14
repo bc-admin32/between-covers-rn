@@ -8,8 +8,10 @@ import { signOut } from '../lib/signout';
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
 
+const JWT_RE = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
+
 function isValidJwt(token: string): boolean {
-  return token.split('.').length === 3;
+  return JWT_RE.test(token.trim());
 }
 
 export default function SplashScreen() {
@@ -27,7 +29,8 @@ export default function SplashScreen() {
       };
 
       try {
-        const idToken = await SecureStore.getItemAsync('bc_id_token');
+        const raw = await SecureStore.getItemAsync('bc_id_token');
+        const idToken = raw?.trim() ?? null;
 
         const elapsed = Date.now() - start;
         const remaining = Math.max(0, MIN_SPLASH_TIME - elapsed);

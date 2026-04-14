@@ -2,17 +2,26 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_BASE = 'https://api.betweencovers.app';
 
+// Valid JWT characters: base64url (A-Z a-z 0-9 - _ =) plus two dots.
+const JWT_RE = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
+
 async function getToken(): Promise<string | null> {
   const raw = await SecureStore.getItemAsync('bc_id_token');
-  // A valid JWT has exactly three dot-separated segments. If the stored value
-  // is missing, truncated, or otherwise malformed, discard it and clear it
-  // so we don't forward a bad Authorization header to the API.
   if (!raw) return null;
-  if (raw.split('.').length !== 3) {
+
+  // Trim any stray whitespace/newlines that SecureStore may have preserved —
+  // even a single trailing \n makes AWS reject the Authorization header.
+  const token = raw.trim();
+
+  // A valid JWT is exactly three base64url segments separated by dots.
+  // Discard and clear anything that doesn't match so we never forward a
+  // malformed Authorization header to the API.
+  if (!JWT_RE.test(token)) {
     await SecureStore.deleteItemAsync('bc_id_token').catch(() => {});
     return null;
   }
-  return raw;
+
+  return token;
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
