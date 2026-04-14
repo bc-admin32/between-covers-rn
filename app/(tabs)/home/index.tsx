@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ImageBackground,
+  ActivityIndicator, ImageBackground, Animated, Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -34,6 +34,33 @@ type HomeData = {
     context: { isIntro: boolean; timeBucket: string | null; holiday: string | null };
   };
 };
+
+function PulseDot() {
+  const scale   = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scale,   { toValue: 1.9, duration: 800, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+          Animated.timing(scale,   { toValue: 1,   duration: 800, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+        ]),
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 0,   duration: 800, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.8, duration: 800, useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={styles.livePulseContainer}>
+      <Animated.View style={[styles.livePulseRing, { transform: [{ scale }], opacity }]} />
+      <View style={styles.livePulseDot} />
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -186,9 +213,7 @@ export default function HomeScreen() {
           {/* LIVE EVENT BANNER */}
           {activeEvent && (
             <TouchableOpacity style={styles.liveBanner} onPress={handleLiveBanner}>
-              <View style={styles.livePulseContainer}>
-                <View style={styles.livePulseDot} />
-              </View>
+              <PulseDot />
               <View style={styles.liveBannerText}>
                 <Text style={styles.liveLabel}>Live Now</Text>
                 <Text style={styles.liveTitle} numberOfLines={1}>{activeEvent.title}</Text>
@@ -300,9 +325,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(184,50,85,0.2)',
+    backgroundColor: 'rgba(184,50,85,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  livePulseRing: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(184,50,85,0.45)',
   },
   livePulseDot: {
     width: 8,

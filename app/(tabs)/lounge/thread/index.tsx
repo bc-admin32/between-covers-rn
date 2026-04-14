@@ -45,7 +45,7 @@ function getInitials(name: string): string {
 }
 
 function Avatar({ url, name, size = 34, isIris = false }: { url: string | null; name: string; size?: number; isIris?: boolean }) {
-  if (isIris) return <Image source={{ uri: IRIS_AVATAR }} style={[{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: '#E8D5E5' }]} />;
+  if (isIris) return <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />;
   if (url) return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#B83255', alignItems: 'center', justifyContent: 'center' }}>

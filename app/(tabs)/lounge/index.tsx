@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   outlineButton: { borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: '#B83255', alignItems: 'center' },
   outlineButtonText: { fontSize: 12, fontWeight: '600', color: '#B83255', letterSpacing: 0.5 },
   irisHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  irisAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E8D5E5' },
+  irisAvatar: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' },
   irisHeaderText: { flex: 1 },
   irisLabel: { fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#9B6B9B', fontFamily: 'Nunito_700Bold' },
   irisTitle: { fontSize: 19, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 24 },

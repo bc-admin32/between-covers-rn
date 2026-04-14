@@ -96,7 +96,7 @@ export default function ProfileScreen() {
 
       // Step 1 — get presigned upload URL
       const urlRes = await apiGet<{ uploadUrl: string; key: string }>(
-        '/profile/photo/upload-url'
+        '/profile/image-upload-url'
       );
 
       // Step 2 — PUT image directly to S3
