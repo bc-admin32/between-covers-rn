@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import {
   View, TouchableOpacity, Text, StyleSheet,
   Animated, Easing, Modal,
@@ -20,62 +20,220 @@ type Props = {
   size?: 'sm' | 'md';
 };
 
-type OverlayState = { type: 'kiss' | 'trash' };
+type OverlayState = {
+  type: 'kiss' | 'trash';
+  originX: number;
+  originY: number;
+};
 
-// ─── Single-emoji overlay ────────────────────────────────────────────────────
+type ParticleSpec = {
+  dx: number; dy: number; rotateEnd: number; delay: number; size: number;
+};
 
-function EmojiOverlay({ state, onDone }: { state: OverlayState; onDone: () => void }) {
-  const scale   = useRef(new Animated.Value(0.4)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const shake   = useRef(new Animated.Value(0)).current;
-  const isKiss  = state.type === 'kiss';
+function generateSpecs(count: number): ParticleSpec[] {
+  return Array.from({ length: count }, (_, i) => {
+    const base = (i / count) * 2 * Math.PI;
+    const angle = base + (Math.random() - 0.5) * (Math.PI / count) * 2;
+    const distance = 65 + Math.random() * 110;
+    return {
+      dx: Math.cos(angle) * distance,
+      dy: Math.sin(angle) * distance - 20,
+      rotateEnd: (Math.random() - 0.5) * 540,
+      delay: Math.floor(Math.random() * 80),
+      size: 13 + Math.floor(Math.random() * 8),
+    };
+  });
+}
+
+// ─── Kiss particle ────────────────────────────────────────────────────────────
+
+function KissParticle({ originX, originY, spec }: { originX: number; originY: number; spec: ParticleSpec }) {
+  const x = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(0.2)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isKiss) {
-      // Pop in → hold → drift up → fade out
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(scale,   { toValue: 1.2, duration: 180, useNativeDriver: true, easing: Easing.out(Easing.back(1.8)) }),
-          Animated.timing(opacity, { toValue: 1,   duration: 120, useNativeDriver: true }),
-        ]),
-        Animated.timing(scale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
-        Animated.delay(600),
-        Animated.parallel([
-          Animated.timing(translateY, { toValue: -40, duration: 400, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
-          Animated.timing(opacity,    { toValue: 0,   duration: 400, useNativeDriver: true }),
-        ]),
-      ]).start(onDone);
-    } else {
-      // Pop in → shake → hold → fade out
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(scale,   { toValue: 1.3, duration: 120, useNativeDriver: true, easing: Easing.out(Easing.back(1.5)) }),
-          Animated.timing(opacity, { toValue: 1,   duration: 100, useNativeDriver: true }),
-        ]),
+    Animated.sequence([
+      Animated.delay(spec.delay),
+      Animated.parallel([
+        Animated.timing(scale,   { toValue: 1,       duration: 120, useNativeDriver: true, easing: Easing.out(Easing.back(1.5)) }),
+        Animated.timing(x,       { toValue: spec.dx, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+        Animated.timing(y,       { toValue: spec.dy, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+        Animated.timing(rotate,  { toValue: 1,       duration: 700, useNativeDriver: true }),
         Animated.sequence([
-          Animated.timing(shake, { toValue:  10, duration: 60, useNativeDriver: true }),
-          Animated.timing(shake, { toValue: -10, duration: 60, useNativeDriver: true }),
-          Animated.timing(shake, { toValue:   6, duration: 60, useNativeDriver: true }),
-          Animated.timing(shake, { toValue:  -6, duration: 60, useNativeDriver: true }),
-          Animated.timing(shake, { toValue:   0, duration: 60, useNativeDriver: true }),
+          Animated.delay(300),
+          Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
         ]),
-        Animated.timing(scale, { toValue: 1.0, duration: 80, useNativeDriver: true }),
-        Animated.delay(600),
-        Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]).start(onDone);
+      ]),
+    ]).start();
+  }, []);
+
+  const rotateStr = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${spec.rotateEnd}deg`] });
+
+  return (
+    <Animated.View style={{
+      position: 'absolute',
+      left: originX - spec.size / 2,
+      top:  originY - spec.size / 2,
+      opacity,
+      transform: [{ translateX: x }, { translateY: y }, { rotate: rotateStr }, { scale }],
+    }}>
+      <Text style={{ fontSize: spec.size, lineHeight: spec.size + 2 }}>💋</Text>
+    </Animated.View>
+  );
+}
+
+// ─── Trash particle ───────────────────────────────────────────────────────────
+
+const TRASH_ITEMS = ['👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '🎭'];
+
+function TrashParticle({ originX, originY, spec, emoji }: { originX: number; originY: number; spec: ParticleSpec; emoji: string }) {
+  const x = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(0.2)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(spec.delay),
+      Animated.parallel([
+        Animated.timing(scale,   { toValue: 1,       duration: 100, useNativeDriver: true }),
+        Animated.timing(x,       { toValue: spec.dx, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+        Animated.timing(y,       { toValue: spec.dy, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+        Animated.timing(rotate,  { toValue: 1,       duration: 700, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(300),
+          Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ]),
+      ]),
+    ]).start();
+  }, []);
+
+  const rotateStr = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${spec.rotateEnd}deg`] });
+
+  return (
+    <Animated.View style={{
+      position: 'absolute',
+      left: originX - spec.size / 2,
+      top:  originY - spec.size / 2,
+      opacity,
+      transform: [{ translateX: x }, { translateY: y }, { rotate: rotateStr }, { scale }],
+    }}>
+      <Text style={{ fontSize: spec.size, lineHeight: spec.size + 2 }}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
+// ─── Overlay: burst + hero finale ────────────────────────────────────────────
+
+function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () => void }) {
+  const isKiss = state.type === 'kiss';
+  const specs  = useMemo(() => generateSpecs(isKiss ? 18 : 28), []);
+
+  // Phase 1 — trash-can shake at origin
+  const trashShake = useRef(new Animated.Value(0)).current;
+  const trashScale = useRef(new Animated.Value(1)).current;
+
+  // Phase 2 — hero finale (centered)
+  const heroScale   = useRef(new Animated.Value(0)).current;
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const heroY       = useRef(new Animated.Value(20)).current;  // kiss drifts up
+  const heroShake   = useRef(new Animated.Value(0)).current;   // wig wobble
+
+  useEffect(() => {
+    // Phase 1: trash can shake immediately
+    if (!isKiss) {
+      Animated.sequence([
+        Animated.timing(trashScale, { toValue: 1.5, duration: 80, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(trashShake, { toValue:  14, duration: 55, useNativeDriver: true }),
+            Animated.timing(trashShake, { toValue: -14, duration: 55, useNativeDriver: true }),
+            Animated.timing(trashShake, { toValue:  10, duration: 55, useNativeDriver: true }),
+            Animated.timing(trashShake, { toValue: -10, duration: 55, useNativeDriver: true }),
+            Animated.timing(trashShake, { toValue:   6, duration: 55, useNativeDriver: true }),
+            Animated.timing(trashShake, { toValue:   0, duration: 55, useNativeDriver: true }),
+          ]),
+          Animated.timing(trashScale, { toValue: 1, duration: 330, useNativeDriver: true }),
+        ]),
+      ]).start();
     }
+
+    // Phase 2: hero appears at ~650ms (as particles are fading)
+    const heroTimer = setTimeout(() => {
+      if (isKiss) {
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(heroScale,   { toValue: 1.2, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.back(1.8)) }),
+            Animated.timing(heroOpacity, { toValue: 1,   duration: 150, useNativeDriver: true }),
+          ]),
+          Animated.timing(heroScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
+          Animated.delay(700),
+          Animated.parallel([
+            Animated.timing(heroY,       { toValue: -30, duration: 500, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+            Animated.timing(heroOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
+          ]),
+        ]).start();
+      } else {
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(heroScale,   { toValue: 1.3, duration: 160, useNativeDriver: true, easing: Easing.out(Easing.back(1.5)) }),
+            Animated.timing(heroOpacity, { toValue: 1,   duration: 120, useNativeDriver: true }),
+          ]),
+          Animated.sequence([
+            Animated.timing(heroShake, { toValue:  14, duration: 65, useNativeDriver: true }),
+            Animated.timing(heroShake, { toValue: -14, duration: 65, useNativeDriver: true }),
+            Animated.timing(heroShake, { toValue:   8, duration: 65, useNativeDriver: true }),
+            Animated.timing(heroShake, { toValue:   0, duration: 65, useNativeDriver: true }),
+          ]),
+          Animated.timing(heroScale, { toValue: 1.0, duration: 80, useNativeDriver: true }),
+          Animated.delay(700),
+          Animated.timing(heroOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+        ]).start();
+      }
+    }, 650);
+
+    const doneTimer = setTimeout(onDone, 1900);
+    return () => { clearTimeout(heroTimer); clearTimeout(doneTimer); };
   }, []);
 
   return (
     <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={() => {}}>
-      <View style={styles.overlayContainer} pointerEvents="none">
-        <Animated.Text style={[
-          styles.overlayEmoji,
-          { opacity, transform: [{ scale }, { translateY }, { translateX: shake }] },
-        ]}>
-          {isKiss ? '💋' : '🗑️'}
-        </Animated.Text>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+
+        {/* Burst particles */}
+        {specs.map((spec, i) =>
+          isKiss
+            ? <KissParticle  key={i} originX={state.originX} originY={state.originY} spec={spec} />
+            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} emoji={TRASH_ITEMS[i % TRASH_ITEMS.length]} />
+        )}
+
+        {/* Trash-can shake at button origin */}
+        {!isKiss && (
+          <Animated.View style={{
+            position: 'absolute',
+            left: state.originX - 22, top: state.originY - 22,
+            width: 44, height: 44,
+            alignItems: 'center', justifyContent: 'center',
+            transform: [{ translateX: trashShake }, { scale: trashScale }],
+          }}>
+            <Text style={{ fontSize: 28 }}>🗑️</Text>
+          </Animated.View>
+        )}
+
+        {/* Hero finale — centered on screen */}
+        {isKiss ? (
+          <Animated.View style={[styles.heroContainer, { opacity: heroOpacity, transform: [{ scale: heroScale }, { translateY: heroY }] }]}>
+            <Text style={styles.heroEmoji}>💋</Text>
+          </Animated.View>
+        ) : (
+          <Animated.View style={[styles.heroContainer, { opacity: heroOpacity, transform: [{ scale: heroScale }, { translateX: heroShake }] }]}>
+            <Text style={styles.heroEmoji}>🎭</Text>
+          </Animated.View>
+        )}
       </View>
     </Modal>
   );
@@ -92,9 +250,10 @@ function VerdictButton({
   buttonSize: number;
   emojiSize: number;
   onPress: () => void;
-  onDramatic: (type: 'kiss' | 'trash') => void;
+  onDramatic: (type: 'kiss' | 'trash', x: number, y: number) => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale   = useRef(new Animated.Value(1)).current;
+  const viewRef = useRef<View>(null);
 
   const handlePress = () => {
     scale.setValue(1);
@@ -104,22 +263,30 @@ function VerdictButton({
     ]).start();
 
     if (item.key === 'chefs_kiss' || item.key === 'trash') {
-      onDramatic(item.key === 'chefs_kiss' ? 'kiss' : 'trash');
+      viewRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
+        onDramatic(
+          item.key === 'chefs_kiss' ? 'kiss' : 'trash',
+          pageX + width / 2,
+          pageY + height / 2,
+        );
+      });
     }
 
     onPress();
   };
 
   return (
-    <TouchableOpacity disabled={!isInteractive} onPress={handlePress} activeOpacity={0.8}>
-      <Animated.View style={[
-        styles.button,
-        { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, transform: [{ scale }] },
-        active ? { backgroundColor: item.bg, shadowOpacity: 0.25 } : styles.buttonInactive,
-      ]}>
-        <Text style={{ fontSize: emojiSize }}>{item.emoji}</Text>
-      </Animated.View>
-    </TouchableOpacity>
+    <View ref={viewRef} collapsable={false}>
+      <TouchableOpacity disabled={!isInteractive} onPress={handlePress} activeOpacity={0.8}>
+        <Animated.View style={[
+          styles.button,
+          { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, transform: [{ scale }] },
+          active ? { backgroundColor: item.bg, shadowOpacity: 0.25 } : styles.buttonInactive,
+        ]}>
+          <Text style={{ fontSize: emojiSize }}>{item.emoji}</Text>
+        </Animated.View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -142,7 +309,7 @@ export default function VerdictRating({ value = null, onChange, size = 'md' }: P
           buttonSize={buttonSize}
           emojiSize={emojiSize}
           onPress={() => onChange?.(item.key)}
-          onDramatic={(type) => setOverlay({ type })}
+          onDramatic={(type, x, y) => setOverlay({ type, originX: x, originY: y })}
         />
       ))}
       {overlay && (
@@ -153,13 +320,14 @@ export default function VerdictRating({ value = null, onChange, size = 'md' }: P
 }
 
 const styles = StyleSheet.create({
-  overlayContainer: {
-    flex: 1,
+  heroContainer: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  overlayEmoji: {
-    fontSize: 72,
+  heroEmoji: {
+    fontSize: 80,
   },
   row: {
     flexDirection: 'row',
