@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "7",
       "bundleIdentifier": "com.betweencovers.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -25,6 +26,7 @@
     },
     "android": {
       "package": "com.betweencovers.app",
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d0d0d"
