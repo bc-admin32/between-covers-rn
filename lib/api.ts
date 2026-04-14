@@ -32,7 +32,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-    console.log('[api] Authorization:', `Bearer ${token.substring(0, 20)}...`);
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
