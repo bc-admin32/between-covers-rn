@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },
   backArrow: { fontSize: 20, color: '#6A5550' },
   backText: { fontSize: 13, color: '#6A5550' },
-  title: { fontSize: 42, color: '#1A1A2E', fontStyle: 'italic', fontWeight: '700' },
+  title: { fontSize: 42, color: '#1A1A2E', fontFamily: 'Nunito_800ExtraBold_Italic' },
   weeksList: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   weekRow: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: '#DDD5C4', backgroundColor: '#FDFAF6' },
   weekHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },

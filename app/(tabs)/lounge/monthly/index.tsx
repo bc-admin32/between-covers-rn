@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },
   backArrow: { fontSize: 20, color: '#C4A882' },
   backText: { fontSize: 13, color: '#C4A882' },
-  title: { fontSize: 32, color: '#fff', fontStyle: 'italic', fontWeight: '700' },
+  title: { fontSize: 32, color: '#fff', fontFamily: 'Nunito_700Bold_Italic' },
   list: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   emptyState: { paddingTop: 64, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#C4A882' },

@@ -39,7 +39,14 @@
       "./node_modules/@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf",
       "./node_modules/@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf",
       "./node_modules/@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf",
-      "./node_modules/@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf"
+      "./node_modules/@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf",
+      "./node_modules/@expo-google-fonts/nunito/400Regular/Nunito_400Regular.ttf",
+      "./node_modules/@expo-google-fonts/nunito/400Regular_Italic/Nunito_400Regular_Italic.ttf",
+      "./node_modules/@expo-google-fonts/nunito/600SemiBold/Nunito_600SemiBold.ttf",
+      "./node_modules/@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf",
+      "./node_modules/@expo-google-fonts/nunito/700Bold_Italic/Nunito_700Bold_Italic.ttf",
+      "./node_modules/@expo-google-fonts/nunito/800ExtraBold/Nunito_800ExtraBold.ttf",
+      "./node_modules/@expo-google-fonts/nunito/800ExtraBold_Italic/Nunito_800ExtraBold_Italic.ttf"
     ]
   }],
   "expo-secure-store",
