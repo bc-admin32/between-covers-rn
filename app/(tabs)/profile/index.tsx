@@ -99,17 +99,25 @@ export default function ProfileScreen() {
         '/profile/image-upload-url'
       );
 
-      // Step 2 — PUT image directly to S3
-      const imageResponse = await fetch(asset.uri);
-      const blob = await imageResponse.blob();
+      // Step 2 — Read file as blob via XHR (more reliable than fetch on RN for local URIs)
+      const contentType = asset.mimeType ?? 'image/jpeg';
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = () => reject(new Error('Failed to read image file'));
+        xhr.responseType = 'blob';
+        xhr.open('GET', asset.uri, true);
+        xhr.send();
+      });
 
+      // Step 2b — PUT directly to S3 presigned URL
       const uploadRes = await fetch(urlRes.uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': asset.mimeType ?? 'image/jpeg' },
+        headers: { 'Content-Type': contentType },
         body: blob,
       });
 
-      if (!uploadRes.ok) throw new Error('S3 upload failed');
+      if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`);
 
       // Step 3 — confirm upload and save URL to profile
       const confirmRes = await apiPost<{ photoUrl: string }>(

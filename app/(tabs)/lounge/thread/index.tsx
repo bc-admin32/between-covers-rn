@@ -155,7 +155,6 @@ export default function LoungeThreadScreen() {
   const [nextKey, setNextKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [threadExpanded, setThreadExpanded] = useState(false);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -276,8 +275,9 @@ export default function LoungeThreadScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={insets.top}
     >
-      {/* HEADER */}
-      <View style={styles.header}>
+      {/* REPLIES + THREAD CARD (all in one scroll) */}
+      <ScrollView ref={scrollRef} style={styles.replies} contentContainerStyle={styles.repliesContent} showsVerticalScrollIndicator={false}>
+        {/* Thread card at top of scroll */}
         <View style={[styles.threadCard, isIrisChat && styles.threadCardIris]}>
           <View style={styles.threadCardHeader}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -289,7 +289,7 @@ export default function LoungeThreadScreen() {
             <Text style={styles.threadCardReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
           </View>
           <View style={styles.threadCardAuthor}>
-            <Avatar url={thread.authorAvatar} name={thread.authorName} size={38} isIris={isIrisChat} />
+            <Avatar url={thread.authorAvatar} name={thread.authorName} size={34} isIris={isIrisChat} />
             <View>
               <Text style={[styles.threadCardAuthorName, isIrisChat && styles.threadCardAuthorNameIris]}>
                 {isIrisChat ? 'Iris' : thread.authorName}
@@ -297,19 +297,9 @@ export default function LoungeThreadScreen() {
               <Text style={styles.threadCardTime}>{timeAgo(thread.createdAt)}</Text>
             </View>
           </View>
-          {thread.body && (
-            <TouchableOpacity onPress={() => setThreadExpanded((e) => !e)} activeOpacity={0.85}>
-              <Text style={styles.threadCardBody} numberOfLines={threadExpanded ? undefined : 3}>{thread.body}</Text>
-              <Text style={[styles.threadCardToggle, isIrisChat && styles.threadCardToggleIris]}>
-                {threadExpanded ? 'Show less ▲' : 'Read more ▼'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {thread.body && <Text style={styles.threadCardBody}>{thread.body}</Text>}
         </View>
-      </View>
-
-      {/* REPLIES */}
-      <ScrollView ref={scrollRef} style={styles.replies} contentContainerStyle={styles.repliesContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.threadDivider} />
         {replies.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Be the first to spill…</Text>
@@ -412,9 +402,9 @@ export default function LoungeThreadScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
-  header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexShrink: 0 },
   backButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
-  threadCard: { backgroundColor: '#FDFAF6', borderRadius: 20, padding: spacing.lg, borderWidth: 1, borderColor: '#DDD5C4' },
+  threadCard: { backgroundColor: '#FDFAF6', borderRadius: 20, padding: spacing.md, borderWidth: 1, borderColor: '#DDD5C4', marginBottom: spacing.sm },
+  threadDivider: { height: 1, backgroundColor: 'rgba(196,168,130,0.25)', marginBottom: spacing.sm },
   threadCardIris: { borderColor: '#E8D5E5' },
   threadCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   threadCardLabel: { flex: 1, fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold', flex: 1 },
@@ -424,11 +414,9 @@ const styles = StyleSheet.create({
   threadCardAuthorName: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#B83255' },
   threadCardAuthorNameIris: { color: '#9B6B9B' },
   threadCardTime: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_400Regular' },
-  threadCardBody: { fontSize: 18, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 26 },
-  threadCardToggle: { fontSize: 11, color: '#B09A7E', marginTop: 4, fontFamily: 'Nunito_600SemiBold' },
-  threadCardToggleIris: { color: '#9B6B9B' },
+  threadCardBody: { fontSize: 14, color: '#3A2C28', fontFamily: 'Nunito_400Regular_Italic', lineHeight: 21 },
   replies: { flex: 1 },
-  repliesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 120 },
+  repliesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 120 },
   emptyState: { paddingVertical: 64, alignItems: 'center', gap: spacing.sm },
   emptyTitle: { fontSize: 22, color: '#C4A882', fontStyle: 'italic' },
   emptySubtitle: { fontSize: 13, color: '#B09A7E' },
