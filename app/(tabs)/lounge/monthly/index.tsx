@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -112,11 +113,12 @@ export default function MonthlyWallScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backArrow}>←</Text>
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Confession Wall</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <CaretLeft size={20} color="#C4A882" weight="bold" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Confession Wall</Text>
+          </View>
         </View>
 
         {loading ? (
@@ -141,10 +143,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1A1A2E' },
   scrollContent: { paddingBottom: 100 },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },
-  backArrow: { fontSize: 20, color: '#C4A882' },
-  backText: { fontSize: 13, color: '#C4A882' },
-  title: { fontSize: 32, color: '#fff', fontFamily: 'Nunito_700Bold_Italic' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(196,168,130,0.15)', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 32, color: '#fff', fontFamily: 'Nunito_700Bold_Italic', flexShrink: 1 },
   list: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   emptyState: { paddingTop: 64, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#C4A882' },

@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Image, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../lib/api';
@@ -192,7 +193,7 @@ export default function LiveEventScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
+          <CaretLeft size={20} color="rgba(253,250,246,0.7)" weight="bold" />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 

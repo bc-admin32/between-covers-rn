@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -201,10 +202,12 @@ export default function ReadingPreferencesScreen() {
 
         {/* HEADER */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backArrow}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Reading Preferences</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <CaretLeft size={24} color="rgba(255,255,255,0.85)" weight="bold" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Reading Preferences</Text>
+          </View>
           <View style={styles.titleDivider} />
         </View>
         <View style={styles.curve} />
@@ -262,8 +265,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F4F8' },
   scrollContent: { paddingBottom: spacing.xl },
   header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
-  backButton: { marginBottom: spacing.lg },
-  backArrow: { fontSize: 20, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 8 },
+  backButton: { padding: 2 },
   title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 38 },
   titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 10 },
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },

@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
   Platform, TextInput,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -187,7 +188,7 @@ export default function IrisThoughtsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backArrow}>←</Text>
+            <CaretLeft size={20} color="#C4A882" weight="bold" />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Image source={{ uri: IRIS_AVATAR }} style={styles.headerAvatar} />

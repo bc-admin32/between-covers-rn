@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, Modal, TextInput,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -325,7 +326,7 @@ export default function CozyEventsScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backArrow}>←</Text>
+            <CaretLeft size={20} color="#0F2A48" weight="bold" />
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>Live & Upcoming</Text>

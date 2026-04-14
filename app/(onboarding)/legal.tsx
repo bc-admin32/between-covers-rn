@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, useWindowDimensions, Linking,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHtml, { CustomRendererProps, TBlock } from 'react-native-render-html';
@@ -104,7 +105,7 @@ export default function LegalDocScreen() {
           style={styles.backButton}
           onPress={() => router.canGoBack() ? router.back() : router.replace('/(onboarding)/acceptance' as any)}
         >
-          <Text style={styles.backArrow}>←</Text>
+          <CaretLeft size={20} color="#0F2A48" weight="bold" />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
       </View>

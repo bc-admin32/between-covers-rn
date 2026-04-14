@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
@@ -47,7 +48,7 @@ export default function CozyBooksScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backArrow}>←</Text>
+            <CaretLeft size={20} color="#0F2A48" weight="bold" />
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>This Month's Bookshelf</Text>

@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -110,12 +111,12 @@ export default function MonthlySubmitScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
-          <Text style={styles.backText}>The Lounge</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>{prompt.title}</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <CaretLeft size={20} color="#C4A882" weight="bold" />
+          </TouchableOpacity>
+          <Text style={styles.title} numberOfLines={2}>{prompt.title}</Text>
+        </View>
         <Text style={styles.body}>{prompt.body}</Text>
 
         <TextInput
@@ -156,10 +157,9 @@ export default function MonthlySubmitScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1A1A2E' },
   scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xl },
-  backArrow: { fontSize: 20, color: '#C4A882' },
-  backText: { fontSize: 13, color: '#C4A882' },
-  title: { fontSize: 34, color: '#FDFAF6', fontStyle: 'italic', fontWeight: '700', lineHeight: 40, marginBottom: spacing.sm },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(196,168,130,0.15)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  title: { fontSize: 28, flex: 1, color: '#FDFAF6', fontStyle: 'italic', fontWeight: '700', lineHeight: 34 },
   body: { fontSize: 14, color: 'rgba(253,250,246,0.6)', lineHeight: 22, marginBottom: spacing.xl },
   input: {
     backgroundColor: 'rgba(253,250,246,0.07)',

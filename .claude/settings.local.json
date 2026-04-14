@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe -Command \"pip install awscli -q 2>&1; aws --version 2>&1\")",
+      "Bash(powershell.exe -Command \"aws --version\")",
+      "Bash(powershell.exe -Command \"& 'C:\\\\Users\\\\lvcar\\\\AppData\\\\Roaming\\\\Python\\\\Python314\\\\Scripts\\\\aws' --version 2>&1\")",
+      "Bash(/c/Users/lvcar/AppData/Roaming/Python/Python314/Scripts/aws --version)",
+      "Bash(export AWS=/c/Users/lvcar/AppData/Roaming/Python/Python314/Scripts/aws)",
+      "Bash(/c/Users/lvcar/AppData/Roaming/Python/Python314/Scripts/aws sts:*)",
+      "Bash(powershell.exe -Command \"python 'c:/Users/lvcar/Documents/BetweenCovers/check_fonts.py'\")",
+      "Bash(python /c/Users/lvcar/AppData/Roaming/Python/Python314/Scripts/../../../python.exe --version)",
+      "Bash(npx expo:*)"
+    ]
+  }
+}

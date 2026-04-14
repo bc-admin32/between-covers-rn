@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
   Platform, Alert,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -276,13 +277,11 @@ export default function LoungeThreadScreen() {
     >
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
-          <Text style={styles.backText}>The Lounge</Text>
-        </TouchableOpacity>
-
         <View style={[styles.threadCard, isIrisChat && styles.threadCardIris]}>
           <View style={styles.threadCardHeader}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <CaretLeft size={16} color={isIrisChat ? '#9B6B9B' : '#B09A7E'} weight="bold" />
+            </TouchableOpacity>
             <Text style={[styles.threadCardLabel, isIrisChat && styles.threadCardLabelIris]}>
               {isIrisChat ? 'Iris Has Thoughts' : thread.topicLabel ?? 'Discussion'}
             </Text>
@@ -406,13 +405,11 @@ export default function LoungeThreadScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
   header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexShrink: 0 },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-  backArrow: { fontSize: 20, color: '#6A5550' },
-  backText: { fontSize: 13, color: '#6A5550' },
+  backButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   threadCard: { backgroundColor: '#FDFAF6', borderRadius: 20, padding: spacing.lg, borderWidth: 1, borderColor: '#DDD5C4' },
   threadCardIris: { borderColor: '#E8D5E5' },
   threadCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  threadCardLabel: { fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold', flex: 1 },
+  threadCardLabel: { flex: 1, fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold', flex: 1 },
   threadCardLabelIris: { color: '#9B6B9B' },
   threadCardReplies: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_600SemiBold', flexShrink: 0, marginLeft: 8 },
   threadCardAuthor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },

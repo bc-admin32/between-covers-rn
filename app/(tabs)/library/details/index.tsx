@@ -3,6 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -192,7 +193,7 @@ export default function BookDetailsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
+          <CaretLeft size={20} color="#fff" weight="bold" />
         </TouchableOpacity>
         <Text style={styles.notFound}>Book not found.</Text>
       </View>
@@ -225,7 +226,7 @@ export default function BookDetailsScreen() {
             style={[styles.backButton, { top: insets.top + 12 }]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backArrow}>←</Text>
+            <CaretLeft size={20} color="#fff" weight="bold" />
           </TouchableOpacity>
 
           <View style={styles.coverContainer}>

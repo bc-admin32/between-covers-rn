@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
@@ -120,11 +121,12 @@ export default function LoungeArchiveScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backArrow}>←</Text>
-            <Text style={styles.backText}>The Lounge</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>The Archive</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <CaretLeft size={22} color="#6A5550" weight="bold" />
+            </TouchableOpacity>
+            <Text style={styles.title}>The Archive</Text>
+          </View>
         </View>
 
         {loading ? (
@@ -149,10 +151,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
   scrollContent: { paddingBottom: 100 },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },
-  backArrow: { fontSize: 20, color: '#6A5550' },
-  backText: { fontSize: 13, color: '#6A5550' },
-  title: { fontSize: 42, color: '#1A1A2E', fontFamily: 'Nunito_800ExtraBold_Italic' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  backButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(106,85,80,0.1)', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 42, color: '#1A1A2E', fontFamily: 'Nunito_800ExtraBold_Italic', flexShrink: 1 },
   weeksList: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   weekRow: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: '#DDD5C4', backgroundColor: '#FDFAF6' },
   weekHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
