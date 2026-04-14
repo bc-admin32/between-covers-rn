@@ -155,6 +155,7 @@ export default function LoungeThreadScreen() {
   const [nextKey, setNextKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [threadExpanded, setThreadExpanded] = useState(false);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -296,7 +297,14 @@ export default function LoungeThreadScreen() {
               <Text style={styles.threadCardTime}>{timeAgo(thread.createdAt)}</Text>
             </View>
           </View>
-          {thread.body && <Text style={styles.threadCardBody}>{thread.body}</Text>}
+          {thread.body && (
+            <TouchableOpacity onPress={() => setThreadExpanded((e) => !e)} activeOpacity={0.85}>
+              <Text style={styles.threadCardBody} numberOfLines={threadExpanded ? undefined : 3}>{thread.body}</Text>
+              <Text style={[styles.threadCardToggle, isIrisChat && styles.threadCardToggleIris]}>
+                {threadExpanded ? 'Show less ▲' : 'Read more ▼'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -417,6 +425,8 @@ const styles = StyleSheet.create({
   threadCardAuthorNameIris: { color: '#9B6B9B' },
   threadCardTime: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_400Regular' },
   threadCardBody: { fontSize: 18, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 26 },
+  threadCardToggle: { fontSize: 11, color: '#B09A7E', marginTop: 4, fontFamily: 'Nunito_600SemiBold' },
+  threadCardToggleIris: { color: '#9B6B9B' },
   replies: { flex: 1 },
   repliesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 120 },
   emptyState: { paddingVertical: 64, alignItems: 'center', gap: spacing.sm },
