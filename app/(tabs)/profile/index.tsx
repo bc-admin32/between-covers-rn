@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
+import { signOut } from '../../../lib/signout';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost, apiPatch } from '../../../lib/api';
@@ -148,9 +149,7 @@ export default function ProfileScreen() {
       {
         text: 'Log Out', style: 'destructive',
         onPress: async () => {
-          await SecureStore.deleteItemAsync('bc_id_token');
-          await SecureStore.deleteItemAsync('bc_access_token');
-          await SecureStore.deleteItemAsync('bc_profile_cache');
+          await signOut();
           router.replace('/(auth)/login' as any);
         },
       },

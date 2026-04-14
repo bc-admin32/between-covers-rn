@@ -1,7 +1,7 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import {
   View, TouchableOpacity, Text, Image, StyleSheet,
-  Animated, Easing, Modal, Dimensions,
+  Animated, Easing, Modal,
 } from 'react-native';
 
 const WIG_IMAGE = require('../../assets/wig.png');
@@ -29,20 +29,22 @@ type OverlayState = {
 };
 
 type ParticleSpec = {
-  dx: number; dy: number; rotateEnd: number; delay: number; size: number;
+  dx: number; dy: number; rotateEnd: number; delay: number; size: number; isWig?: boolean;
 };
 
-function generateSpecs(count: number): ParticleSpec[] {
+function generateSpecs(count: number, wigIndices?: number[]): ParticleSpec[] {
   return Array.from({ length: count }, (_, i) => {
     const base = (i / count) * 2 * Math.PI;
-    const angle = base + (Math.random() - 0.5) * (Math.PI / count) * 2;
-    const distance = 65 + Math.random() * 110;
+    // Extra angle noise per particle for more chaotic spread
+    const angle = base + (Math.random() - 0.5) * (Math.PI / count) * 3;
+    const distance = 80 + Math.random() * 130;
     return {
       dx: Math.cos(angle) * distance,
-      dy: Math.sin(angle) * distance - 20,
-      rotateEnd: (Math.random() - 0.5) * 540,
-      delay: Math.floor(Math.random() * 80),
-      size: 13 + Math.floor(Math.random() * 8),
+      dy: Math.sin(angle) * distance - 25,
+      rotateEnd: (Math.random() - 0.5) * 720,
+      delay: Math.floor(Math.random() * 150),
+      size: 14 + Math.floor(Math.random() * 10),
+      isWig: wigIndices?.includes(i) ?? false,
     };
   });
 }
@@ -89,14 +91,16 @@ function KissParticle({ originX, originY, spec }: { originX: number; originY: nu
 
 // ─── Trash particle ───────────────────────────────────────────────────────────
 
-const TRASH_ITEMS = ['👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '🎭'];
+const TRASH_EMOJIS = ['👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀'];
 
-function TrashParticle({ originX, originY, spec, emoji }: { originX: number; originY: number; spec: ParticleSpec; emoji: string }) {
-  const x = useRef(new Animated.Value(0)).current;
-  const y = useRef(new Animated.Value(0)).current;
+function TrashParticle({ originX, originY, spec, emoji }: {
+  originX: number; originY: number; spec: ParticleSpec; emoji: string;
+}) {
+  const x       = useRef(new Animated.Value(0)).current;
+  const y       = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
-  const scale = useRef(new Animated.Value(0.2)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
+  const scale   = useRef(new Animated.Value(0.2)).current;
+  const rotate  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
@@ -107,14 +111,29 @@ function TrashParticle({ originX, originY, spec, emoji }: { originX: number; ori
         Animated.timing(y,       { toValue: spec.dy, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
         Animated.timing(rotate,  { toValue: 1,       duration: 700, useNativeDriver: true }),
         Animated.sequence([
-          Animated.delay(300),
-          Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+          Animated.delay(280),
+          Animated.timing(opacity, { toValue: 0, duration: 380, useNativeDriver: true }),
         ]),
       ]),
     ]).start();
   }, []);
 
   const rotateStr = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${spec.rotateEnd}deg`] });
+
+  if (spec.isWig) {
+    const wigSize = spec.size * 1.8;
+    return (
+      <Animated.View style={{
+        position: 'absolute',
+        left: originX - wigSize / 2,
+        top:  originY - wigSize / 2,
+        opacity,
+        transform: [{ translateX: x }, { translateY: y }, { rotate: rotateStr }, { scale }],
+      }}>
+        <Image source={WIG_IMAGE} style={{ width: wigSize, height: wigSize }} resizeMode="contain" />
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View style={{
@@ -131,30 +150,55 @@ function TrashParticle({ originX, originY, spec, emoji }: { originX: number; ori
 
 // ─── Overlay: burst + hero finale ────────────────────────────────────────────
 
+// Indices in the 28-particle set that render as the wig image instead of emoji.
+// Two wigs spread across the burst arc for visual variety.
+const WIG_PARTICLE_INDICES = new Set([5, 19]);
+
 function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () => void }) {
   const isKiss = state.type === 'kiss';
-  const specs  = useMemo(() => generateSpecs(isKiss ? 18 : 28), []);
 
-  // Phase 1 — trash-can shake at origin
+  // Wig indices only relevant for trash; pass empty set for kiss to keep specs clean.
+  const specs = useMemo(
+    () => generateSpecs(isKiss ? 18 : 28, isKiss ? [] : [...WIG_PARTICLE_INDICES]),
+    [],
+  );
+
+  // ── Kiss finale ─────────────────────────────────────────────────────────────
+  const heroScale   = useRef(new Animated.Value(0)).current;
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const heroY       = useRef(new Animated.Value(20)).current;
+
+  // ── Trash Phase 1: can shake ────────────────────────────────────────────────
   const trashShake = useRef(new Animated.Value(0)).current;
   const trashScale = useRef(new Animated.Value(1)).current;
 
-  // Phase 2 — hero finale
-  const heroScale   = useRef(new Animated.Value(0)).current;
-  const heroOpacity = useRef(new Animated.Value(0)).current;
-  const heroY       = useRef(new Animated.Value(20)).current;  // kiss drifts up
-
-  // Wig: launches from trash button, swirls to center
-  const { width: screenW, height: screenH } = Dimensions.get('window');
-  const wigX      = useRef(new Animated.Value(state.originX - screenW / 2)).current;
-  const wigY      = useRef(new Animated.Value(state.originY - screenH / 2)).current;
-  const wigScale  = useRef(new Animated.Value(0.25)).current;
-  const wigOp     = useRef(new Animated.Value(0)).current;
-  const wigRotate = useRef(new Animated.Value(0)).current;
+  // ── Trash Phase 3: 🤬🫷 finale ──────────────────────────────────────────────
+  const finaleScale   = useRef(new Animated.Value(0)).current;
+  const finaleOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Phase 1: trash can shake immediately
-    if (!isKiss) {
+    if (isKiss) {
+      // ── Kiss: burst → pause → 💋 pops in, holds, drifts up ─────────────────
+      const heroTimer = setTimeout(() => {
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(heroScale,   { toValue: 1.2, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.back(1.8)) }),
+            Animated.timing(heroOpacity, { toValue: 1,   duration: 150, useNativeDriver: true }),
+          ]),
+          Animated.timing(heroScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
+          Animated.delay(700),
+          Animated.parallel([
+            Animated.timing(heroY,       { toValue: -30, duration: 500, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+            Animated.timing(heroOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
+          ]),
+        ]).start();
+      }, 900);
+
+      const doneTimer = setTimeout(onDone, 2700);
+      return () => { clearTimeout(heroTimer); clearTimeout(doneTimer); };
+
+    } else {
+      // ── Trash Phase 1: can shudders the moment the button is pressed ─────────
       Animated.sequence([
         Animated.timing(trashScale, { toValue: 1.5, duration: 80, useNativeDriver: true }),
         Animated.parallel([
@@ -169,70 +213,45 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
           Animated.timing(trashScale, { toValue: 1, duration: 330, useNativeDriver: true }),
         ]),
       ]).start();
+
+      // ── Trash Phase 3: after chaos (~700ms) + dramatic pause (~400ms) ────────
+      // Particles are fully gone by ~660ms. We wait until ~1100ms for total
+      // silence before the 🤬🫷 slam.
+      const finaleTimer = setTimeout(() => {
+        Animated.sequence([
+          // Slam in: scale from 0 → 1.4 with a hard back-ease for impact
+          Animated.parallel([
+            Animated.timing(finaleScale,   { toValue: 1.4, duration: 180, useNativeDriver: true, easing: Easing.out(Easing.back(2.2)) }),
+            Animated.timing(finaleOpacity, { toValue: 1,   duration: 120, useNativeDriver: true }),
+          ]),
+          // Settle to natural size
+          Animated.timing(finaleScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
+          // Hold — let it sink in
+          Animated.delay(800),
+          // Fade out
+          Animated.timing(finaleOpacity, { toValue: 0, duration: 380, useNativeDriver: true }),
+        ]).start();
+      }, 1100);
+
+      // Total runtime: 1100ms pause + 180ms slam + 100ms settle + 800ms hold + 380ms fade ≈ 2580ms
+      const doneTimer = setTimeout(onDone, 2700);
+      return () => { clearTimeout(finaleTimer); clearTimeout(doneTimer); };
     }
-
-    // Phase 2: hero
-    const heroTimer = setTimeout(() => {
-      if (isKiss) {
-        // 💋 pops in centered, holds, drifts up and fades
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(heroScale,   { toValue: 1.2, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.back(1.8)) }),
-            Animated.timing(heroOpacity, { toValue: 1,   duration: 150, useNativeDriver: true }),
-          ]),
-          Animated.timing(heroScale, { toValue: 1.0, duration: 100, useNativeDriver: true }),
-          Animated.delay(700),
-          Animated.parallel([
-            Animated.timing(heroY,       { toValue: -30, duration: 500, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
-            Animated.timing(heroOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
-          ]),
-        ]).start();
-      } else {
-        // Wig thrown from trash button — arcs up then lands at center, right-side up
-        const startY = wigY._value;
-        Animated.sequence([
-          Animated.parallel([
-            // Appear immediately
-            Animated.timing(wigOp,    { toValue: 1,   duration: 60,  useNativeDriver: true }),
-            // X: straight across to center
-            Animated.timing(wigX,     { toValue: 0,   duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-            // Y: arc — up first, then land at center
-            Animated.sequence([
-              Animated.timing(wigY,   { toValue: startY - 220, duration: 280, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-              Animated.timing(wigY,   { toValue: 0,            duration: 320, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
-            ]),
-            // Scale up as it flies in
-            Animated.timing(wigScale, { toValue: 1.1, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-            // Exactly 2 full rotations = 720° → lands right-side up
-            Animated.timing(wigRotate, { toValue: 2, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
-          ]),
-          // Landing bounce
-          Animated.timing(wigScale, { toValue: 1.15, duration: 120, useNativeDriver: true }),
-          Animated.timing(wigScale, { toValue: 1.0,  duration: 120, useNativeDriver: true }),
-          // Hold
-          Animated.delay(750),
-          // Fade
-          Animated.timing(wigOp, { toValue: 0, duration: 300, useNativeDriver: true }),
-        ]).start();
-      }
-    }, 900);
-
-    const doneTimer = setTimeout(onDone, 2700);
-    return () => { clearTimeout(heroTimer); clearTimeout(doneTimer); };
   }, []);
 
   return (
     <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={() => {}}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
 
-        {/* Burst particles */}
+        {/* ── Phase 1 particles ─────────────────────────────────────────────── */}
         {specs.map((spec, i) =>
           isKiss
             ? <KissParticle  key={i} originX={state.originX} originY={state.originY} spec={spec} />
-            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} emoji={TRASH_ITEMS[i % TRASH_ITEMS.length]} />
+            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec}
+                emoji={TRASH_EMOJIS[i % TRASH_EMOJIS.length]} />
         )}
 
-        {/* Trash-can shake at button origin */}
+        {/* ── Trash-can shake at button origin ──────────────────────────────── */}
         {!isKiss && (
           <Animated.View style={{
             position: 'absolute',
@@ -245,22 +264,26 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
           </Animated.View>
         )}
 
-        {/* Hero finale */}
-        {isKiss ? (
-          <Animated.View style={[styles.heroContainer, { opacity: heroOpacity, transform: [{ scale: heroScale }, { translateY: heroY }] }]}>
+        {/* ── Kiss hero finale ──────────────────────────────────────────────── */}
+        {isKiss && (
+          <Animated.View style={[styles.heroContainer, {
+            opacity: heroOpacity,
+            transform: [{ scale: heroScale }, { translateY: heroY }],
+          }]}>
             <Text style={styles.heroEmoji}>💋</Text>
           </Animated.View>
-        ) : (
+        )}
+
+        {/* ── Trash hero finale: Phase 3 ────────────────────────────────────── */}
+        {!isKiss && (
           <Animated.View style={[styles.heroContainer, {
-            opacity: wigOp,
-            transform: [
-              { translateX: wigX },
-              { translateY: wigY },
-              { scale: wigScale },
-              { rotate: wigRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) },
-            ],
+            opacity: finaleOpacity,
+            transform: [{ scale: finaleScale }],
           }]}>
-            <Image source={WIG_IMAGE} style={styles.heroWig} resizeMode="contain" />
+            <View style={styles.finaleRow}>
+              <Text style={styles.finaleEmoji}>🤬</Text>
+              <Text style={styles.finaleEmoji}>🫷</Text>
+            </View>
           </Animated.View>
         )}
       </View>
@@ -358,9 +381,13 @@ const styles = StyleSheet.create({
   heroEmoji: {
     fontSize: 80,
   },
-  heroWig: {
-    width: 120,
-    height: 120,
+  finaleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  finaleEmoji: {
+    fontSize: 80,
   },
   row: {
     flexDirection: 'row',

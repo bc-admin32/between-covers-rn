@@ -7,8 +7,8 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import * as SecureStore from 'expo-secure-store';
 import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
+import { signOut } from '../../../../lib/signout';
 import { spacing, radius, colors } from '../../../../lib/theme';
 
 function SectionCard({ title, children, danger }: {
@@ -118,9 +118,8 @@ export default function AccountSettingsScreen() {
           onPress: async () => {
             setDeactivating(true);
             try {
-              await apiPost('/account/deactivate');
-              await SecureStore.deleteItemAsync('bc_id_token');
-              await SecureStore.deleteItemAsync('bc_access_token');
+              await apiPost('/account/deactivate', {});
+              await signOut();
               router.replace('/(auth)/login' as any);
             } finally {
               setDeactivating(false);
@@ -143,9 +142,8 @@ export default function AccountSettingsScreen() {
           onPress: async () => {
             setDeleting(true);
             try {
-              await apiPost('/account/delete');
-              await SecureStore.deleteItemAsync('bc_id_token');
-              await SecureStore.deleteItemAsync('bc_access_token');
+              await apiPost('/account/delete', {});
+              await signOut();
               router.replace('/(auth)/login' as any);
             } finally {
               setDeleting(false);

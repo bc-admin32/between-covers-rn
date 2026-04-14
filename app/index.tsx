@@ -3,9 +3,14 @@ import { View, Image, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { normalizeRoute } from '../lib/routes';
+import { signOut } from '../lib/signout';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
+
+function isValidJwt(token: string): boolean {
+  return token.split('.').length === 3;
+}
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -14,16 +19,23 @@ export default function SplashScreen() {
     const run = async () => {
       const start = Date.now();
 
+      const forceLogin = async () => {
+        // Wipe any stale tokens before landing on the login screen so the
+        // user starts completely fresh (no Face ID prompt, no cached session).
+        await signOut();
+        router.replace('/(auth)/login');
+      };
+
       try {
         const idToken = await SecureStore.getItemAsync('bc_id_token');
 
         const elapsed = Date.now() - start;
         const remaining = Math.max(0, MIN_SPLASH_TIME - elapsed);
-
         await new Promise(resolve => setTimeout(resolve, remaining));
 
-        if (!idToken) {
-          router.replace('/(auth)/login');
+        // No token or malformed token — clean up and go to login.
+        if (!idToken || !isValidJwt(idToken)) {
+          await forceLogin();
           return;
         }
 
@@ -32,8 +44,11 @@ export default function SplashScreen() {
           headers: { Authorization: `Bearer ${idToken}` },
         });
 
+        // Non-200 means the token is expired, the user was deleted/deactivated,
+        // or the account no longer exists. Force a full signout so no stale
+        // credentials remain and the login screen starts fresh.
         if (!res.ok) {
-          router.replace('/(auth)/login');
+          await forceLogin();
           return;
         }
 
@@ -42,10 +57,10 @@ export default function SplashScreen() {
         if (result?.nextRoute?.startsWith('/')) {
           router.replace(normalizeRoute(result.nextRoute) as any);
         } else {
-          router.replace('/(auth)/login');
+          await forceLogin();
         }
       } catch {
-        router.replace('/(auth)/login');
+        await forceLogin();
       }
     };
 

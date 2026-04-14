@@ -3,7 +3,16 @@ import * as SecureStore from 'expo-secure-store';
 const API_BASE = 'https://api.betweencovers.app';
 
 async function getToken(): Promise<string | null> {
-  return SecureStore.getItemAsync('bc_id_token');
+  const raw = await SecureStore.getItemAsync('bc_id_token');
+  // A valid JWT has exactly three dot-separated segments. If the stored value
+  // is missing, truncated, or otherwise malformed, discard it and clear it
+  // so we don't forward a bad Authorization header to the API.
+  if (!raw) return null;
+  if (raw.split('.').length !== 3) {
+    await SecureStore.deleteItemAsync('bc_id_token').catch(() => {});
+    return null;
+  }
+  return raw;
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -24,7 +33,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new Error(err?.message ?? `API error ${res.status}`);
   }
 
-  return res.json();
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 export function apiGet<T = any>(path: string): Promise<T> {

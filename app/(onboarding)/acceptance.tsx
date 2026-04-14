@@ -18,11 +18,16 @@ const POLICIES = [
 export default function AcceptanceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [openedDocs, setOpenedDocs] = useState<Set<string>>(new Set());
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const allDocsOpened = POLICIES.every((p) => openedDocs.has(p.doc));
+  const canAccept = allDocsOpened;
+  const canContinue = allDocsOpened && accepted;
+
   const handleContinue = async () => {
-    if (!accepted || submitting) return;
+    if (!canContinue || submitting) return;
     setSubmitting(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -42,42 +47,55 @@ export default function AcceptanceScreen() {
         <Text style={styles.subtitle}>Please review and accept our policies to proceed.</Text>
 
         <View style={styles.card}>
-          {POLICIES.map((p, i) => (
-            <View key={p.doc}>
-              <TouchableOpacity
-                style={styles.policyRow}
-                onPress={() => router.push(`/legal/document?doc=${p.doc}` as any)}
-              >
-                <View style={styles.policyLeft}>
-                  <Text style={styles.policyIcon}>{p.icon}</Text>
-                  <Text style={styles.policyLabel}>{p.label}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-              {i < POLICIES.length - 1 && <View style={styles.divider} />}
-            </View>
-          ))}
+          {POLICIES.map((p, i) => {
+            const opened = openedDocs.has(p.doc);
+            return (
+              <View key={p.doc}>
+                <TouchableOpacity
+                  style={styles.policyRow}
+                  onPress={() => {
+                    setOpenedDocs((prev) => new Set([...prev, p.doc]));
+                    router.push(`/legal/document?doc=${p.doc}` as any);
+                  }}
+                >
+                  <View style={styles.policyLeft}>
+                    <Text style={styles.policyIcon}>{p.icon}</Text>
+                    <Text style={[styles.policyLabel, opened && styles.policyLabelOpened]}>{p.label}</Text>
+                  </View>
+                  {opened
+                    ? <Text style={styles.openedCheck}>✓</Text>
+                    : <Text style={styles.chevron}>›</Text>
+                  }
+                </TouchableOpacity>
+                {i < POLICIES.length - 1 && <View style={styles.divider} />}
+              </View>
+            );
+          })}
 
           <View style={styles.divider} />
 
           <TouchableOpacity
             style={styles.checkboxRow}
             onPress={() => {
+              if (!canAccept) return;
               Haptics.selectionAsync();
               setAccepted(!accepted);
             }}
+            activeOpacity={canAccept ? 0.7 : 1}
           >
-            <View style={[styles.checkbox, accepted && styles.checkboxChecked]}>
+            <View style={[styles.checkbox, accepted && styles.checkboxChecked, !canAccept && styles.checkboxDisabled]}>
               {accepted && <Text style={styles.checkmark}>✓</Text>}
             </View>
-            <Text style={styles.checkboxLabel}>I have read and accept all policies</Text>
+            <Text style={[styles.checkboxLabel, !canAccept && styles.checkboxLabelDisabled]}>
+              I have read and accept all policies
+            </Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity
-          style={[styles.continueButton, (!accepted || submitting) && styles.continueDisabled]}
+          style={[styles.continueButton, (!canContinue || submitting) && styles.continueDisabled]}
           onPress={handleContinue}
-          disabled={!accepted || submitting}
+          disabled={!canContinue || submitting}
         >
           <Text style={styles.continueText}>
             {submitting ? 'Continuing…' : 'Continue'}
@@ -180,6 +198,21 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#0F2A48',
+  },
+  checkboxDisabled: {
+    borderColor: '#D4C4C4',
+    backgroundColor: '#F8F5F5',
+  },
+  checkboxLabelDisabled: {
+    color: '#B8A8A8',
+  },
+  policyLabelOpened: {
+    color: '#7A9AB0',
+  },
+  openedCheck: {
+    fontSize: 15,
+    color: '#B83255',
+    fontWeight: '700',
   },
   continueButton: {
     width: '100%',
