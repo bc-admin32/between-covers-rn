@@ -1,8 +1,10 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import {
-  View, TouchableOpacity, Text, StyleSheet,
+  View, TouchableOpacity, Text, Image, StyleSheet,
   Animated, Easing, Modal,
 } from 'react-native';
+
+const WIG_IMAGE = require('../../assets/wig.png');
 
 export type Verdict = 'trash' | 'meh' | 'cute' | 'obsessed' | 'chefs_kiss';
 
@@ -231,7 +233,7 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
           </Animated.View>
         ) : (
           <Animated.View style={[styles.heroContainer, { opacity: heroOpacity, transform: [{ scale: heroScale }, { translateX: heroShake }] }]}>
-            <Text style={styles.heroEmoji}>🎭</Text>
+            <Image source={WIG_IMAGE} style={styles.heroWig} resizeMode="contain" />
           </Animated.View>
         )}
       </View>
@@ -328,6 +330,10 @@ const styles = StyleSheet.create({
   },
   heroEmoji: {
     fontSize: 80,
+  },
+  heroWig: {
+    width: 120,
+    height: 120,
   },
   row: {
     flexDirection: 'row',
