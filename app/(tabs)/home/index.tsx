@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ImageBackground, Animated,
+  ActivityIndicator, ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { apiGet, apiPost } from '../../../lib/api';
@@ -49,13 +50,16 @@ export default function HomeScreen() {
   }, []);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [focusCount, setFocusCount] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    setFocusCount((c) => c + 1);
+  }, []));
   const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [watched, setWatched] = useState(false);
   const markedRef = useRef(false);
   const overlayOpenRef = useRef(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
   const player = useVideoPlayer(
     data?.irisDaily?.videoUrl ?? '',
     (p) => { p.loop = false; }
@@ -75,14 +79,6 @@ export default function HomeScreen() {
     return () => sub.remove();
   }, [player]);
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -110,7 +106,7 @@ export default function HomeScreen() {
       }
     };
     load();
-  }, [retryCount]);
+  }, [retryCount, focusCount]);
 
   useEffect(() => {
     apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
@@ -231,12 +227,12 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity onPress={openVideo}>
-                  <Animated.View style={[styles.irisAvatarWrapper, { transform: [{ scale: pulseAnim }] }]}>
+                  <View style={styles.irisAvatarWrapper}>
                     <Image
                       source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
                       style={styles.irisAvatar}
                     />
-                  </Animated.View>
+                  </View>
                 </TouchableOpacity>
               )}
             </View>

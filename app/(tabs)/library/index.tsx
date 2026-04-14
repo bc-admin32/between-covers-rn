@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Image, ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../../lib/api';
@@ -42,7 +42,7 @@ export default function LibraryScreen() {
   const [gridView, setGridView] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     async function load() {
       try {
         const [snapshotRes, libraryRes] = await Promise.all([
@@ -59,7 +59,7 @@ export default function LibraryScreen() {
       }
     }
     load();
-  }, []);
+  }, []));
 
   useEffect(() => {
     if (!loaded) return;

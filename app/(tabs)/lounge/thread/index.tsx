@@ -338,7 +338,7 @@ export default function LoungeThreadScreen() {
 
       {/* COMPOSER */}
       {isClosed ? (
-        <View style={[styles.closedBar, { paddingBottom: insets.bottom + spacing.md }]}>
+        <View style={[styles.closedBar, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
           <View style={styles.closedPill}>
             <Text style={styles.closedEmoji}>🔒</Text>
             <Text style={styles.closedText}>This conversation has closed</Text>
@@ -346,7 +346,7 @@ export default function LoungeThreadScreen() {
           <Text style={styles.closedSubtext}>Thanks for being part of it ✦</Text>
         </View>
       ) : (
-        <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
+        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
           {replyingTo && (
             <View style={styles.replyingToBar}>
               <Text style={styles.replyingToText}>↩ Replying to <Text style={styles.replyingToName}>@{replyingTo.displayName}</Text></Text>
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   threadCardTime: { fontSize: 11, color: '#C4A882' },
   threadCardBody: { fontSize: 18, color: '#1A1A2E', fontStyle: 'italic', lineHeight: 26 },
   replies: { flex: 1 },
-  repliesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  repliesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 120 },
   emptyState: { paddingVertical: 64, alignItems: 'center', gap: spacing.sm },
   emptyTitle: { fontSize: 22, color: '#C4A882', fontStyle: 'italic' },
   emptySubtitle: { fontSize: 13, color: '#B09A7E' },

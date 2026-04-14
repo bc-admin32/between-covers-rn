@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
   backButton: { marginBottom: spacing.lg },
   backArrow: { fontSize: 20, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  title: { fontSize: 34, fontStyle: 'italic', color: '#F0EDE4', lineHeight: 38 },
+  title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 38 },
   titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 10 },
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { padding: spacing.lg },

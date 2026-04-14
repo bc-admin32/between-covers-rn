@@ -34,7 +34,12 @@
   "expo-router",
   ["expo-font", {
     "fonts": [
-      "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"
+      "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf",
+      "./node_modules/@expo-google-fonts/dancing-script/400Regular/DancingScript_400Regular.ttf",
+      "./node_modules/@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf",
+      "./node_modules/@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf",
+      "./node_modules/@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf",
+      "./node_modules/@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf"
     ]
   }],
   "expo-secure-store",

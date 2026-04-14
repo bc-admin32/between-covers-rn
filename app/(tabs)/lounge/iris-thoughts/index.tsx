@@ -180,7 +180,8 @@ export default function IrisThoughtsScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={insets.top}
     >
       {/* HEADER */}
       <View style={styles.header}>
@@ -240,7 +241,7 @@ export default function IrisThoughtsScreen() {
 
       {/* COMPOSER */}
       {thread && (
-        <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
+        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
           {showEmojiTray && (
             <View style={styles.emojiTray}>
               {EMOJI_TRAY.map((emoji) => (
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
   threadBodyText: { fontSize: 18, color: '#1A1A2E', fontStyle: 'italic', lineHeight: 26 },
   threadBodyAuthor: { fontSize: 10, color: '#9B6B9B', fontWeight: '600', marginTop: spacing.xs },
   messages: { flex: 1 },
-  messagesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  messagesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 120 },
   irisBubbleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-end', gap: spacing.sm, marginBottom: spacing.md },
   irisBubbleContent: { maxWidth: '78%', alignItems: 'flex-end' },
   irisBubble: { backgroundColor: '#FDFAF6', borderRadius: 18, borderBottomRightRadius: 4, padding: spacing.md, borderWidth: 1, borderColor: '#E8D5E5' },

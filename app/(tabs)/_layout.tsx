@@ -53,11 +53,13 @@ export default function TabLayout() {
         tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }],
         tabBarShowLabel: false,
         tabBarItemStyle: styles.tabBarItem,
+        tabBarBackground: () => null,
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <TabIcon name="home" focused={focused} />
           ),
@@ -66,6 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cozy"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <TabIcon name="cozy" focused={focused} />
           ),
@@ -74,6 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="library"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <TabIcon name="library" focused={focused} />
           ),
@@ -82,6 +86,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="lounge"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <View style={styles.loungeWrapper}>
               <TabIcon name="lounge" focused={focused} />
@@ -93,6 +98,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <TabIcon name="profile" focused={focused} />
           ),
@@ -104,7 +110,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#F0EDE4',
+    position: 'absolute',
+    backgroundColor: 'transparent',
     borderTopWidth: 0,
     elevation: 0,
     height: 88,

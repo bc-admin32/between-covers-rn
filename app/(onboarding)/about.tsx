@@ -57,7 +57,7 @@ export default function AboutScreen() {
             disabled={submitting}
           >
             <Text style={styles.buttonText}>
-              {submitting ? 'Starting…' : 'Start Exploring'}
+              {submitting ? 'Entering…' : 'Step Inside'}
             </Text>
           </TouchableOpacity>
         </View>

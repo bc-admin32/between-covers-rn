@@ -230,7 +230,18 @@ export default function CozyItemsScreen() {
                         if (isRecipe) { setActiveRecipe(item); return; }
                         if (actionLink) {
                           const isSpotify = actionLink.includes('spotify.com') || actionLink.startsWith('spotify:');
-                          isSpotify ? Linking.openURL(actionLink) : WebBrowser.openBrowserAsync(actionLink);
+                          if (isSpotify) {
+                            const spotifyUri = actionLink
+                              .replace('https://open.spotify.com/', 'spotify:')
+                              .replace('/playlist/', ':playlist:')
+                              .replace('/track/', ':track:')
+                              .replace('/album/', ':album:');
+                            Linking.canOpenURL(spotifyUri).then((canOpen) =>
+                              Linking.openURL(canOpen ? spotifyUri : actionLink)
+                            ).catch(() => {});
+                          } else {
+                            WebBrowser.openBrowserAsync(actionLink);
+                          }
                         }
                       }}
                       disabled={!isRecipe && !actionLink}
@@ -256,7 +267,7 @@ const styles = StyleSheet.create({
   backButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
   backArrow: { fontSize: 18, color: '#0F2A48', fontWeight: '600' },
   headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4' },
-  headerTitle: { fontSize: 26, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 30 },
+  headerTitle: { fontSize: 26, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', lineHeight: 30 },
   irisButton: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
   irisAvatar: { width: 44, height: 44, borderRadius: 22 },
   irisNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, backgroundColor: '#fff', borderRadius: radius.md, borderWidth: 1, borderColor: '#D7E2E9' },
@@ -298,7 +309,7 @@ const styles = StyleSheet.create({
   recipeImage: { marginHorizontal: -spacing.lg, marginBottom: spacing.md, aspectRatio: 16 / 9, overflow: 'hidden', borderRadius: 16 },
   recipeImageImg: { width: '100%', height: '100%' },
   recipeLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 6 },
-  recipeTitle: { fontSize: 26, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 32, marginBottom: spacing.md },
+  recipeTitle: { fontSize: 26, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', lineHeight: 32, marginBottom: spacing.md },
   recipeDivider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginBottom: spacing.lg },
   recipeBody: { fontSize: 14, fontWeight: '300', color: '#3d352e', lineHeight: 25 },
   recipeEmpty: { fontSize: 14, fontStyle: 'italic', color: '#9c8f7e' },

@@ -83,7 +83,18 @@ function isPromoActive(endDate?: string): boolean {
   return new Date() <= new Date(endDate);
 }
 
-function openLink(url: string) {
+async function openLink(url: string) {
+  const isSpotify = url.includes('spotify.com') || url.startsWith('spotify:');
+  if (isSpotify) {
+    const spotifyUri = url
+      .replace('https://open.spotify.com/', 'spotify:')
+      .replace('/playlist/', ':playlist:')
+      .replace('/track/', ':track:')
+      .replace('/album/', ':album:');
+    const canOpen = await Linking.canOpenURL(spotifyUri);
+    Linking.openURL(canOpen ? spotifyUri : url).catch(() => {});
+    return;
+  }
   const isHttp = url.startsWith('http://') || url.startsWith('https://');
   isHttp
     ? WebBrowser.openBrowserAsync(url).catch(() => {})
@@ -439,7 +450,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F4F8' },
   scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
-  headerTitle: { fontSize: 24, fontStyle: 'italic', color: '#0F2A48', fontWeight: '400' },
+  headerTitle: { fontSize: 24, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48' },
   archiveButton: { borderWidth: 1, borderColor: '#ddd4c8', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 4 },
   archiveButtonText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
   irisCardOuter: { backgroundColor: '#A9C0D4', borderRadius: 20, padding: 14, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3 },
@@ -447,14 +458,14 @@ const styles = StyleSheet.create({
   irisAvatarButton: { width: 60, height: 60, borderRadius: 30, overflow: 'hidden', backgroundColor: '#F1F4F8', flexShrink: 0 },
   irisAvatar: { width: 60, height: 60, borderRadius: 30 },
   irisText: { flex: 1 },
-  irisCardTitle: { fontSize: 17, fontWeight: '500', color: '#0F2A48', fontStyle: 'italic', marginBottom: 4 },
+  irisCardTitle: { fontSize: 17, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 4 },
   irisCardBody: { fontSize: 12, fontWeight: '300', color: '#6A5969', lineHeight: 18 },
   themeSection: { marginBottom: spacing.md },
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e8e0d4' },
   dividerStar: { marginHorizontal: spacing.sm, color: '#C4A882', fontSize: 12 },
   themeLabel: { fontSize: 10, fontWeight: '300', letterSpacing: 2.2, textTransform: 'uppercase', color: '#b0a090', textAlign: 'center', marginBottom: 10 },
-  themeTitle: { fontSize: 34, fontWeight: '300', fontStyle: 'italic', color: '#2a1f18', textAlign: 'center', marginBottom: 14, lineHeight: 38 },
+  themeTitle: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#2a1f18', textAlign: 'center', marginBottom: 14, lineHeight: 38 },
   taglineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: spacing.md, paddingHorizontal: 12 },
   taglineLine: { flex: 1, maxWidth: 44, height: 1, backgroundColor: '#e0d8cc' },
   tagline: { fontSize: 15, fontWeight: '300', fontStyle: 'italic', color: '#8a7c6e', textAlign: 'center', lineHeight: 22 },
@@ -493,7 +504,7 @@ const styles = StyleSheet.create({
   recipeImage: { marginHorizontal: -spacing.lg, marginBottom: spacing.md, aspectRatio: 16 / 9, overflow: 'hidden', borderRadius: 16 },
   recipeImageImg: { width: '100%', height: '100%' },
   recipeLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 6 },
-  recipeTitle: { fontSize: 26, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 32, marginBottom: spacing.md },
+  recipeTitle: { fontSize: 26, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', lineHeight: 32, marginBottom: spacing.md },
   recipeDivider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginBottom: spacing.lg },
   recipeBody: { fontSize: 14, fontWeight: '300', color: '#3d352e', lineHeight: 25 },
   recipeEmpty: { fontSize: 14, fontStyle: 'italic', color: '#9c8f7e' },

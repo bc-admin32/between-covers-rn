@@ -101,8 +101,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 34,
+    fontFamily: 'DancingScript_700Bold',
     color: '#0F2A48',
     textAlign: 'center',
     marginBottom: spacing.sm,

@@ -94,13 +94,13 @@ function KissParticle({
   );
 }
 
-// ─── Trash particle (crumpled paper ball with word) ──────────────────────────
+// ─── Trash particle (thrown items) ───────────────────────────────────────────
 
-const TRASH_WORDS = ['skip', 'nope', 'meh', 'bye', 'hard\npass', 'ugh', 'next'];
+const TRASH_ITEMS = ['👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '👢', '🍅', '🥚', '🧻', '🚽', '💩', '🤡', '💔', '🥀', '🎭'];
 
 function TrashParticle({
-  originX, originY, spec, word,
-}: { originX: number; originY: number; spec: ParticleSpec; word: string }) {
+  originX, originY, spec, emoji,
+}: { originX: number; originY: number; spec: ParticleSpec; emoji: string }) {
   const x       = useRef(new Animated.Value(0)).current;
   const y       = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
@@ -128,28 +128,15 @@ function TrashParticle({
     outputRange: ['0deg', `${spec.rotateEnd}deg`],
   });
 
-  const r = spec.size / 2;
-
   return (
     <Animated.View style={{
       position: 'absolute',
-      left:         originX - r,
-      top:          originY - r,
-      width:        spec.size,
-      height:       spec.size,
-      borderRadius: r,
-      backgroundColor: '#F5F3F0',
-      borderWidth: 1,
-      borderColor: '#D4CFC9',
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
+      left: originX - spec.size / 2,
+      top:  originY - spec.size / 2,
       opacity,
       transform: [{ translateX: x }, { translateY: y }, { rotate: rotateStr }, { scale }],
     }}>
-      <Text style={{ fontSize: spec.size * 0.26, color: '#9ca3af', fontWeight: '700', textAlign: 'center', lineHeight: spec.size * 0.3 }} numberOfLines={2}>
-        {word}
-      </Text>
+      <Text style={{ fontSize: spec.size, lineHeight: spec.size + 2 }}>{emoji}</Text>
     </Animated.View>
   );
 }
@@ -193,7 +180,7 @@ function ParticleOverlay({
         {specs.map((spec, i) =>
           isKiss
             ? <KissParticle  key={i} originX={state.originX} originY={state.originY} spec={spec} />
-            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} word={TRASH_WORDS[i % TRASH_WORDS.length]} />
+            : <TrashParticle key={i} originX={state.originX} originY={state.originY} spec={spec} emoji={TRASH_ITEMS[i % TRASH_ITEMS.length]} />
         )}
 
         {/* Shaking trash can overlaid at origin */}

@@ -43,7 +43,7 @@ export default function AccountSettingsScreen() {
   const [email, setEmail] = useState('');
   const [timeZone, setTimeZone] = useState('America/Chicago');
   const [timeZoneMode, setTimeZoneMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
-  const [country, setCountry] = useState<'US' | 'CA'>('US');
+  const [country, setCountry] = useState<'US' | 'CA' | 'GB' | 'AU'>('US');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
@@ -201,16 +201,21 @@ export default function AccountSettingsScreen() {
               />
             </Field>
             <Field label="Country">
-              <View style={styles.countryRow}>
-                {(['US', 'CA'] as const).map((c) => (
+              <View style={styles.countryGrid}>
+                {([
+                  { key: 'US', label: '🇺🇸 United States' },
+                  { key: 'CA', label: '🇨🇦 Canada' },
+                  { key: 'GB', label: '🇬🇧 United Kingdom' },
+                  { key: 'AU', label: '🇦🇺 Australia' },
+                ] as const).map((c) => (
                   <TouchableOpacity
-                    key={c}
-                    style={[styles.countryOption, country === c && styles.countryOptionSelected]}
-                    onPress={() => setCountry(c)}
+                    key={c.key}
+                    style={[styles.countryOption, country === c.key && styles.countryOptionSelected]}
+                    onPress={() => setCountry(c.key)}
                     disabled={loadFailed}
                   >
-                    <Text style={[styles.countryOptionText, country === c && styles.countryOptionTextSelected]}>
-                      {c === 'US' ? '🇺🇸 United States' : '🇨🇦 Canada'}
+                    <Text style={[styles.countryOptionText, country === c.key && styles.countryOptionTextSelected]}>
+                      {c.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -322,7 +327,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
   backButton: { marginBottom: spacing.lg },
   backArrow: { fontSize: 20, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  title: { fontSize: 34, fontStyle: 'italic', color: '#F0EDE4', lineHeight: 38 },
+  title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 38 },
   titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 10 },
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
@@ -337,7 +342,8 @@ const styles = StyleSheet.create({
   input: { height: 46, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff', paddingHorizontal: 14, fontSize: 14, color: '#0F2A48' },
   inputDisabled: { backgroundColor: '#F1F4F8', color: '#A9C0D4' },
   countryRow: { flexDirection: 'row', gap: spacing.sm },
-  countryOption: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', alignItems: 'center', backgroundColor: '#fff' },
+  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  countryOption: { width: '47%', paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', alignItems: 'center', backgroundColor: '#fff' },
   countryOptionSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
   countryOptionText: { fontSize: 13, color: '#0F2A48' },
   countryOptionTextSelected: { color: '#fff', fontWeight: '600' },
