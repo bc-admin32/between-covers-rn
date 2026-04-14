@@ -2,13 +2,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { FileText, Lock, UsersThree, ShieldCheck } from 'phosphor-react-native';
 import { spacing } from '../../../../lib/theme';
 
 const LEGAL_LINKS = [
-  { label: 'Terms of Service', doc: 'terms-of-use' },
-  { label: 'Privacy Policy', doc: 'privacy-policy' },
-  { label: 'Community Guidelines', doc: 'community-guidelines' },
-  { label: 'Reporting & Enforcement', doc: 'reporting-enforcement' },
+  { label: 'Terms of Service',        doc: 'terms-of-use',           Icon: FileText   },
+  { label: 'Privacy Policy',          doc: 'privacy-policy',         Icon: Lock       },
+  { label: 'Community Guidelines',    doc: 'community-guidelines',   Icon: UsersThree },
+  { label: 'Reporting & Enforcement', doc: 'reporting-enforcement',  Icon: ShieldCheck },
 ];
 
 export default function LegalScreen() {
@@ -37,6 +38,7 @@ export default function LegalScreen() {
               style={[styles.row, index !== 0 && styles.rowBorder]}
               onPress={() => router.push(`/(tabs)/profile/legal/document?doc=${item.doc}` as any)}
             >
+              <item.Icon size={18} color="#6B9AB8" weight="duotone" />
               <Text style={styles.rowLabel}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={14} color="rgba(15,42,72,0.25)" />
             </TouchableOpacity>
@@ -62,9 +64,9 @@ const styles = StyleSheet.create({
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { padding: spacing.lg },
   card: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.06)' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'space-between', padding: spacing.lg },
   rowBorder: { borderTopWidth: 1, borderTopColor: 'rgba(15,42,72,0.07)' },
-  rowLabel: { fontSize: 14, color: '#0F2A48' },
+  rowLabel: { flex: 1, fontSize: 14, color: '#0F2A48' },
   support: { marginTop: spacing.xl, textAlign: 'center', fontSize: 12, color: '#A9C0D4', letterSpacing: 0.2 },
   supportLink: { color: '#6B9AB8' },
 });
