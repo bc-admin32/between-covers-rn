@@ -315,7 +315,7 @@ export default function VerdictRating({ value = null, onChange, size = 'md' }: P
         />
       ))}
       {overlay && (
-        <EmojiOverlay state={overlay} onDone={() => setOverlay(null)} />
+        <ParticleOverlay state={overlay} onDone={() => setOverlay(null)} />
       )}
     </View>
   );
