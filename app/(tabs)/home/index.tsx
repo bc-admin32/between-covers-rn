@@ -37,43 +37,43 @@ type HomeData = {
 
 function IrisPulseAvatar({ uri, onPress }: { uri: string; onPress: () => void }) {
   const ringScale   = useRef(new Animated.Value(1)).current;
-  const ringOpacity = useRef(new Animated.Value(0.7)).current;
+  const ringOpacity = useRef(new Animated.Value(0.35)).current;
   const ring2Scale  = useRef(new Animated.Value(1)).current;
-  const ring2Opacity= useRef(new Animated.Value(0.4)).current;
+  const ring2Opacity= useRef(new Animated.Value(0.2)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Glow rings
+    // Soft pulse rings
     Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(ringScale,   { toValue: 1.55, duration: 900, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
-          Animated.timing(ringScale,   { toValue: 1,    duration: 900, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+          Animated.timing(ringScale,   { toValue: 1.25, duration: 1200, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+          Animated.timing(ringScale,   { toValue: 1,    duration: 1200, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
         ]),
         Animated.sequence([
-          Animated.timing(ringOpacity, { toValue: 0,   duration: 900, useNativeDriver: true }),
-          Animated.timing(ringOpacity, { toValue: 0.7, duration: 900, useNativeDriver: true }),
+          Animated.timing(ringOpacity, { toValue: 0,    duration: 1200, useNativeDriver: true }),
+          Animated.timing(ringOpacity, { toValue: 0.35, duration: 1200, useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.timing(ring2Scale,   { toValue: 1.3, duration: 900, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
-          Animated.timing(ring2Scale,   { toValue: 1,   duration: 900, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+          Animated.timing(ring2Scale,   { toValue: 1.12, duration: 1200, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+          Animated.timing(ring2Scale,   { toValue: 1,    duration: 1200, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
         ]),
         Animated.sequence([
-          Animated.timing(ring2Opacity, { toValue: 0,   duration: 900, useNativeDriver: true }),
-          Animated.timing(ring2Opacity, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+          Animated.timing(ring2Opacity, { toValue: 0,   duration: 1200, useNativeDriver: true }),
+          Animated.timing(ring2Opacity, { toValue: 0.2, duration: 1200, useNativeDriver: true }),
         ]),
       ])
     ).start();
 
-    // Subtle shake
+    // Gentle shake every ~5s
     Animated.loop(
       Animated.sequence([
-        Animated.timing(shakeX, { toValue: 3,  duration: 80, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -3, duration: 80, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: 2,  duration: 80, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -2, duration: 80, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: 0,  duration: 80, useNativeDriver: true }),
-        Animated.delay(3500),
+        Animated.timing(shakeX, { toValue: 1.5,  duration: 90, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -1.5, duration: 90, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 1,    duration: 90, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -1,   duration: 90, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 0,    duration: 90, useNativeDriver: true }),
+        Animated.delay(5000),
       ])
     ).start();
   }, []);
@@ -419,16 +419,16 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    borderWidth: 3,
-    borderColor: 'rgba(184,50,85,0.7)',
+    borderWidth: 2,
+    borderColor: 'rgba(184,50,85,0.5)',
   },
   irisPulseRing2: {
     position: 'absolute',
     width: 96,
     height: 96,
     borderRadius: 48,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   irisAvatarWrapper: {
     width: 96,
