@@ -114,7 +114,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="legal/document" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="legal" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
