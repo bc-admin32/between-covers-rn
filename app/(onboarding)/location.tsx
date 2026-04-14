@@ -34,9 +34,15 @@ export default function LocationScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowOptions(true), 11000);
-    return () => clearTimeout(timer);
-  }, []);
+    let wasPlaying = false;
+    const sub = player.addListener('playingChange', ({ isPlaying }: { isPlaying: boolean }) => {
+      if (wasPlaying && !isPlaying) setShowOptions(true);
+      wasPlaying = isPlaying;
+    });
+    // Fallback in case the event never fires (e.g. load failure)
+    const fallback = setTimeout(() => setShowOptions(true), 30000);
+    return () => { sub.remove(); clearTimeout(fallback); };
+  }, [player]);
 
   const handleSelect = async (value: string) => {
     if (submitting) return;

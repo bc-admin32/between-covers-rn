@@ -13,6 +13,7 @@ export default function AboutScreen() {
   const insets = useSafeAreaInsets();
   const [showButton, setShowButton] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
   const player = useVideoPlayer(
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/About.mp4',
@@ -52,11 +53,13 @@ export default function AboutScreen() {
       {showButton && (
         <View style={[styles.buttonContainer, { bottom: insets.bottom + 24 }]}>
           <TouchableOpacity
-            style={[styles.button, submitting && styles.buttonDisabled]}
+            style={[styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}
             onPress={handleStart}
+            onPressIn={() => setPressed(true)}
+            onPressOut={() => setPressed(false)}
             disabled={submitting}
           >
-            <Text style={styles.buttonText}>
+            <Text style={[styles.buttonText, pressed && styles.buttonTextPressed]}>
               {submitting ? 'Entering…' : 'Step Inside'}
             </Text>
           </TouchableOpacity>
@@ -79,7 +82,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: radius.xl,
     paddingVertical: spacing.md,
-    backgroundColor: '#fff',
+    backgroundColor: '#B83255',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -88,11 +91,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
+  buttonPressed: { backgroundColor: '#fff' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: {
     fontSize: 24,
-    color: '#180448',
+    color: '#fff',
     letterSpacing: 0.5,
     fontFamily: 'DancingScript_700Bold',
   },
+  buttonTextPressed: { color: '#B83255' },
 });

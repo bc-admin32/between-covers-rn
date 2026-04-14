@@ -46,7 +46,7 @@ export default function AcceptanceScreen() {
             <View key={p.doc}>
               <TouchableOpacity
                 style={styles.policyRow}
-                onPress={() => router.push(`/(onboarding)/legal?doc=${p.doc}` as any)}
+                onPress={() => router.push(`/(tabs)/profile/legal/document?doc=${p.doc}` as any)}
               >
                 <View style={styles.policyLeft}>
                   <Text style={styles.policyIcon}>{p.icon}</Text>

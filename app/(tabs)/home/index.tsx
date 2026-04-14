@@ -35,6 +35,62 @@ type HomeData = {
   };
 };
 
+function IrisPulseAvatar({ uri, onPress }: { uri: string; onPress: () => void }) {
+  const ringScale   = useRef(new Animated.Value(1)).current;
+  const ringOpacity = useRef(new Animated.Value(0.7)).current;
+  const ring2Scale  = useRef(new Animated.Value(1)).current;
+  const ring2Opacity= useRef(new Animated.Value(0.4)).current;
+  const shakeX      = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Glow rings
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(ringScale,   { toValue: 1.55, duration: 900, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+          Animated.timing(ringScale,   { toValue: 1,    duration: 900, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+        ]),
+        Animated.sequence([
+          Animated.timing(ringOpacity, { toValue: 0,   duration: 900, useNativeDriver: true }),
+          Animated.timing(ringOpacity, { toValue: 0.7, duration: 900, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(ring2Scale,   { toValue: 1.3, duration: 900, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+          Animated.timing(ring2Scale,   { toValue: 1,   duration: 900, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+        ]),
+        Animated.sequence([
+          Animated.timing(ring2Opacity, { toValue: 0,   duration: 900, useNativeDriver: true }),
+          Animated.timing(ring2Opacity, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+
+    // Subtle shake
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shakeX, { toValue: 3,  duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -3, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 2,  duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: -2, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeX, { toValue: 0,  duration: 80, useNativeDriver: true }),
+        Animated.delay(3500),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.irisPulseContainer}>
+      <Animated.View style={[styles.irisPulseRing, { transform: [{ scale: ringScale }], opacity: ringOpacity }]} />
+      <Animated.View style={[styles.irisPulseRing2, { transform: [{ scale: ring2Scale }], opacity: ring2Opacity }]} />
+      <Animated.View style={{ transform: [{ translateX: shakeX }] }}>
+        <View style={styles.irisAvatarWrapper}>
+          <Image source={{ uri }} style={styles.irisAvatar} />
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function PulseDot() {
   const scale   = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0.8)).current;
@@ -251,14 +307,10 @@ export default function HomeScreen() {
                   <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={openVideo}>
-                  <View style={styles.irisAvatarWrapper}>
-                    <Image
-                      source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
-                      style={styles.irisAvatar}
-                    />
-                  </View>
-                </TouchableOpacity>
+                <IrisPulseAvatar
+                  uri={iris.staticImageUrl ?? 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png'}
+                  onPress={openVideo}
+                />
               )}
             </View>
           )}
@@ -361,6 +413,23 @@ const styles = StyleSheet.create({
   joinText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   irisContainer: { alignItems: 'center' },
   irisButton: { alignItems: 'center', gap: spacing.sm },
+  irisPulseContainer: { alignItems: 'center', justifyContent: 'center', width: 96, height: 96 },
+  irisPulseRing: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: 'rgba(184,50,85,0.7)',
+  },
+  irisPulseRing2: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
   irisAvatarWrapper: {
     width: 96,
     height: 96,
