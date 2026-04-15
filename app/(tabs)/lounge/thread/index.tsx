@@ -180,6 +180,7 @@ export default function LoungeThreadScreen() {
   const [editingReply, setEditingReply] = useState<Reply | null>(null);
   const [editText, setEditText] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -269,6 +270,7 @@ export default function LoungeThreadScreen() {
 
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
+    setEditError(null);
     setEditSubmitting(true);
     console.log('[ThreadEdit] submitting edit — threadId:', threadId, 'replyId:', editingReply.replyId, 'sk:', editingReply.sk);
     try {
@@ -278,15 +280,19 @@ export default function LoungeThreadScreen() {
       );
       console.log('[ThreadEdit] result:', res.result);
       if (res.result === 'updated' && res.reply) {
-        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
         setEditingReply(null);
         setEditText('');
+        setEditError(null);
+        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
       } else {
-        showToast('Could not save edit. Try again.');
+        const msg = `result="${res.result ?? 'none'}" sk="${editingReply.sk || 'EMPTY'}" threadId="${threadId}"`;
+        console.error('[ThreadEdit] unexpected result:', msg);
+        setEditError(msg);
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error('[ThreadEdit] error:', e);
-      showToast('Could not save edit. Try again.');
+      setEditError(`${msg} | sk="${editingReply.sk || 'EMPTY'}" threadId="${threadId}"`);
     } finally {
       setEditSubmitting(false);
     }
@@ -370,13 +376,16 @@ export default function LoungeThreadScreen() {
                   autoFocus
                 />
                 <View style={styles.editActions}>
-                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); }} style={styles.editCancelButton} disabled={editSubmitting}>
+                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); setEditError(null); }} style={styles.editCancelButton} disabled={editSubmitting}>
                     <Text style={styles.editCancelText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={submitEdit} style={[styles.editSaveButton, editSubmitting && { backgroundColor: '#DDD5C4' }]} disabled={editSubmitting}>
                     <Text style={styles.editSaveText}>{editSubmitting ? 'Saving…' : 'Save'}</Text>
                   </TouchableOpacity>
                 </View>
+                {editError ? (
+                  <Text style={styles.editErrorText}>{editError}</Text>
+                ) : null}
               </View>
             ) : (
               <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} onBlock={handleBlock} onToast={showToast} threadId={threadId!} />
@@ -509,6 +518,7 @@ const styles = StyleSheet.create({
   editCancelText: { fontSize: 11, fontWeight: '600', color: '#6A5550' },
   editSaveButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#B83255' },
   editSaveText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  editErrorText: { fontSize: 11, color: '#ef4444', marginTop: 6, fontFamily: 'Nunito_400Regular', lineHeight: 16 },
   closedBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, alignItems: 'center', gap: spacing.xs, borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4' },
   closedPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(196,168,130,0.15)', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(196,168,130,0.3)' },
   closedEmoji: { fontSize: 16 },
