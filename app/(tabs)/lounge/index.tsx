@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator, Image, Modal, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ type Section =
 type LoungeData = {
   active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
+  legalAcceptedAt?: string | null;
 };
 
 // Module-level in-memory cache — no size limit, survives tab switches.
@@ -55,6 +56,8 @@ export default function LoungeScreen() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [pollSubmitting, setPollSubmitting] = useState(false);
   const [pollResult, setPollResult] = useState<{ options: PollOption[]; totalVotes: number; selectedOptionId: string } | null>(null);
+  const [eulaModal, setEulaModal] = useState(false);
+  const [eulaAccepting, setEulaAccepting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -69,6 +72,7 @@ export default function LoungeScreen() {
         const res = await apiGet<LoungeData>('/lounge/resolve');
         loungeCache = res;
         setData(res);
+        if (!res.legalAcceptedAt) setEulaModal(true);
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
       } catch {
@@ -79,6 +83,19 @@ export default function LoungeScreen() {
     };
     load();
   }, []);
+
+  const handleEulaAccept = async () => {
+    setEulaAccepting(true);
+    try {
+      await apiPost('/legal/accept');
+      setData((prev) => prev ? { ...prev, legalAcceptedAt: new Date().toISOString() } : prev);
+      setEulaModal(false);
+    } catch {
+      // keep modal open on failure
+    } finally {
+      setEulaAccepting(false);
+    }
+  };
 
   const handleVote = async (pollId: string, optionId: string) => {
     if (pollSubmitting) return;
@@ -123,6 +140,32 @@ export default function LoungeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* EULA gate — shown once until user accepts community terms */}
+      <Modal visible={eulaModal} transparent animationType="slide" onRequestClose={() => {}}>
+        <View style={styles.eulaOverlay}>
+          <View style={styles.eulaSheet}>
+            <View style={styles.eulaHandle} />
+            <Text style={styles.eulaTitle}>Before You Jump In ✦</Text>
+            <Text style={styles.eulaBody}>
+              The Lounge is a space for our community to connect over the books and stories we love.
+              {'\n\n'}
+              By participating you agree to our{' '}
+              <Text style={styles.eulaLink}>Community Guidelines</Text>
+              {' '}— keep it kind, keep it real, and keep it Between Covers.
+              {'\n\n'}
+              We reserve the right to remove content or suspend accounts that violate these guidelines.
+            </Text>
+            <TouchableOpacity
+              style={[styles.eulaAcceptBtn, eulaAccepting && styles.eulaAcceptBtnDisabled]}
+              onPress={handleEulaAccept}
+              disabled={eulaAccepting}
+            >
+              <Text style={styles.eulaAcceptBtnText}>{eulaAccepting ? 'Saving…' : 'I Agree — Let\'s Go'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* HEADER */}
@@ -194,7 +237,9 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
                 style={styles.irisCtaButton}
-                onPress={() => iris?.threadId && router.push(`/lounge/thread?id=${encodeURIComponent(iris.threadId)}` as any)}
+                onPress={() => iris?.threadId && router.push(
+                  `/lounge/iris-thoughts?id=${encodeURIComponent(iris.threadId)}&title=${encodeURIComponent(iris.title ?? '')}&prompt=${encodeURIComponent(iris.body ?? '')}` as any
+                )}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
@@ -401,4 +446,22 @@ const styles = StyleSheet.create({
   monthlyOutlineButtonText: { fontSize: 12, fontWeight: '600', color: '#C4A882', letterSpacing: 0.5 },
   monthlyClosedText: { fontSize: 11, color: 'rgba(196,168,130,0.6)', alignSelf: 'center' },
   errorText: { fontSize: 14, color: '#6A5550', textAlign: 'center' },
+  eulaOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  eulaSheet: {
+    backgroundColor: '#FDFAF6', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: spacing.lg, paddingBottom: 48,
+  },
+  eulaHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: '#DDD5C4',
+    alignSelf: 'center', marginBottom: spacing.lg,
+  },
+  eulaTitle: { fontSize: 22, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', marginBottom: spacing.md },
+  eulaBody: { fontSize: 14, color: '#6A5550', fontFamily: 'Nunito_400Regular', lineHeight: 22, marginBottom: spacing.lg },
+  eulaLink: { color: '#B83255', fontFamily: 'Nunito_600SemiBold' },
+  eulaAcceptBtn: {
+    backgroundColor: '#B83255', borderRadius: 999, paddingVertical: 14,
+    alignItems: 'center',
+  },
+  eulaAcceptBtnDisabled: { backgroundColor: '#DDD5C4' },
+  eulaAcceptBtnText: { fontSize: 15, color: '#fff', fontFamily: 'Nunito_700Bold' },
 });

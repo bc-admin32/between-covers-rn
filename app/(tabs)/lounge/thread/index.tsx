@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import PostMenu from '../../../../components/lounge/PostMenu';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
@@ -73,9 +74,11 @@ function ReactionBar({ replyId, reactions, onReact }: { replyId: string; reactio
   );
 }
 
-function ReplyCard({ reply, onReact, onReplyTo, onEdit }: {
+function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, threadId }: {
   reply: Reply; onReact: (replyId: string, emoji: string) => void;
   onReplyTo: (reply: Reply) => void; onEdit: (reply: Reply) => void;
+  onBlock: (userId: string) => void; onToast: (msg: string) => void;
+  threadId: string;
 }) {
   const isIris = reply.userId === 'IRIS';
   const [showEmojiTray, setShowEmojiTray] = useState(false);
@@ -122,6 +125,17 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit }: {
               </TouchableOpacity>
             </>
           )}
+          {!reply.isOwn && !isIris && (
+            <PostMenu
+              threadId={threadId}
+              replyId={reply.replyId}
+              targetUserId={reply.userId}
+              displayName={reply.displayName}
+              isOwn={false}
+              onBlocked={onBlock}
+              onToast={onToast}
+            />
+          )}
         </View>
 
         {showEmojiTray && (
@@ -162,7 +176,21 @@ export default function LoungeThreadScreen() {
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null);
   const [editingReply, setEditingReply] = useState<Reply | null>(null);
   const [editText, setEditText] = useState('');
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const handleBlock = useCallback((userId: string) => {
+    setBlockedUsers((prev) => [...prev, userId]);
+    setReplies((prev) => prev.filter((r) => r.userId !== userId));
+  }, []);
 
   useEffect(() => {
     if (!threadId) { setError('No thread specified.'); setLoading(false); return; }
@@ -174,6 +202,10 @@ export default function LoungeThreadScreen() {
       })
       .catch(() => setError("Couldn't load this thread right now."))
       .finally(() => setLoading(false));
+
+    apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
+      .then((res) => setBlockedUsers(res.blockedUsers ?? []))
+      .catch(() => {});
   }, [threadId]);
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
@@ -269,12 +301,19 @@ export default function LoungeThreadScreen() {
   const isIrisChat = thread.type === 'IRIS_CHAT';
   const isClosed = thread.status === 'closed';
 
+  const visibleReplies = replies.filter((r) => !blockedUsers.includes(r.userId));
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={insets.top}
     >
+      {toast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      )}
       {/* REPLIES + THREAD CARD (all in one scroll) */}
       <ScrollView ref={scrollRef} style={styles.replies} contentContainerStyle={styles.repliesContent} showsVerticalScrollIndicator={false}>
         {/* Thread card at top of scroll */}
@@ -306,7 +345,7 @@ export default function LoungeThreadScreen() {
             <Text style={styles.emptySubtitle}>No replies yet. The floor is yours.</Text>
           </View>
         ) : (
-          replies.map((reply) => (
+          visibleReplies.map((reply) => (
             editingReply?.replyId === reply.replyId ? (
               <View key={reply.replyId} style={styles.editContainer}>
                 <TextInput
@@ -326,7 +365,7 @@ export default function LoungeThreadScreen() {
                 </View>
               </View>
             ) : (
-              <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} />
+              <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} onBlock={handleBlock} onToast={showToast} threadId={threadId!} />
             )
           ))
         )}
@@ -480,4 +519,10 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, color: '#6A5550', textAlign: 'center' },
   backLink: { marginTop: spacing.md },
   backLinkText: { fontSize: 14, color: '#B83255', textDecorationLine: 'underline' },
+  toast: {
+    position: 'absolute', top: 60, left: 20, right: 20, zIndex: 999,
+    backgroundColor: '#1A1A2E', borderRadius: 12, paddingHorizontal: spacing.md,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  toastText: { fontSize: 13, color: '#FDFAF6', fontFamily: 'Nunito_600SemiBold', textAlign: 'center' },
 });

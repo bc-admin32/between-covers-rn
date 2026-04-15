@@ -30,35 +30,45 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d0d0d"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
-  "expo-router",
-  ["expo-font", {
-    "fonts": [
-      "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf",
-      "./node_modules/@expo-google-fonts/dancing-script/400Regular/DancingScript_400Regular.ttf",
-      "./node_modules/@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf",
-      "./node_modules/@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf",
-      "./node_modules/@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf",
-      "./node_modules/@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf",
-      "./node_modules/@expo-google-fonts/nunito/400Regular/Nunito_400Regular.ttf",
-      "./node_modules/@expo-google-fonts/nunito/400Regular_Italic/Nunito_400Regular_Italic.ttf",
-      "./node_modules/@expo-google-fonts/nunito/600SemiBold/Nunito_600SemiBold.ttf",
-      "./node_modules/@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf",
-      "./node_modules/@expo-google-fonts/nunito/700Bold_Italic/Nunito_700Bold_Italic.ttf",
-      "./node_modules/@expo-google-fonts/nunito/800ExtraBold/Nunito_800ExtraBold.ttf",
-      "./node_modules/@expo-google-fonts/nunito/800ExtraBold_Italic/Nunito_800ExtraBold_Italic.ttf"
-    ]
-  }],
-  "expo-secure-store",
-  "expo-video",
-  "expo-image-picker",
-  ["expo-notifications", {
-    "icon": "./assets/icon.png",
-    "color": "#B83255"
-  }]
-],
+      "expo-router",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf",
+            "./node_modules/@expo-google-fonts/dancing-script/400Regular/DancingScript_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf",
+            "./node_modules/@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/nunito/400Regular/Nunito_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/nunito/400Regular_Italic/Nunito_400Regular_Italic.ttf",
+            "./node_modules/@expo-google-fonts/nunito/600SemiBold/Nunito_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/nunito/700Bold_Italic/Nunito_700Bold_Italic.ttf",
+            "./node_modules/@expo-google-fonts/nunito/800ExtraBold/Nunito_800ExtraBold.ttf",
+            "./node_modules/@expo-google-fonts/nunito/800ExtraBold_Italic/Nunito_800ExtraBold_Italic.ttf"
+          ]
+        }
+      ],
+      "expo-secure-store",
+      "expo-video",
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#B83255"
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     },
@@ -66,6 +76,12 @@
       "eas": {
         "projectId": "fde8b76a-03ee-4d60-9df8-2b1953c28770"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/fde8b76a-03ee-4d60-9df8-2b1953c28770"
     }
   }
 }

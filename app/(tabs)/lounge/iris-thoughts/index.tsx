@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import PostMenu from '../../../../components/lounge/PostMenu';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
@@ -69,7 +70,10 @@ function ReactionBar({ replyId, reactions, onReact }: { replyId: string; reactio
   );
 }
 
-function MessageBubble({ reply, onReact }: { reply: Reply; onReact: (replyId: string, emoji: string) => void }) {
+function MessageBubble({ reply, onReact, threadId, onBlock, onToast }: {
+  reply: Reply; onReact: (replyId: string, emoji: string) => void;
+  threadId: string; onBlock: (userId: string) => void; onToast: (msg: string) => void;
+}) {
   const isIris = reply.userId === 'IRIS';
 
   if (isIris) {
@@ -97,7 +101,20 @@ function MessageBubble({ reply, onReact }: { reply: Reply; onReact: (replyId: st
           {reply.body && <Text style={styles.userBubbleText}>{reply.body}</Text>}
           {reply.mediaUrl && <Image source={{ uri: reply.mediaUrl }} style={styles.bubbleMedia} resizeMode="cover" />}
         </View>
-        <Text style={styles.userBubbleTime}>{timeAgo(reply.createdAt)}</Text>
+        <View style={styles.userBubbleFooter}>
+          <Text style={styles.userBubbleTime}>{timeAgo(reply.createdAt)}</Text>
+          {!reply.isOwn && (
+            <PostMenu
+              threadId={threadId}
+              replyId={reply.replyId}
+              targetUserId={reply.userId}
+              displayName={reply.displayName}
+              isOwn={false}
+              onBlocked={onBlock}
+              onToast={onToast}
+            />
+          )}
+        </View>
         <ReactionBar replyId={reply.replyId} reactions={reply.reactions} onReact={onReact} />
       </View>
     </View>
@@ -107,18 +124,33 @@ function MessageBubble({ reply, onReact }: { reply: Reply; onReact: (replyId: st
 export default function IrisThoughtsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
+  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
   const scrollRef = useRef<ScrollView>(null);
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [nextKey, setNextKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [repliesError, setRepliesError] = useState(false);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showEmojiTray, setShowEmojiTray] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const handleBlock = useCallback((userId: string) => {
+    setBlockedUsers((prev) => [...prev, userId]);
+    setReplies((prev) => prev.filter((r) => r.userId !== userId));
+  }, []);
 
   useEffect(() => {
     if (!threadId) { setLoading(false); return; }
@@ -128,8 +160,12 @@ export default function IrisThoughtsScreen() {
         setReplies(res.replies);
         setNextKey(res.nextKey);
       })
-      .catch(() => setError("Couldn't load Iris's thoughts right now."))
+      .catch(() => setRepliesError(true))
       .finally(() => setLoading(false));
+
+    apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
+      .then((res) => setBlockedUsers(res.blockedUsers ?? []))
+      .catch(() => {});
   }, [threadId]);
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
@@ -178,12 +214,19 @@ export default function IrisThoughtsScreen() {
     );
   }
 
+  const visibleReplies = replies.filter((r) => !blockedUsers.includes(r.userId));
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={insets.top}
     >
+      {toast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      )}
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -194,7 +237,7 @@ export default function IrisThoughtsScreen() {
             <Image source={{ uri: IRIS_AVATAR }} style={styles.headerAvatar} />
             <View>
               <Text style={styles.headerLabel}>Iris Has Thoughts</Text>
-              <Text style={styles.headerTitle}>{thread?.topicLabel ?? "This week's mood"}</Text>
+              <Text style={styles.headerTitle}>{thread?.topicLabel ?? paramTitle ?? "This week's mood"}</Text>
             </View>
           </View>
           {thread && (
@@ -202,47 +245,32 @@ export default function IrisThoughtsScreen() {
           )}
         </View>
 
-        {thread?.body && (
+        {(thread?.body ?? paramPrompt) ? (
           <View style={styles.threadBody}>
-            <Text style={styles.threadBodyText}>"{thread.body}"</Text>
-            <Text style={styles.threadBodyAuthor}>— Iris</Text>
+            <Text style={styles.threadBodyText}>{thread?.body ?? paramPrompt}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* MESSAGES */}
-      {!thread && !error ? (
-        <View style={styles.emptyState}>
-          <Image source={{ uri: IRIS_AVATAR }} style={styles.emptyAvatar} />
-          <Text style={styles.emptyTitle}>Iris is gathering her thoughts…</Text>
-          <Text style={styles.emptySubtitle}>Check back soon for this week's thought.</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backLinkText}>Go back</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
+      {loading ? null : (
         <ScrollView ref={scrollRef} style={styles.messages} contentContainerStyle={styles.messagesContent} showsVerticalScrollIndicator={false}>
           {replies.length === 0 ? (
             <View style={styles.emptyReplies}>
-              <Text style={styles.emptyRepliesTitle}>Be the first to respond…</Text>
-              <Text style={styles.emptyRepliesSubtitle}>What do you think?</Text>
+              <Text style={styles.emptyRepliesTitle}>Be the first to share your thoughts…</Text>
             </View>
           ) : (
-            replies.map((reply) => (
-              <MessageBubble key={reply.replyId} reply={reply} onReact={handleReact} />
+            visibleReplies.map((reply) => (
+              <MessageBubble key={reply.replyId} reply={reply} onReact={handleReact} threadId={threadId!} onBlock={handleBlock} onToast={showToast} />
             ))
           )}
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       )}
 
-      {/* COMPOSER */}
-      {thread && (
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
+      {/* COMPOSER — show if threadId is available, even on replies error */}
+      {threadId && (
+        <View style={[styles.composer, { paddingBottom: insets.bottom + 65 }]}>
           {showEmojiTray && (
             <View style={styles.emojiTray}>
               {EMOJI_TRAY.map((emoji) => (
@@ -317,7 +345,8 @@ const styles = StyleSheet.create({
   userBubbleOwn: { backgroundColor: '#B83255' },
   userBubbleName: { fontSize: 10, fontFamily: 'Nunito_700Bold', color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
   userBubbleText: { fontSize: 14, color: '#fff', lineHeight: 21, fontFamily: 'Nunito_400Regular' },
-  userBubbleTime: { fontSize: 10, color: '#C4A882', marginTop: spacing.xs, fontFamily: 'Nunito_400Regular' },
+  userBubbleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  userBubbleTime: { fontSize: 10, color: '#C4A882', fontFamily: 'Nunito_400Regular' },
   bubbleMedia: { width: '100%', height: 180, borderRadius: 12, marginTop: spacing.sm },
   reactionBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   reactionButton: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#F5F0EB', borderWidth: 1, borderColor: 'transparent' },
@@ -330,7 +359,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, color: '#C4A882', fontStyle: 'italic', textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: '#B09A7E', textAlign: 'center' },
   emptyReplies: { paddingVertical: 64, alignItems: 'center', gap: spacing.sm },
-  emptyRepliesTitle: { fontSize: 20, color: '#C4A882', fontStyle: 'italic' },
+  emptyRepliesTitle: { fontSize: 20, color: '#C4A882', fontStyle: 'italic', textAlign: 'center' },
   emptyRepliesSubtitle: { fontSize: 13, color: '#B09A7E' },
   errorText: { fontSize: 14, color: '#6A5550', textAlign: 'center' },
   backLinkText: { fontSize: 14, color: '#B83255', textDecorationLine: 'underline' },
@@ -348,4 +377,10 @@ const styles = StyleSheet.create({
   sendButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B83255', alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { backgroundColor: '#DDD5C4' },
   sendButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  toast: {
+    position: 'absolute', top: 60, left: 20, right: 20, zIndex: 999,
+    backgroundColor: '#1A1A2E', borderRadius: 12, paddingHorizontal: spacing.md,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  toastText: { fontSize: 13, color: '#FDFAF6', fontFamily: 'Nunito_600SemiBold', textAlign: 'center' },
 });

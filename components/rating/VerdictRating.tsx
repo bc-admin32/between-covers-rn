@@ -280,10 +280,7 @@ function ParticleOverlay({ state, onDone }: { state: OverlayState; onDone: () =>
             opacity: finaleOpacity,
             transform: [{ scale: finaleScale }],
           }]}>
-            <View style={styles.finaleRow}>
-              <Text style={styles.finaleEmoji}>🤬</Text>
-              <Text style={styles.finaleEmoji}>🫷</Text>
-            </View>
+            <Text style={styles.finaleEmoji}>😤</Text>
           </Animated.View>
         )}
       </View>
@@ -380,11 +377,6 @@ const styles = StyleSheet.create({
   },
   heroEmoji: {
     fontSize: 80,
-  },
-  finaleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
   },
   finaleEmoji: {
     fontSize: 80,
