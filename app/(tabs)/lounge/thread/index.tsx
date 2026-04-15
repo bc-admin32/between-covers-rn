@@ -162,7 +162,10 @@ export default function LoungeThreadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
+  // Explicitly decode — Expo Router may leave %23 un-decoded, causing the
+  // Lambda's startsWith("THREAD#") check to fail and build a broken pk.
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const threadId = rawId ? decodeURIComponent(rawId) : null;
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
