@@ -194,7 +194,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
                 style={styles.irisCtaButton}
-                onPress={() => { if (iris?.threadId) router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(iris.threadId)}` as any); }}
+                onPress={() => { if (iris?.threadId) router.push(`/(tabs)/lounge/iris-thoughts?threadId=${encodeURIComponent(iris.threadId)}` as any); }}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
