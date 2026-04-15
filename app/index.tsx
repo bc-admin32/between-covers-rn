@@ -4,6 +4,13 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
+import {
+  initConnection,
+  endConnection,
+  getAvailablePurchases,
+} from 'react-native-iap';
+
+const IAP_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -21,49 +28,68 @@ export default function SplashScreen() {
     const run = async () => {
       const start = Date.now();
 
-      const forceLogin = async () => {
-        // Wipe any stale tokens before landing on the login screen so the
-        // user starts completely fresh (no Face ID prompt, no cached session).
-        await signOut();
-        router.replace('/(auth)/login');
-      };
+      const goPaywall = () => router.replace('/(auth)/paywall' as any);
+      const goLogin  = () => router.replace('/(auth)/login');
+
+      const elapsed = () => Date.now() - start;
+      const waitForSplash = () =>
+        new Promise(resolve =>
+          setTimeout(resolve, Math.max(0, MIN_SPLASH_TIME - elapsed()))
+        );
 
       try {
         const raw = await SecureStore.getItemAsync('bc_id_token');
         const idToken = raw?.trim() ?? null;
 
-        const elapsed = Date.now() - start;
-        const remaining = Math.max(0, MIN_SPLASH_TIME - elapsed);
-        await new Promise(resolve => setTimeout(resolve, remaining));
+        // ── RETURNING USER: valid token → resolve and route ──────────────
+        if (idToken && isValidJwt(idToken)) {
+          const res = await fetch(`${API_BASE}/auth/resolve`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
 
-        // No token or malformed token — clean up and go to login.
-        if (!idToken || !isValidJwt(idToken)) {
-          await forceLogin();
-          return;
-        }
+          await waitForSplash();
 
-        const res = await fetch(`${API_BASE}/auth/resolve`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
+          if (res.ok) {
+            const result = await res.json();
+            if (result?.nextRoute?.startsWith('/')) {
+              router.replace(normalizeRoute(result.nextRoute) as any);
+              return;
+            }
+          }
 
-        // Non-200 means the token is expired, the user was deleted/deactivated,
-        // or the account no longer exists. Force a full signout so no stale
-        // credentials remain and the login screen starts fresh.
-        if (!res.ok) {
-          await forceLogin();
-          return;
-        }
-
-        const result = await res.json();
-
-        if (result?.nextRoute?.startsWith('/')) {
-          router.replace(normalizeRoute(result.nextRoute) as any);
+          // Token rejected — wipe and fall through to subscription check.
+          await signOut();
         } else {
-          await forceLogin();
+          await waitForSplash();
         }
+
+        // ── NEW / LOGGED-OUT USER: check subscription ────────────────────
+        // Fast path: check cached flag written after purchase/restore.
+        const cached = await SecureStore.getItemAsync('bc_subscription_active');
+        if (cached === 'true') {
+          goLogin();
+          return;
+        }
+
+        // Slow path: query StoreKit for active purchases.
+        try {
+          await initConnection();
+          const purchases = await getAvailablePurchases();
+          await endConnection();
+          const active = purchases.find(p => p.productId === IAP_PRODUCT_ID);
+          if (active) {
+            await SecureStore.setItemAsync('bc_subscription_active', 'true');
+            goLogin();
+            return;
+          }
+        } catch {
+          // StoreKit unavailable (e.g. simulator without Apple ID) — show paywall.
+        }
+
+        goPaywall();
       } catch {
-        await forceLogin();
+        goPaywall();
       }
     };
 
