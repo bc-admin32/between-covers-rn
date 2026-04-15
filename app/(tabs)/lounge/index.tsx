@@ -23,6 +23,9 @@ type LoungeData = {
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
 };
 
+// Module-level in-memory cache — no size limit, survives tab switches.
+let loungeCache: LoungeData | null = null;
+
 function formatWeekRange(startDate: string, endDate: string): string {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -55,13 +58,21 @@ export default function LoungeScreen() {
 
   useEffect(() => {
     const load = async () => {
+      // Show cached data immediately so the screen is never blank.
+      if (loungeCache) {
+        setData(loungeCache);
+        const cachedPoll = loungeCache.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
+        if (cachedPoll?.hasVoted && cachedPoll.selectedOptionId) setSelectedOption(cachedPoll.selectedOptionId);
+        setLoading(false);
+      }
       try {
         const res = await apiGet<LoungeData>('/lounge/resolve');
+        loungeCache = res;
         setData(res);
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
       } catch {
-        setError("Couldn't load the lounge right now.");
+        if (!loungeCache) setError("Couldn't load the lounge right now.");
       } finally {
         setLoading(false);
       }
