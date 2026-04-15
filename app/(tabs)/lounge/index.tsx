@@ -5,14 +5,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
-const CACHE_KEY = 'bc_lounge_cache';
-
 type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 type Section =
   | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean }
@@ -59,18 +56,8 @@ export default function LoungeScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        const cached = await SecureStore.getItemAsync(CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          setData(parsed);
-          const poll = parsed.active?.sections.find((s: Section) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
-          if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
-          setLoading(false);
-        }
         const res = await apiGet<LoungeData>('/lounge/resolve');
-        console.log('[lounge] raw response:', JSON.stringify(res, null, 2));
         setData(res);
-        await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(res));
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
       } catch {
@@ -155,7 +142,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>💬 Chiming in</Text>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => { console.log('[lounge] primary thread pressed — full object:', JSON.stringify(primary), '| threadId:', primary.threadId); router.push({ pathname: '/(tabs)/lounge/thread', params: { id: primary.threadId } } as any); }}
+                onPress={() => router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(primary.threadId)}` as any)}
               >
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
@@ -174,7 +161,7 @@ export default function LoungeScreen() {
             <Text style={styles.cardDescription}>{secondary.description}</Text>
             <TouchableOpacity
               style={styles.outlineButton}
-              onPress={() => { console.log('[lounge] secondary thread pressed — full object:', JSON.stringify(secondary), '| threadId:', secondary.threadId); router.push({ pathname: '/(tabs)/lounge/thread', params: { id: secondary.threadId } } as any); }}
+              onPress={() => router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(secondary.threadId)}` as any)}
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
@@ -196,7 +183,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
                 style={styles.irisCtaButton}
-                onPress={() => { console.log('[lounge] iris thread pressed — full object:', JSON.stringify(iris), '| threadId:', iris?.threadId); iris?.threadId ? router.push({ pathname: '/(tabs)/lounge/thread', params: { id: iris.threadId } } as any) : undefined; }}
+                onPress={() => { if (iris?.threadId) router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(iris.threadId)}` as any); }}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
