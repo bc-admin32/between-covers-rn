@@ -192,7 +192,7 @@ export default function IrisThoughtsScreen() {
         { threadId, content: text.trim() }
       );
       if (res.result === 'published' && res.reply) {
-        setReplies((prev) => [...prev, res.reply!]);
+        setReplies((prev) => [...prev, { ...res.reply!, reactions: res.reply!.reactions ?? [] }]);
         setText('');
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.result === 'rejected_minor') {

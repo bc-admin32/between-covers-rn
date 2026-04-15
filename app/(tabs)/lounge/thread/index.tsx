@@ -176,6 +176,7 @@ export default function LoungeThreadScreen() {
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null);
   const [editingReply, setEditingReply] = useState<Reply | null>(null);
   const [editText, setEditText] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -264,7 +265,8 @@ export default function LoungeThreadScreen() {
   };
 
   const submitEdit = async () => {
-    if (!editingReply || !editText.trim()) return;
+    if (!editingReply || !editText.trim() || editSubmitting) return;
+    setEditSubmitting(true);
     try {
       const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean } }>(
         '/lounge/thread/edit',
@@ -274,8 +276,14 @@ export default function LoungeThreadScreen() {
         setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
         setEditingReply(null);
         setEditText('');
+      } else {
+        showToast('Could not save edit. Try again.');
       }
-    } catch {}
+    } catch {
+      showToast('Could not save edit. Try again.');
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -356,11 +364,11 @@ export default function LoungeThreadScreen() {
                   autoFocus
                 />
                 <View style={styles.editActions}>
-                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); }} style={styles.editCancelButton}>
+                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); }} style={styles.editCancelButton} disabled={editSubmitting}>
                     <Text style={styles.editCancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={submitEdit} style={styles.editSaveButton}>
-                    <Text style={styles.editSaveText}>Save</Text>
+                  <TouchableOpacity onPress={submitEdit} style={[styles.editSaveButton, editSubmitting && { backgroundColor: '#DDD5C4' }]} disabled={editSubmitting}>
+                    <Text style={styles.editSaveText}>{editSubmitting ? 'Saving…' : 'Save'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

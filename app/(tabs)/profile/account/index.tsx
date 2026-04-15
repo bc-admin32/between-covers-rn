@@ -49,6 +49,7 @@ export default function AccountSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -75,6 +76,7 @@ export default function AccountSettingsScreen() {
     if (loadFailed) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSaving(true);
+    setSaveStatus('saving');
     try {
       await apiPatch('/profile', {
         displayName,
@@ -83,6 +85,11 @@ export default function AccountSettingsScreen() {
         timeZoneMode,
         country,
       });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } finally {
       setSaving(false);
     }
@@ -229,6 +236,8 @@ export default function AccountSettingsScreen() {
             >
               <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save Changes'}</Text>
             </TouchableOpacity>
+            {saveStatus === 'saved' && <Text style={[styles.notifStatusText, { color: '#2E9E68', textAlign: 'center' }]}>Saved ✓</Text>}
+            {saveStatus === 'error' && <Text style={[styles.notifStatusText, { color: '#B83255', textAlign: 'center' }]}>Failed to save — try again</Text>}
           </SectionCard>
 
           {/* TIME ZONE */}
