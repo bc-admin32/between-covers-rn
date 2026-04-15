@@ -291,7 +291,9 @@ export default function LoungeScreen() {
                     <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
                       {isSelected && <View style={styles.pollRadioDot} />}
                     </View>
-                    <Text style={styles.pollOptionText}>{option.label}</Text>
+                    <View style={styles.pollOptionTextWrap}>
+                      <Text style={styles.pollOptionText}>{option.label}</Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -416,14 +418,15 @@ const styles = StyleSheet.create({
   pollRadio: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: '#B83255', alignItems: 'center', justifyContent: 'center' },
   pollRadioSelected: { backgroundColor: '#B83255', borderColor: '#B83255' },
   pollRadioDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  pollOptionText: { fontSize: 13, color: '#3A2C28', flex: 1, flexShrink: 1, flexWrap: 'wrap' },
+  pollOptionTextWrap: { flex: 1, minWidth: 0 },
+  pollOptionText: { fontSize: 13, color: '#3A2C28' },
   pollResultRow: { marginBottom: spacing.sm },
-  pollResultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  pollResultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   pollResultLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
   pollResultDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#B83255' },
-  pollResultLabel: { fontSize: 13, color: '#3A2C28', flex: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 0 },
+  pollResultLabel: { fontSize: 13, color: '#3A2C28', flex: 1, minWidth: 0 },
   pollResultLabelSelected: { color: '#B83255', fontWeight: '700' },
-  pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E' },
+  pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E', flexShrink: 0, marginLeft: spacing.sm },
   pollResultPctSelected: { color: '#B83255' },
   pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden' },
   pollBarFill: { height: 8, borderRadius: 4 },

@@ -270,11 +270,13 @@ export default function LoungeThreadScreen() {
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
     setEditSubmitting(true);
+    console.log('[ThreadEdit] submitting edit — threadId:', threadId, 'replyId:', editingReply.replyId, 'sk:', editingReply.sk);
     try {
       const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean } }>(
         '/lounge/thread/edit',
         { threadId, replyId: editingReply.replyId, sk: editingReply.sk, content: editText.trim() }
       );
+      console.log('[ThreadEdit] result:', res.result);
       if (res.result === 'updated' && res.reply) {
         setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
         setEditingReply(null);
@@ -282,7 +284,8 @@ export default function LoungeThreadScreen() {
       } else {
         showToast('Could not save edit. Try again.');
       }
-    } catch {
+    } catch (e) {
+      console.error('[ThreadEdit] error:', e);
       showToast('Could not save edit. Try again.');
     } finally {
       setEditSubmitting(false);
