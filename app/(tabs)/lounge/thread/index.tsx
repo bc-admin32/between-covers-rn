@@ -147,8 +147,8 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit }: {
 export default function LoungeThreadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { threadId: threadIdParam } = useLocalSearchParams<{ threadId: string }>();
-  const threadId = threadIdParam ? (Array.isArray(threadIdParam) ? threadIdParam[0] : threadIdParam) : null;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);

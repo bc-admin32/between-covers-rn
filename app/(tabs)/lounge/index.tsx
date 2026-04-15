@@ -153,7 +153,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>💬 Chiming in</Text>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(primary.threadId)}` as any)}
+                onPress={() => router.push(`/lounge/thread?id=${encodeURIComponent(primary.threadId)}` as any)}
               >
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
@@ -172,7 +172,7 @@ export default function LoungeScreen() {
             <Text style={styles.cardDescription}>{secondary.description}</Text>
             <TouchableOpacity
               style={styles.outlineButton}
-              onPress={() => router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(secondary.threadId)}` as any)}
+              onPress={() => router.push(`/lounge/thread?id=${encodeURIComponent(secondary.threadId)}` as any)}
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
@@ -194,7 +194,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>What do you think?</Text>
               <TouchableOpacity
                 style={styles.irisCtaButton}
-                onPress={() => { if (iris?.threadId) router.push(`/(tabs)/lounge/thread?threadId=${encodeURIComponent(iris.threadId)}` as any); }}
+                onPress={() => iris?.threadId && router.push(`/lounge/thread?id=${encodeURIComponent(iris.threadId)}` as any)}
               >
                 <Text style={styles.primaryButtonText}>{iris.ctaLabel}</Text>
               </TouchableOpacity>
