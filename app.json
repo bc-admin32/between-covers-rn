@@ -17,6 +17,7 @@
       "supportsTablet": false,
       "buildNumber": "7",
       "bundleIdentifier": "com.betweencovers.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Between Covers uses your camera to update your profile photo.",
