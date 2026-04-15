@@ -155,7 +155,9 @@ export default function BookDetailsScreen() {
           try {
             await apiDelete(`/library/${workId}`);
             router.back();
-          } catch {}
+          } catch {
+            Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
+          }
         },
       },
     ]);
@@ -192,10 +194,43 @@ export default function BookDetailsScreen() {
   if (!workId || !data) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <CaretLeft size={20} color="#fff" weight="bold" />
-        </TouchableOpacity>
-        <Text style={styles.notFound}>Book not found.</Text>
+        <View style={styles.unavailableHeader}>
+          <TouchableOpacity style={styles.unavailableBack} onPress={() => router.back()}>
+            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.unavailableBody}>
+          <Text style={styles.unavailableTitle}>Book unavailable</Text>
+          <Text style={styles.unavailableSubtitle}>
+            We couldn't load the details for this book right now.
+          </Text>
+          {workId ? (
+            <TouchableOpacity
+              style={styles.unavailableRemove}
+              onPress={() =>
+                Alert.alert('Remove Book', 'Remove this book from your library?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Remove', style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await apiDelete(`/library/${workId}`);
+                        router.back();
+                      } catch {
+                        Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
+                      }
+                    },
+                  },
+                ])
+              }
+            >
+              <Text style={styles.unavailableRemoveText}>Remove from Library</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity onPress={() => router.back()} style={styles.unavailableBackLink}>
+            <Text style={styles.unavailableBackLinkText}>← Back to Library</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -437,6 +472,15 @@ const styles = StyleSheet.create({
   retailerText: { fontSize: 12, fontWeight: '700', color: '#0F2A48', letterSpacing: 0.5 },
   retailerTextActive: { color: '#fff' },
   notFound: { fontSize: 16, color: '#0F2A48', textAlign: 'center', marginTop: 40 },
+  unavailableHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(15,42,72,0.08)' },
+  unavailableBack: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(15,42,72,0.07)', alignItems: 'center', justifyContent: 'center' },
+  unavailableBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, gap: spacing.md },
+  unavailableTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', textAlign: 'center' },
+  unavailableSubtitle: { fontSize: 14, color: '#9c8f7e', textAlign: 'center', lineHeight: 21 },
+  unavailableRemove: { marginTop: spacing.sm },
+  unavailableRemoveText: { fontSize: 13, color: 'rgba(184,50,85,0.8)', textDecorationLine: 'underline' },
+  unavailableBackLink: { marginTop: spacing.sm },
+  unavailableBackLinkText: { fontSize: 13, color: '#6B9AB8' },
   irisFab: {
     position: 'absolute',
     right: 20,
