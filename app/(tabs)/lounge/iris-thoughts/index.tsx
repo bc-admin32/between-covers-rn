@@ -125,7 +125,11 @@ export default function IrisThoughtsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
-  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
+  // Explicitly decode in case Expo Router leaves %23 etc. un-decoded — the
+  // Lambda pk check does a literal startsWith("IRIS#CHAT#") and will reject
+  // any encoded variant.
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const threadId = rawId ? decodeURIComponent(rawId) : null;
   const scrollRef = useRef<ScrollView>(null);
 
   const [thread, setThread] = useState<Thread | null>(null);
@@ -154,6 +158,7 @@ export default function IrisThoughtsScreen() {
 
   useEffect(() => {
     if (!threadId) { setLoading(false); return; }
+    console.log('[IrisThoughts] threadId:', threadId);
     apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
       .then((res) => {
         setThread(res.thread);
@@ -186,19 +191,25 @@ export default function IrisThoughtsScreen() {
     setSubmitting(true);
     setSubmitError(null);
     setShowEmojiTray(false);
+    console.log('[IrisThoughts] posting reply, threadId:', threadId);
     try {
       const res = await apiPost<{ result: string; reply?: Reply }>(
         '/lounge/thread/reply',
         { threadId, content: text.trim() }
       );
+      console.log('[IrisThoughts] reply result:', res.result);
       if (res.result === 'published' && res.reply) {
         setReplies((prev) => [...prev, { ...res.reply!, reactions: res.reply!.reactions ?? [] }]);
         setText('');
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
+      } else {
+        console.warn('[IrisThoughts] unexpected result:', res.result);
+        setSubmitError('Something went wrong posting your reply. Try again.');
       }
-    } catch {
+    } catch (e) {
+      console.error('[IrisThoughts] reply error:', e);
       setSubmitError('Something went wrong. Try again in a moment.');
     } finally {
       setSubmitting(false);
