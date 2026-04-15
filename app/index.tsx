@@ -8,7 +8,7 @@ import {
   initConnection,
   endConnection,
   getAvailablePurchases,
-} from 'react-native-iap';
+} from 'expo-iap';
 
 const IAP_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,79 +11,72 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import {
-  initConnection,
-  endConnection,
-  getSubscriptions,
-  requestSubscription,
+  IAPProvider,
+  useIAP,
   getAvailablePurchases,
-  finishTransaction,
-  purchaseUpdatedListener,
-  purchaseErrorListener,
-  type Subscription,
-  type SubscriptionPurchase,
-  type PurchaseError,
-} from 'react-native-iap';
+  type ProductPurchase,
+} from 'expo-iap';
 
 const PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 
+// IAPProvider must wrap the component that calls useIAP.
 export default function PaywallScreen() {
+  return (
+    <IAPProvider>
+      <PaywallContent />
+    </IAPProvider>
+  );
+}
+
+function PaywallContent() {
   const router = useRouter();
-  const [product, setProduct] = useState<Subscription | null>(null);
+  const {
+    subscriptions,
+    currentPurchase,
+    currentPurchaseError,
+    getSubscriptions,
+    requestSubscription,
+    finishTransaction,
+  } = useIAP();
+
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const purchaseUpdateRef = useRef<ReturnType<typeof purchaseUpdatedListener> | null>(null);
-  const purchaseErrorRef = useRef<ReturnType<typeof purchaseErrorListener> | null>(null);
-
+  // Load product price on mount.
   useEffect(() => {
-    let mounted = true;
-
-    const setup = async () => {
-      try {
-        await initConnection();
-        const subs = await getSubscriptions({ skus: [PRODUCT_ID] });
-        if (mounted && subs.length > 0) setProduct(subs[0]);
-      } catch {
-        // StoreKit unavailable or product not found — show fallback price
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    purchaseUpdateRef.current = purchaseUpdatedListener(
-      async (purchase: SubscriptionPurchase) => {
-        if (purchase.productId === PRODUCT_ID) {
-          try {
-            await finishTransaction({ purchase, isConsumable: false });
-            await SecureStore.setItemAsync('bc_subscription_active', 'true');
-            setPurchasing(false);
-            router.replace('/(auth)/login');
-          } catch {
-            setPurchasing(false);
-            showError('Purchase verification failed. Please try again.');
-          }
-        }
-      }
-    );
-
-    purchaseErrorRef.current = purchaseErrorListener((error: PurchaseError) => {
-      setPurchasing(false);
-      if ((error as any).code !== 'E_USER_CANCELLED') {
-        showError('Purchase failed. Please try again.');
-      }
-    });
-
-    setup();
-
-    return () => {
-      mounted = false;
-      purchaseUpdateRef.current?.remove();
-      purchaseErrorRef.current?.remove();
-      endConnection();
-    };
+    getSubscriptions({ skus: [PRODUCT_ID] })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
+
+  // Handle successful purchase.
+  useEffect(() => {
+    if (!currentPurchase || currentPurchase.productId !== PRODUCT_ID) return;
+    const confirm = async () => {
+      try {
+        await finishTransaction({ purchase: currentPurchase, isConsumable: false });
+        await SecureStore.setItemAsync('bc_subscription_active', 'true');
+        router.replace('/(auth)/login');
+      } catch {
+        showError('Purchase verification failed. Please try again.');
+      } finally {
+        setPurchasing(false);
+      }
+    };
+    confirm();
+  }, [currentPurchase]);
+
+  // Handle purchase error.
+  useEffect(() => {
+    if (!currentPurchaseError) return;
+    setPurchasing(false);
+    const code = (currentPurchaseError as any).code;
+    if (code !== 'E_USER_CANCELLED' && code !== 'user_cancelled') {
+      showError('Purchase failed. Please try again.');
+    }
+  }, [currentPurchaseError]);
 
   const showError = (msg: string) => {
     setErrorMsg(msg);
@@ -97,7 +90,7 @@ export default function PaywallScreen() {
     try {
       await requestSubscription({ sku: PRODUCT_ID });
     } catch {
-      // purchaseErrorListener handles the error UI
+      // currentPurchaseError effect handles the error UI.
       setPurchasing(false);
     }
   };
@@ -107,7 +100,7 @@ export default function PaywallScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRestoring(true);
     try {
-      const purchases = await getAvailablePurchases();
+      const purchases: ProductPurchase[] = await getAvailablePurchases();
       const active = purchases.find(p => p.productId === PRODUCT_ID);
       if (active) {
         await SecureStore.setItemAsync('bc_subscription_active', 'true');
@@ -127,7 +120,10 @@ export default function PaywallScreen() {
     router.replace('/(auth)/login');
   };
 
-  const priceText = product ? `${product.localizedPrice} / month` : '$7.99 / month';
+  const product = subscriptions.find(s => s.productId === PRODUCT_ID);
+  const priceText = product
+    ? `${(product as any).localizedPrice ?? (product as any).price} / month`
+    : '$7.99 / month';
 
   return (
     <ScrollView
