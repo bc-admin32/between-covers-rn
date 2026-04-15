@@ -166,13 +166,18 @@ export default function LoungeThreadScreen() {
 
   useEffect(() => {
     if (!threadId) { setError('No thread specified.'); setLoading(false); return; }
+    console.log('[thread] loading threadId:', threadId);
     apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
       .then((res) => {
+        console.log('[thread] loaded ok, replies:', res.replies?.length);
         setThread(res.thread);
         setReplies(res.replies.map((r) => ({ ...r, reactions: r.reactions ?? [] })));
         setNextKey(res.nextKey);
       })
-      .catch(() => setError("Couldn't load this thread right now."))
+      .catch((err) => {
+        console.log('[thread] error:', err?.message);
+        setError("Couldn't load this thread right now.");
+      })
       .finally(() => setLoading(false));
   }, [threadId]);
 
