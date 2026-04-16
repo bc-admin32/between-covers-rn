@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform, TextInput, Alert,
+  Platform, TextInput,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -158,8 +158,6 @@ export default function IrisThoughtsScreen() {
 
   useEffect(() => {
     if (!threadId) { setLoading(false); return; }
-    console.log('[IrisThoughts] threadId:', threadId);
-    Alert.alert('Debug — threadId', threadId);
     apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
       .then((res) => {
         setThread(res.thread);
@@ -192,13 +190,11 @@ export default function IrisThoughtsScreen() {
     setSubmitting(true);
     setSubmitError(null);
     setShowEmojiTray(false);
-    console.log('[IrisThoughts] posting reply, threadId:', threadId);
     try {
       const res = await apiPost<{ result: string; reply?: Reply }>(
         '/lounge/thread/reply',
         { threadId, content: text.trim() }
       );
-      console.log('[IrisThoughts] reply result:', res.result);
       if (res.result === 'published' && res.reply) {
         setReplies((prev) => [...prev, { ...res.reply!, reactions: res.reply!.reactions ?? [] }]);
         setText('');
@@ -206,16 +202,10 @@ export default function IrisThoughtsScreen() {
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
       } else {
-        const detail = (res as any).message
-          ? `${res.result ?? 'error'}: ${(res as any).message}`
-          : `result="${res.result ?? 'none'}"`;
-        console.warn('[IrisThoughts] unexpected result:', detail);
-        setSubmitError(`Post failed — ${detail} | id="${threadId}"`);
+        setSubmitError("Something went wrong. Please try again.");
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[IrisThoughts] reply error:', e);
-      setSubmitError(`${msg} | id="${threadId}"`);
+    } catch {
+      setSubmitError("Couldn't post your reply. Please try again.");
     } finally {
       setSubmitting(false);
     }

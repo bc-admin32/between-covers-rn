@@ -267,6 +267,7 @@ export default function LoungeScreen() {
                 const pct = hasVoted && pollTotal > 0 ? Math.round((count / pollTotal) * 100) : null;
 
                 if (hasVoted) {
+                  const safePct = pct ?? 0;
                   return (
                     <View key={option.id} style={styles.pollResultRow}>
                       <View style={styles.pollResultHeader}>
@@ -277,11 +278,12 @@ export default function LoungeScreen() {
                           </Text>
                         </View>
                         <Text style={[styles.pollResultPct, isSelected && styles.pollResultPctSelected]}>
-                          {pct}%
+                          {safePct}%
                         </Text>
                       </View>
                       <View style={styles.pollBar}>
-                        <View style={[styles.pollBarFill, { width: `${pct}%` as any, backgroundColor: isSelected ? '#B83255' : '#C4A882' }]} />
+                        <View style={[styles.pollBarFill, { flex: safePct, backgroundColor: isSelected ? '#B83255' : '#C4A882' }]} />
+                        <View style={{ flex: 100 - safePct }} />
                       </View>
                     </View>
                   );
@@ -425,16 +427,16 @@ const styles = StyleSheet.create({
   pollRadioDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   pollOptionTextWrap: { flex: 1, minWidth: 0 },
   pollOptionText: { fontSize: 13, color: '#3A2C28' },
-  pollResultRow: { marginBottom: spacing.sm },
-  pollResultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, width: '100%' },
+  pollResultRow: { marginBottom: spacing.sm, overflow: 'hidden' },
+  pollResultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   pollResultLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
   pollResultDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#B83255', flexShrink: 0 },
   pollResultLabel: { fontSize: 13, color: '#3A2C28', flex: 1, minWidth: 0 },
   pollResultLabelSelected: { color: '#B83255', fontWeight: '700' },
   pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E', flexShrink: 0, width: 44, textAlign: 'right' },
   pollResultPctSelected: { color: '#B83255' },
-  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden', width: '100%' },
-  pollBarFill: { height: 8, borderRadius: 4 },
+  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden', flexDirection: 'row' },
+  pollBarFill: { height: 8 },
   pollVoteCount: { textAlign: 'center', fontSize: 11, color: '#B09A7E', marginTop: spacing.md },
   monthlyCard: { backgroundColor: '#1A1A2E', borderColor: '#C4A882' },
   monthlyLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Nunito_700Bold', color: '#C4A882', marginBottom: spacing.sm },

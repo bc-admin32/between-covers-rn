@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -258,6 +258,13 @@ export default function LoungeThreadScreen() {
         setText('');
         setReplyingTo(null);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        // Refresh in background to populate sk on newly posted replies (required for edits)
+        setTimeout(() => {
+          if (!threadId) return;
+          apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
+            .then((fresh) => setReplies(fresh.replies.map((r) => ({ ...r, reactions: r.reactions ?? [] }))))
+            .catch(() => {});
+        }, 1200);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That reply didn't quite fit the vibe — give it another go! 💛");
       }
@@ -272,27 +279,20 @@ export default function LoungeThreadScreen() {
     if (!editingReply || !editText.trim() || editSubmitting) return;
     setEditError(null);
     setEditSubmitting(true);
-    console.log('[ThreadEdit] submitting edit — threadId:', threadId, 'replyId:', editingReply.replyId, 'sk:', editingReply.sk);
     try {
       const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean } }>(
         '/lounge/thread/edit',
         { threadId, replyId: editingReply.replyId, sk: editingReply.sk, content: editText.trim() }
       );
-      console.log('[ThreadEdit] result:', res.result);
       if (res.result === 'updated' && res.reply) {
+        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
         setEditingReply(null);
         setEditText('');
-        setEditError(null);
-        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
       } else {
-        const msg = `result="${res.result ?? 'none'}" sk="${editingReply.sk || 'EMPTY'}" threadId="${threadId}"`;
-        console.error('[ThreadEdit] unexpected result:', msg);
-        setEditError(msg);
+        setEditError("Couldn't save your edit. Please try again.");
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[ThreadEdit] error:', e);
-      setEditError(`${msg} | sk="${editingReply.sk || 'EMPTY'}" threadId="${threadId}"`);
+    } catch {
+      setEditError("Couldn't save your edit. Please try again.");
     } finally {
       setEditSubmitting(false);
     }
