@@ -60,7 +60,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-iap",
       "expo-video",
       "expo-image-picker",
       [
