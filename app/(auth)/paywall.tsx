@@ -54,17 +54,38 @@ export default function PaywallScreen() {
     finishingRef.current = true;
 
     const confirm = async () => {
-      try {
-        await finishTransaction({ purchase: currentPurchase, isConsumable: false });
-        await SecureStore.setItemAsync('bc_subscription_active', 'true');
-        router.replace('/(auth)/login');
-      } catch {
-        showError('Purchase verification failed. Please try again.');
-        setPurchasing(false);
-      } finally {
-        finishingRef.current = false;
-      }
-    };
+  try {
+    await finishTransaction({ purchase: currentPurchase, isConsumable: false });
+
+    // Write subscription to DynamoDB
+    const idToken = await SecureStore.getItemAsync('bc_id_token');
+    if (idToken) {
+      await fetch('https://api.betweencovers.app/subscription/write', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId: currentPurchase.productId,
+          transactionId: currentPurchase.transactionId,
+          platform: 'ios',
+          originalPurchaseDate: currentPurchase.transactionDate
+            ? new Date(currentPurchase.transactionDate).toISOString()
+            : new Date().toISOString(),
+        }),
+      }).catch(err => console.warn('Subscription write failed:', err));
+    }
+
+    await SecureStore.setItemAsync('bc_subscription_active', 'true');
+    router.replace('/(auth)/login');
+  } catch {
+    showError('Purchase verification failed. Please try again.');
+    setPurchasing(false);
+  } finally {
+    finishingRef.current = false;
+  }
+};
 
     confirm();
   }, [currentPurchase]);
