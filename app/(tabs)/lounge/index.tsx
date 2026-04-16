@@ -72,6 +72,7 @@ export default function LoungeScreen() {
         const res = await apiGet<LoungeData>('/lounge/resolve');
         loungeCache = res;
         setData(res);
+        console.log('[Lounge] legalAcceptedAt from API:', res.legalAcceptedAt);
         if (!res.legalAcceptedAt) setEulaModal(true);
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
@@ -88,7 +89,11 @@ export default function LoungeScreen() {
     setEulaAccepting(true);
     try {
       await apiPost('/legal/accept');
-      setData((prev) => prev ? { ...prev, legalAcceptedAt: new Date().toISOString() } : prev);
+      const acceptedAt = new Date().toISOString();
+      // Update both local state and the module-level cache so the modal
+      // doesn't re-fire if the component remounts before the next API refresh.
+      setData((prev) => prev ? { ...prev, legalAcceptedAt: acceptedAt } : prev);
+      if (loungeCache) loungeCache = { ...loungeCache, legalAcceptedAt: acceptedAt };
       setEulaModal(false);
     } catch {
       // keep modal open on failure

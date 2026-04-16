@@ -205,12 +205,16 @@ export default function IrisThoughtsScreen() {
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
       } else {
-        console.warn('[IrisThoughts] unexpected result:', res.result);
-        setSubmitError('Something went wrong posting your reply. Try again.');
+        const detail = (res as any).message
+          ? `${res.result ?? 'error'}: ${(res as any).message}`
+          : `result="${res.result ?? 'none'}"`;
+        console.warn('[IrisThoughts] unexpected result:', detail);
+        setSubmitError(`Post failed — ${detail}`);
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error('[IrisThoughts] reply error:', e);
-      setSubmitError('Something went wrong. Try again in a moment.');
+      setSubmitError(`Error: ${msg}`);
     } finally {
       setSubmitting(false);
     }
