@@ -21,7 +21,6 @@ export default function SplashScreen() {
     const run = async () => {
       const start = Date.now();
 
-      const goPaywall = () => router.replace('/(auth)/paywall' as any);
       const goLogin  = () => router.replace('/(auth)/login');
 
       const elapsed = () => Date.now() - start;
@@ -65,9 +64,9 @@ export default function SplashScreen() {
           return;
         }
 
-        goPaywall();
+        goLogin();
       } catch {
-        goPaywall();
+        goLogin();
       }
     };
 
