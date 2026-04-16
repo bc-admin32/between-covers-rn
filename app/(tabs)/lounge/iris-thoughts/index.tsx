@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform, TextInput,
+  Platform, TextInput, Alert,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -159,6 +159,7 @@ export default function IrisThoughtsScreen() {
   useEffect(() => {
     if (!threadId) { setLoading(false); return; }
     console.log('[IrisThoughts] threadId:', threadId);
+    Alert.alert('Debug — threadId', threadId);
     apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
       .then((res) => {
         setThread(res.thread);
@@ -209,12 +210,12 @@ export default function IrisThoughtsScreen() {
           ? `${res.result ?? 'error'}: ${(res as any).message}`
           : `result="${res.result ?? 'none'}"`;
         console.warn('[IrisThoughts] unexpected result:', detail);
-        setSubmitError(`Post failed — ${detail}`);
+        setSubmitError(`Post failed — ${detail} | id="${threadId}"`);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[IrisThoughts] reply error:', e);
-      setSubmitError(`Error: ${msg}`);
+      setSubmitError(`${msg} | id="${threadId}"`);
     } finally {
       setSubmitting(false);
     }
