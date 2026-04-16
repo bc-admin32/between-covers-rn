@@ -4,13 +4,6 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
-import {
-  initConnection,
-  endConnection,
-  getAvailablePurchases,
-} from 'expo-iap';
-
-const IAP_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -65,26 +58,11 @@ export default function SplashScreen() {
         }
 
         // ── NEW / LOGGED-OUT USER: check subscription ────────────────────
-        // Fast path: check cached flag written after purchase/restore.
+        // Check cached flag written after purchase/restore on the paywall.
         const cached = await SecureStore.getItemAsync('bc_subscription_active');
         if (cached === 'true') {
           goLogin();
           return;
-        }
-
-        // Slow path: query StoreKit for active purchases.
-        try {
-          await initConnection();
-          const purchases = await getAvailablePurchases();
-          await endConnection();
-          const active = purchases.find(p => p.productId === IAP_PRODUCT_ID);
-          if (active) {
-            await SecureStore.setItemAsync('bc_subscription_active', 'true');
-            goLogin();
-            return;
-          }
-        } catch {
-          // StoreKit unavailable (e.g. simulator without Apple ID) — show paywall.
         }
 
         goPaywall();
