@@ -77,7 +77,24 @@ export default function PaywallScreen() {
       }).catch(err => console.warn('Subscription write failed:', err));
     }
 
-    await SecureStore.setItemAsync('bc_subscription_active', 'true');
+    try {
+      const idToken = await SecureStore.getItemAsync('bc_id_token');
+      if (idToken) {
+        const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (resolveRes.ok) {
+          const result = await resolveRes.json();
+          if (result?.nextRoute?.startsWith('/')) {
+            router.replace(result.nextRoute as any);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Post-purchase resolve failed:', err);
+    }
     router.replace('/(auth)/login');
   } catch {
     showError('Purchase verification failed. Please try again.');
@@ -131,7 +148,24 @@ export default function PaywallScreen() {
       const purchases = await doRestorePurchases();
       const active = purchases.find((p) => p.productId === PRODUCT_ID);
       if (active) {
-        await SecureStore.setItemAsync('bc_subscription_active', 'true');
+        try {
+          const idToken = await SecureStore.getItemAsync('bc_id_token');
+          if (idToken) {
+            const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (resolveRes.ok) {
+              const result = await resolveRes.json();
+              if (result?.nextRoute?.startsWith('/')) {
+                router.replace(result.nextRoute as any);
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Post-restore resolve failed:', err);
+        }
         router.replace('/(auth)/login');
       } else {
         showError('No active subscription found.');

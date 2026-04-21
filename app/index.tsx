@@ -21,7 +21,6 @@ export default function SplashScreen() {
     const run = async () => {
       const start = Date.now();
 
-      const goPaywall = () => router.replace('/(auth)/paywall' as any);
       const goLogin   = () => router.replace('/(auth)/login');
 
       const elapsed = () => Date.now() - start;
@@ -57,17 +56,10 @@ export default function SplashScreen() {
           await waitForSplash();
         }
 
-        // ── NEW / LOGGED-OUT USER: check subscription ────────────────────
-        // Check cached flag written after purchase/restore on the paywall.
-        const cached = await SecureStore.getItemAsync('bc_subscription_active');
-        if (cached === 'true') {
-          goLogin();
-          return;
-        }
-
-        goPaywall();
+        // ── NEW / LOGGED-OUT USER ────────────────────────────────────────
+        goLogin();
       } catch {
-        goPaywall();
+        goLogin();
       }
     };
 
