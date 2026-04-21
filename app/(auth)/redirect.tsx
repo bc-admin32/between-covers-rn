@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { normalizeRoute } from '../../lib/routes';
+import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -74,7 +75,20 @@ export default function RedirectScreen() {
         });
 
         if (!resolveRes.ok) {
-          setErrorCode('REDIRECT_AUTH_RESOLVE_FAILED');
+          // Tokens were stored above — clear them now so index.tsx doesn't
+          // enter a loop (find token → resolve fails → forceLogin → login →
+          // user logs in → tokens stored → repeat).
+          await signOut();
+          const body = await resolveRes.json().catch(() => null);
+          const isGone = resolveRes.status === 404 || resolveRes.status === 403;
+          const msg = (body?.message ?? '') as string;
+          const isDeactivated = isGone && (
+            msg.toLowerCase().includes('deactivat') ||
+            msg.toLowerCase().includes('suspend') ||
+            msg.toLowerCase().includes('not found') ||
+            resolveRes.status === 404
+          );
+          setErrorCode(isDeactivated ? 'ACCOUNT_DEACTIVATED' : 'REDIRECT_AUTH_RESOLVE_FAILED');
           return;
         }
 
@@ -96,11 +110,25 @@ export default function RedirectScreen() {
   }, [params.code]);
 
   if (errorCode) {
+    const isDeactivated = errorCode === 'ACCOUNT_DEACTIVATED';
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Hmm… something didn't go as expected.</Text>
-        <Text style={styles.errorSubtitle}>Please try signing in again.</Text>
-        <Text style={styles.errorCode}>Error code: {errorCode}</Text>
+        <Text style={styles.errorTitle}>
+          {isDeactivated ? 'Account unavailable' : 'Hmm… something didn\'t go as expected.'}
+        </Text>
+        <Text style={styles.errorSubtitle}>
+          {isDeactivated
+            ? 'This account has been deactivated. Please contact support at support@betweencovers.app.'
+            : 'Please try signing in again.'}
+        </Text>
+        {!isDeactivated && (
+          <Text style={styles.errorCode}>Error code: {errorCode}</Text>
+        )}
+        <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/(auth)/login')}>
+          <Text style={styles.retryButtonText}>
+            {isDeactivated ? 'Back to Sign In' : 'Try Again'}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -150,5 +178,18 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#6b7280',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    color: '#d1d5db',
+    fontWeight: '600',
   },
 });

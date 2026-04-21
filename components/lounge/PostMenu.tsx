@@ -39,12 +39,19 @@ export default function PostMenu({
     if (!selectedReason || submitting) return;
     setSubmitting(true);
     try {
-      await apiPost('/lounge/report-post', { threadId, replyId, reason: selectedReason });
+      await apiPost('/lounge/report-post', {
+        threadId,
+        replyId,
+        reportedUserId: targetUserId,
+        reason: selectedReason,
+      });
       setReportOpen(false);
       setSelectedReason(null);
       onToast('Report submitted. Thank you.');
-    } catch {
-      onToast('Could not submit report. Try again.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[PostMenu] report error:', e);
+      onToast(`Report failed: ${msg}`);
     } finally {
       setSubmitting(false);
     }

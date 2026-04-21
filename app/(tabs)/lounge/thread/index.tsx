@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -162,7 +162,10 @@ export default function LoungeThreadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
+  // Explicitly decode — Expo Router may leave %23 un-decoded, causing the
+  // Lambda's startsWith("THREAD#") check to fail and build a broken pk.
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const threadId = rawId ? decodeURIComponent(rawId) : null;
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -177,6 +180,7 @@ export default function LoungeThreadScreen() {
   const [editingReply, setEditingReply] = useState<Reply | null>(null);
   const [editText, setEditText] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -254,6 +258,13 @@ export default function LoungeThreadScreen() {
         setText('');
         setReplyingTo(null);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        // Refresh in background to populate sk on newly posted replies (required for edits)
+        setTimeout(() => {
+          if (!threadId) return;
+          apiGet<ThreadResponse>(`/lounge/thread/replies?threadId=${encodeURIComponent(threadId)}`)
+            .then((fresh) => setReplies(fresh.replies.map((r) => ({ ...r, reactions: r.reactions ?? [] }))))
+            .catch(() => {});
+        }, 1200);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That reply didn't quite fit the vibe — give it another go! 💛");
       }
@@ -266,6 +277,7 @@ export default function LoungeThreadScreen() {
 
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
+    setEditError(null);
     setEditSubmitting(true);
     try {
       const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean } }>(
@@ -277,10 +289,10 @@ export default function LoungeThreadScreen() {
         setEditingReply(null);
         setEditText('');
       } else {
-        showToast('Could not save edit. Try again.');
+        setEditError("Couldn't save your edit. Please try again.");
       }
     } catch {
-      showToast('Could not save edit. Try again.');
+      setEditError("Couldn't save your edit. Please try again.");
     } finally {
       setEditSubmitting(false);
     }
@@ -364,13 +376,16 @@ export default function LoungeThreadScreen() {
                   autoFocus
                 />
                 <View style={styles.editActions}>
-                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); }} style={styles.editCancelButton} disabled={editSubmitting}>
+                  <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); setEditError(null); }} style={styles.editCancelButton} disabled={editSubmitting}>
                     <Text style={styles.editCancelText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={submitEdit} style={[styles.editSaveButton, editSubmitting && { backgroundColor: '#DDD5C4' }]} disabled={editSubmitting}>
                     <Text style={styles.editSaveText}>{editSubmitting ? 'Saving…' : 'Save'}</Text>
                   </TouchableOpacity>
                 </View>
+                {editError ? (
+                  <Text style={styles.editErrorText}>{editError}</Text>
+                ) : null}
               </View>
             ) : (
               <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} onBlock={handleBlock} onToast={showToast} threadId={threadId!} />
@@ -503,6 +518,7 @@ const styles = StyleSheet.create({
   editCancelText: { fontSize: 11, fontWeight: '600', color: '#6A5550' },
   editSaveButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#B83255' },
   editSaveText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  editErrorText: { fontSize: 11, color: '#ef4444', marginTop: 6, fontFamily: 'Nunito_400Regular', lineHeight: 16 },
   closedBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, alignItems: 'center', gap: spacing.xs, borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4' },
   closedPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(196,168,130,0.15)', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(196,168,130,0.3)' },
   closedEmoji: { fontSize: 16 },

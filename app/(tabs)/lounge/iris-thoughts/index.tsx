@@ -125,7 +125,11 @@ export default function IrisThoughtsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
-  const threadId = id ? (Array.isArray(id) ? id[0] : id) : null;
+  // Explicitly decode in case Expo Router leaves %23 etc. un-decoded — the
+  // Lambda pk check does a literal startsWith("IRIS#CHAT#") and will reject
+  // any encoded variant.
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const threadId = rawId ? decodeURIComponent(rawId) : null;
   const scrollRef = useRef<ScrollView>(null);
 
   const [thread, setThread] = useState<Thread | null>(null);
@@ -197,9 +201,11 @@ export default function IrisThoughtsScreen() {
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
+      } else {
+        setSubmitError("Something went wrong. Please try again.");
       }
     } catch {
-      setSubmitError('Something went wrong. Try again in a moment.');
+      setSubmitError("Couldn't post your reply. Please try again.");
     } finally {
       setSubmitting(false);
     }

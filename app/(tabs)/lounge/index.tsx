@@ -21,7 +21,7 @@ type Section =
 type LoungeData = {
   active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
-  legalAcceptedAt?: string | null;
+  loungeTermsAcceptedAt?: string | null;
 };
 
 // Module-level in-memory cache — no size limit, survives tab switches.
@@ -72,7 +72,8 @@ export default function LoungeScreen() {
         const res = await apiGet<LoungeData>('/lounge/resolve');
         loungeCache = res;
         setData(res);
-        if (!res.legalAcceptedAt) setEulaModal(true);
+        console.log('[Lounge] loungeTermsAcceptedAt from API:', res.loungeTermsAcceptedAt);
+        if (!res.loungeTermsAcceptedAt) setEulaModal(true);
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
       } catch {
@@ -87,8 +88,12 @@ export default function LoungeScreen() {
   const handleEulaAccept = async () => {
     setEulaAccepting(true);
     try {
-      await apiPost('/legal/accept');
-      setData((prev) => prev ? { ...prev, legalAcceptedAt: new Date().toISOString() } : prev);
+      const res = await apiPost<{ loungeTermsAcceptedAt?: string }>('/legal/accept');
+      const acceptedAt = res?.loungeTermsAcceptedAt ?? new Date().toISOString();
+      // Update both local state and the module-level cache so the modal
+      // doesn't re-fire if the component remounts before the next API refresh.
+      setData((prev) => prev ? { ...prev, loungeTermsAcceptedAt: acceptedAt } : prev);
+      if (loungeCache) loungeCache = { ...loungeCache, loungeTermsAcceptedAt: acceptedAt };
       setEulaModal(false);
     } catch {
       // keep modal open on failure
@@ -262,6 +267,7 @@ export default function LoungeScreen() {
                 const pct = hasVoted && pollTotal > 0 ? Math.round((count / pollTotal) * 100) : null;
 
                 if (hasVoted) {
+                  const safePct = pct ?? 0;
                   return (
                     <View key={option.id} style={styles.pollResultRow}>
                       <View style={styles.pollResultHeader}>
@@ -272,11 +278,12 @@ export default function LoungeScreen() {
                           </Text>
                         </View>
                         <Text style={[styles.pollResultPct, isSelected && styles.pollResultPctSelected]}>
-                          {pct}%
+                          {safePct}%
                         </Text>
                       </View>
                       <View style={styles.pollBar}>
-                        <View style={[styles.pollBarFill, { width: `${pct}%` as any, backgroundColor: isSelected ? '#B83255' : '#C4A882' }]} />
+                        <View style={[styles.pollBarFill, { flex: safePct, backgroundColor: isSelected ? '#B83255' : '#C4A882' }]} />
+                        <View style={{ flex: 100 - safePct }} />
                       </View>
                     </View>
                   );
@@ -291,7 +298,9 @@ export default function LoungeScreen() {
                     <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
                       {isSelected && <View style={styles.pollRadioDot} />}
                     </View>
-                    <Text style={styles.pollOptionText}>{option.label}</Text>
+                    <View style={styles.pollOptionTextWrap}>
+                      <Text style={styles.pollOptionText}>{option.label}</Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -416,17 +425,18 @@ const styles = StyleSheet.create({
   pollRadio: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: '#B83255', alignItems: 'center', justifyContent: 'center' },
   pollRadioSelected: { backgroundColor: '#B83255', borderColor: '#B83255' },
   pollRadioDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  pollOptionText: { fontSize: 13, color: '#3A2C28', flex: 1, flexShrink: 1 },
-  pollResultRow: { marginBottom: spacing.sm },
-  pollResultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  pollResultLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  pollResultDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#B83255' },
-  pollResultLabel: { fontSize: 13, color: '#3A2C28', flex: 1, flexShrink: 1 },
+  pollOptionTextWrap: { flex: 1, minWidth: 0 },
+  pollOptionText: { fontSize: 13, color: '#3A2C28' },
+  pollResultRow: { marginBottom: spacing.sm, overflow: 'hidden' },
+  pollResultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  pollResultLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
+  pollResultDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#B83255', flexShrink: 0 },
+  pollResultLabel: { fontSize: 13, color: '#3A2C28', flex: 1, minWidth: 0 },
   pollResultLabelSelected: { color: '#B83255', fontWeight: '700' },
-  pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E' },
+  pollResultPct: { fontSize: 12, fontWeight: '600', color: '#B09A7E', flexShrink: 0, width: 44, textAlign: 'right' },
   pollResultPctSelected: { color: '#B83255' },
-  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden' },
-  pollBarFill: { height: 8, borderRadius: 4 },
+  pollBar: { height: 8, borderRadius: 4, backgroundColor: '#F0EDE4', overflow: 'hidden', flexDirection: 'row' },
+  pollBarFill: { height: 8 },
   pollVoteCount: { textAlign: 'center', fontSize: 11, color: '#B09A7E', marginTop: spacing.md },
   monthlyCard: { backgroundColor: '#1A1A2E', borderColor: '#C4A882' },
   monthlyLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Nunito_700Bold', color: '#C4A882', marginBottom: spacing.sm },
