@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -16,6 +17,9 @@ import { normalizeRoute } from '../../lib/routes';
 const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 const ANNUAL_PRODUCT_ID  = 'com.betweencovers.app.membership.annual';
 const ALL_PRODUCT_IDS    = [MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID];
+
+const TERMS_URL   = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/terms-of-use.html';
+const PRIVACY_URL = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/privacy-policy.html';
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -42,7 +46,7 @@ export default function PaywallScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  // Fetch subscription product once StoreKit connection is ready
+  // Fetch subscription products once StoreKit connection is ready
   useEffect(() => {
     if (!connected) return;
     fetchProducts({ skus: ALL_PRODUCT_IDS, type: 'subs' })
@@ -58,55 +62,55 @@ export default function PaywallScreen() {
     finishingRef.current = true;
 
     const confirm = async () => {
-  try {
-    await finishTransaction({ purchase: currentPurchase, isConsumable: false });
+      try {
+        await finishTransaction({ purchase: currentPurchase, isConsumable: false });
 
-    // Write subscription to DynamoDB
-    const idToken = await SecureStore.getItemAsync('bc_id_token');
-    if (idToken) {
-      await fetch('https://api.betweencovers.app/subscription/write', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          productId: currentPurchase.productId,
-          transactionId: currentPurchase.transactionId,
-          platform: 'ios',
-          originalPurchaseDate: currentPurchase.transactionDate
-            ? new Date(currentPurchase.transactionDate).toISOString()
-            : new Date().toISOString(),
-        }),
-      }).catch(err => console.warn('Subscription write failed:', err));
-    }
-
-    try {
-      const idToken = await SecureStore.getItemAsync('bc_id_token');
-      if (idToken) {
-        const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (resolveRes.ok) {
-          const result = await resolveRes.json();
-          if (result?.nextRoute?.startsWith('/')) {
-            router.replace(normalizeRoute(result.nextRoute) as any);
-            return;
-          }
+        // Write subscription to DynamoDB
+        const idToken = await SecureStore.getItemAsync('bc_id_token');
+        if (idToken) {
+          await fetch('https://api.betweencovers.app/subscription/write', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              productId: currentPurchase.productId,
+              transactionId: currentPurchase.transactionId,
+              platform: 'ios',
+              originalPurchaseDate: currentPurchase.transactionDate
+                ? new Date(currentPurchase.transactionDate).toISOString()
+                : new Date().toISOString(),
+            }),
+          }).catch(err => console.warn('Subscription write failed:', err));
         }
+
+        try {
+          const idToken = await SecureStore.getItemAsync('bc_id_token');
+          if (idToken) {
+            const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (resolveRes.ok) {
+              const result = await resolveRes.json();
+              if (result?.nextRoute?.startsWith('/')) {
+                router.replace(normalizeRoute(result.nextRoute) as any);
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Post-purchase resolve failed:', err);
+        }
+        router.replace('/(auth)/login');
+      } catch {
+        showError('Purchase verification failed. Please try again.');
+        setPurchasing(false);
+      } finally {
+        finishingRef.current = false;
       }
-    } catch (err) {
-      console.warn('Post-purchase resolve failed:', err);
-    }
-    router.replace('/(auth)/login');
-  } catch {
-    showError('Purchase verification failed. Please try again.');
-    setPurchasing(false);
-  } finally {
-    finishingRef.current = false;
-  }
-};
+    };
 
     confirm();
   }, [currentPurchase]);
@@ -186,6 +190,9 @@ export default function PaywallScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.replace('/(auth)/login');
   };
+
+  const openTerms   = () => Linking.openURL(TERMS_URL).catch(() => {});
+  const openPrivacy = () => Linking.openURL(PRIVACY_URL).catch(() => {});
 
   const annualProduct  = subscriptions.find((s) => s.id === ANNUAL_PRODUCT_ID);
   const monthlyProduct = subscriptions.find((s) => s.id === MONTHLY_PRODUCT_ID);
@@ -285,6 +292,16 @@ export default function PaywallScreen() {
         <Text style={styles.legal}>
           Cancel anytime. Subscription renews automatically unless canceled before renewal.
         </Text>
+
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={openTerms} activeOpacity={0.7}>
+            <Text style={styles.legalLinkText}>Terms of Use</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalLinkSeparator}>•</Text>
+          <TouchableOpacity onPress={openPrivacy} activeOpacity={0.7}>
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity style={styles.signInLink} onPress={handleSignIn} activeOpacity={0.7}>
@@ -444,6 +461,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 17,
     marginTop: 4,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    color: '#C4A882',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  legalLinkSeparator: {
+    fontSize: 12,
+    color: 'rgba(196,168,130,0.5)',
   },
   signInLink: {
     flexDirection: 'row',
