@@ -12,7 +12,9 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases } from 'expo-iap';
 
-const PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
+const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
+const ANNUAL_PRODUCT_ID  = 'com.betweencovers.app.membership.annual';
+const ALL_PRODUCT_IDS    = [MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID];
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function PaywallScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
   const finishingRef = useRef(false);
 
   // Fallback: stop loading after 8s if StoreKit never connects
@@ -41,7 +44,7 @@ export default function PaywallScreen() {
   // Fetch subscription product once StoreKit connection is ready
   useEffect(() => {
     if (!connected) return;
-    fetchProducts({ skus: [PRODUCT_ID], type: 'subs' })
+    fetchProducts({ skus: ALL_PRODUCT_IDS, type: 'subs' })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [connected]);
@@ -49,7 +52,7 @@ export default function PaywallScreen() {
   // Handle successful purchase event
   useEffect(() => {
     if (!currentPurchase) return;
-    if (currentPurchase.productId !== PRODUCT_ID) return;
+    if (!ALL_PRODUCT_IDS.includes(currentPurchase.productId)) return;
     if (finishingRef.current) return;
     finishingRef.current = true;
 
@@ -126,11 +129,12 @@ export default function PaywallScreen() {
     if (purchasing || restoring) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPurchasing(true);
+    const sku = selectedPlan === 'annual' ? ANNUAL_PRODUCT_ID : MONTHLY_PRODUCT_ID;
     try {
       await requestPurchase({
         request: {
-          ios: { sku: PRODUCT_ID },
-          android: { skus: [PRODUCT_ID] },
+          ios: { sku },
+          android: { skus: [sku] },
         },
         type: 'subs',
       });
@@ -146,7 +150,7 @@ export default function PaywallScreen() {
     setRestoring(true);
     try {
       const purchases = await doRestorePurchases();
-      const active = purchases.find((p) => p.productId === PRODUCT_ID);
+      const active = purchases.find((p) => ALL_PRODUCT_IDS.includes(p.productId));
       if (active) {
         try {
           const idToken = await SecureStore.getItemAsync('bc_id_token');
@@ -182,10 +186,11 @@ export default function PaywallScreen() {
     router.replace('/(auth)/login');
   };
 
-  const product = subscriptions.find((s) => s.id === PRODUCT_ID);
-  const priceText = product
-    ? `${product.displayPrice} / month`
-    : '$7.99 / month';
+  const annualProduct  = subscriptions.find((s) => s.id === ANNUAL_PRODUCT_ID);
+  const monthlyProduct = subscriptions.find((s) => s.id === MONTHLY_PRODUCT_ID);
+
+  const annualPriceLabel  = annualProduct  ? `${annualProduct.displayPrice}/year`  : '$89.99/year';
+  const monthlyPriceLabel = monthlyProduct ? `${monthlyProduct.displayPrice}/month` : '$10.99/month';
 
   return (
     <ScrollView
@@ -194,24 +199,58 @@ export default function PaywallScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.brand}>Between Covers</Text>
-      <Text style={styles.tagline}>Your cozy romance reading escape</Text>
+      <Text style={styles.tagline}>Your romance escape starts here</Text>
 
       <View style={styles.features}>
-        <FeatureRow icon="📚" text="Weekly book discussions & hot takes" />
-        <FeatureRow icon="✨" text="The Lounge — your book club community" />
-        <FeatureRow icon="🌹" text="Iris, your AI romance reading guide" />
-        <FeatureRow icon="📖" text="Monthly prompts & reading challenges" />
+        <FeatureRow icon="✨" text="Meet Iris, your romance book bestie" />
+        <FeatureRow icon="💬" text="Join the Lounge for romance chats and community discussions" />
+        <FeatureRow icon="📚" text="Discover curated reads, cozy picks, and your next obsession" />
+        <FeatureRow icon="🎥" text="Join live moments as the community grows" />
+        <FeatureRow icon="🌙" text="Unlock the full Between Covers experience" />
       </View>
 
-      <View style={styles.pricing}>
-        {loading ? (
-          <ActivityIndicator color="#FDFAF6" />
-        ) : (
-          <>
-            <Text style={styles.price}>{priceText}</Text>
-            <Text style={styles.trial}>7-day free trial · cancel anytime</Text>
-          </>
-        )}
+      <View style={styles.plans}>
+        {/* Annual card */}
+        <TouchableOpacity
+          style={[styles.planCard, selectedPlan === 'annual' && styles.planCardSelected]}
+          onPress={() => setSelectedPlan('annual')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.planCardInner}>
+            <View style={styles.planCardLeft}>
+              <Text style={styles.planTitle}>Annual</Text>
+              {loading ? (
+                <ActivityIndicator color="#FDFAF6" style={styles.planLoader} />
+              ) : (
+                <>
+                  <Text style={styles.planPrice}>7 days free, then {annualPriceLabel}</Text>
+                  <Text style={styles.planSub}>About $7.50/month</Text>
+                </>
+              )}
+            </View>
+            <View style={styles.bestValueBadge}>
+              <Text style={styles.bestValueText}>⭐ Best Value</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Monthly card */}
+        <TouchableOpacity
+          style={[styles.planCard, selectedPlan === 'monthly' && styles.planCardSelected]}
+          onPress={() => setSelectedPlan('monthly')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.planCardInner}>
+            <View style={styles.planCardLeft}>
+              <Text style={styles.planTitle}>Monthly</Text>
+              {loading ? (
+                <ActivityIndicator color="#FDFAF6" style={styles.planLoader} />
+              ) : (
+                <Text style={styles.planPrice}>7 days free, then {monthlyPriceLabel}</Text>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.cta}>
@@ -224,28 +263,26 @@ export default function PaywallScreen() {
           {purchasing ? (
             <ActivityIndicator color="#FDFAF6" />
           ) : (
-            <Text style={styles.primaryBtnText}>Start Free Trial</Text>
+            <Text style={styles.primaryBtnText}>Start My Free Trial</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.secondaryBtn, (restoring || purchasing) && styles.btnDisabled]}
           onPress={handleRestore}
           disabled={restoring || purchasing}
           activeOpacity={0.7}
         >
           {restoring ? (
-            <ActivityIndicator color="#FDFAF6" size="small" />
+            <ActivityIndicator color="#C4A882" size="small" />
           ) : (
-            <Text style={styles.secondaryBtnText}>Restore Purchase</Text>
+            <Text style={styles.restoreText}>Restore Purchase</Text>
           )}
         </TouchableOpacity>
 
         {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
         <Text style={styles.legal}>
-          Cancel anytime. Billed monthly after free trial.{'\n'}
-          Subscriptions auto-renew unless cancelled.
+          Cancel anytime. Subscription renews automatically unless canceled before renewal.
         </Text>
       </View>
 
@@ -269,7 +306,7 @@ function FeatureRow({ icon, text }: { icon: string; text: string }) {
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: '#0F2A48',
+    backgroundColor: '#000000',
   },
   content: {
     paddingTop: 72,
@@ -290,41 +327,82 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#C4A882',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 36,
   },
   features: {
     width: '100%',
-    gap: 16,
-    marginBottom: 36,
+    gap: 14,
+    marginBottom: 32,
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 14,
   },
   featureIcon: {
-    fontSize: 22,
+    fontSize: 20,
+    marginTop: 1,
   },
   featureText: {
     fontSize: 15,
     color: '#F0EDE4',
     flex: 1,
+    lineHeight: 22,
   },
-  pricing: {
+  plans: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 28,
+  },
+  planCard: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+  },
+  planCardSelected: {
+    borderColor: '#B83255',
+    backgroundColor: 'rgba(184,50,85,0.08)',
+  },
+  planCardInner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-    marginBottom: 32,
+    justifyContent: 'space-between',
   },
-  price: {
-    fontSize: 30,
+  planCardLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  planTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#FDFAF6',
-    marginBottom: 4,
   },
-  trial: {
+  planPrice: {
     fontSize: 13,
     color: '#C4A882',
+  },
+  planSub: {
+    fontSize: 12,
+    color: 'rgba(196,168,130,0.7)',
+  },
+  planLoader: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  bestValueBadge: {
+    backgroundColor: 'rgba(184,50,85,0.25)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 12,
+  },
+  bestValueText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FDFAF6',
   },
   cta: {
     width: '100%',
@@ -339,15 +417,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryBtn: {
-    width: '100%',
-    height: 52,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   btnDisabled: {
     opacity: 0.55,
   },
@@ -356,10 +425,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FDFAF6',
   },
-  secondaryBtnText: {
-    fontSize: 15,
+  restoreText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FDFAF6',
+    color: '#C4A882',
+    textDecorationLine: 'underline',
   },
   error: {
     fontSize: 13,
