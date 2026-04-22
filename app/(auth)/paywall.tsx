@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases } from 'expo-iap';
+import { normalizeRoute } from '../../lib/routes';
 
 const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 const ANNUAL_PRODUCT_ID  = 'com.betweencovers.app.membership.annual';
@@ -90,7 +91,7 @@ export default function PaywallScreen() {
         if (resolveRes.ok) {
           const result = await resolveRes.json();
           if (result?.nextRoute?.startsWith('/')) {
-            router.replace(result.nextRoute as any);
+            router.replace(normalizeRoute(result.nextRoute) as any);
             return;
           }
         }
@@ -162,7 +163,7 @@ export default function PaywallScreen() {
             if (resolveRes.ok) {
               const result = await resolveRes.json();
               if (result?.nextRoute?.startsWith('/')) {
-                router.replace(result.nextRoute as any);
+                router.replace(normalizeRoute(result.nextRoute) as any);
                 return;
               }
             }
