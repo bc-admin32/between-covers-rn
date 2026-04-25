@@ -5,6 +5,7 @@
     "owner": "betweencovers",
     "version": "1.0.0",
     "orientation": "portrait",
+    "_iconTodo": "TODO: drop in final brand assets — replace icon.png and adaptive-icon.png before App Store submission",
     "icon": "./assets/icon.png",
     "scheme": "com.betweencovers.app",
     "userInterfaceStyle": "dark",
@@ -25,7 +26,7 @@
         "NSPhotoLibraryAddUsageDescription": "Between Covers saves your photo to your library.",
         "LSApplicationQueriesSchemes": ["spotify"]
       }
-  
+
     },
     "android": {
       "package": "com.betweencovers.app",

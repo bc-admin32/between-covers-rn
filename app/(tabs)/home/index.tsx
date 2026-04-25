@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ImageBackground, Animated, Easing,
+  ActivityIndicator, ImageBackground, Animated, Easing, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -11,6 +11,13 @@ import { apiGet, apiPost } from '../../../lib/api';
 import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { FeedbackModal } from '../../../components/FeedbackModal';
+
+function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone });
+  const start = new Date(startDateStr).toLocaleDateString('en-CA', { timeZone });
+  return Math.round((new Date(today).getTime() - new Date(start).getTime()) / 86400000);
+}
 
 const CACHE_KEY = 'bc_home_cache';
 const BG_CACHE_KEY = 'bc_home_bg';
@@ -141,22 +148,61 @@ export default function HomeScreen() {
   const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [watched, setWatched] = useState(false);
+  const [showTrialOverlay, setShowTrialOverlay] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [isTrialDay6, setIsTrialDay6] = useState(false);
   const markedRef = useRef(false);
   const overlayOpenRef = useRef(false);
+  const isTrialDay6Ref = useRef(false);
   const player = useVideoPlayer(
     data?.irisDaily?.videoUrl ?? '',
     (p) => { p.loop = false; }
   );
 
-  // Keep ref in sync so the playingChange listener always reads fresh state
+  // Keep refs in sync so listeners always read fresh state
   useEffect(() => { overlayOpenRef.current = overlayOpen; }, [overlayOpen]);
+  useEffect(() => { isTrialDay6Ref.current = isTrialDay6; }, [isTrialDay6]);
 
-  // Auto-close the video overlay when the clip finishes playing naturally
+  // Check once on mount whether this user is on trial day 6 and hasn't seen the overlay today
+  useEffect(() => {
+    SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
+      if (!cached) return;
+      try {
+        const profile = JSON.parse(cached);
+        if (
+          profile.subscriptionStatus === 'trial' &&
+          profile.subscriptionStartDate &&
+          profile.timeZone &&
+          getDaysSinceTrial(profile.subscriptionStartDate, profile.timeZone) === 6
+        ) {
+          const today = new Date().toLocaleDateString('en-CA', { timeZone: profile.timeZone });
+          SecureStore.getItemAsync('bc_last_day6_video_shown').then((lastShown) => {
+            if (lastShown !== today) setIsTrialDay6(true);
+          });
+        }
+      } catch {}
+    });
+  }, []);
+
+  // When the video ends naturally, either close or show the trial-day-6 overlay
   useEffect(() => {
     const sub = player.addListener('playingChange', ({ isPlaying }: { isPlaying: boolean }) => {
       if (!isPlaying && overlayOpenRef.current) {
-        setOverlayOpen(false);
-        setWatched(true);
+        if (isTrialDay6Ref.current) {
+          setShowTrialOverlay(true);
+          // Mark shown so it doesn't appear again today
+          SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
+            if (!cached) return;
+            try {
+              const { timeZone } = JSON.parse(cached);
+              const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone ?? 'UTC' });
+              SecureStore.setItemAsync('bc_last_day6_video_shown', today).catch(() => {});
+            } catch {}
+          });
+        } else {
+          setOverlayOpen(false);
+          setWatched(true);
+        }
       }
     });
     return () => sub.remove();
@@ -244,6 +290,12 @@ export default function HomeScreen() {
     setWatched(true);
   };
 
+  const dismissTrialOverlay = () => {
+    setShowTrialOverlay(false);
+    setOverlayOpen(false);
+    setWatched(true);
+  };
+
   const handleLiveBanner = () => {
     if (!activeEvent) return;
     const dest = activeEvent.eventType === 'IRIS_LIVE'
@@ -258,6 +310,7 @@ export default function HomeScreen() {
       style={styles.container}
       imageStyle={{ opacity: 0.75 }}
     >
+      <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
 
         {/* GREETING */}
@@ -291,9 +344,30 @@ export default function HomeScreen() {
                     contentFit="cover"
                     nativeControls={false}
                   />
-                  <TouchableOpacity style={styles.skipButton} onPress={closeVideo}>
-                    <Text style={styles.skipText}>skip</Text>
-                  </TouchableOpacity>
+                  {!showTrialOverlay && (
+                    <TouchableOpacity style={styles.skipButton} onPress={closeVideo}>
+                      <Text style={styles.skipText}>skip</Text>
+                    </TouchableOpacity>
+                  )}
+                  {showTrialOverlay && (
+                    <View style={styles.trialOverlay}>
+                      <TouchableOpacity
+                        style={styles.trialBtn}
+                        onPress={() => Linking.openURL('itms-apps://apps.apple.com/account/subscriptions').catch(() => {})}
+                      >
+                        <Text style={styles.trialBtnText}>Manage trial</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.trialBtn, styles.trialBtnSecondary]}
+                        onPress={() => setFeedbackOpen(true)}
+                      >
+                        <Text style={[styles.trialBtnText, styles.trialBtnTextSecondary]}>Share feedback</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.trialDismiss} onPress={dismissTrialOverlay}>
+                        <Text style={styles.trialDismissText}>Dismiss</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               ) : watched ? (
                 <TouchableOpacity
@@ -468,4 +542,41 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   skipText: { color: 'rgba(255,255,255,0.8)', fontSize: 10, letterSpacing: 0.4 },
+  trialOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    padding: 14,
+  },
+  trialBtn: {
+    width: '100%',
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#B83255',
+    alignItems: 'center',
+  },
+  trialBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  trialBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  trialBtnTextSecondary: {
+    color: 'rgba(255,255,255,0.85)',
+  },
+  trialDismiss: {
+    marginTop: 2,
+    paddingVertical: 4,
+  },
+  trialDismissText: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.45)',
+  },
 });

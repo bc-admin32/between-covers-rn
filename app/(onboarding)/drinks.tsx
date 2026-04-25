@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
-
-
 
 const DRINKS = [
   { value: 'TEA', label: '🍵 Tea' },
@@ -19,14 +17,19 @@ const DRINKS = [
   { value: 'COCKTAIL', label: '🍹 Cocktail / Mocktail' },
 ];
 
+const MIN = 2;
+const MAX = 3;
+
 export default function DrinksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
+  // TODO: upload final v2 video to S3 before launch; owner will provide HeyGen-produced files
   const player = useVideoPlayer(
-    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Drinks.mp4',
+    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/v2/Drinks.mp4',
     (p) => {
       p.loop = false;
       p.play();
@@ -38,11 +41,20 @@ export default function DrinksScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSelect = async (value: string) => {
+  const toggle = (value: string) => {
     if (submitting) return;
+    setSelected((prev) => {
+      if (prev.includes(value)) return prev.filter((v) => v !== value);
+      if (prev.length >= MAX) return prev;
+      return [...prev, value];
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (submitting || selected.length < MIN) return;
     setSubmitting(true);
     try {
-      const res = await apiPost('/onboarding/submit', { step: 'L6Dri', value });
+      const res = await apiPost('/onboarding/submit', { step: 'L6Dri', value: selected });
       if (res?.nextRoute) {
         router.replace(normalizeRoute(res.nextRoute) as any);
         return;
@@ -50,6 +62,8 @@ export default function DrinksScreen() {
     } catch {}
     setSubmitting(false);
   };
+
+  const canSubmit = selected.length >= MIN;
 
   return (
     <View style={styles.container}>
@@ -64,18 +78,37 @@ export default function DrinksScreen() {
         <View style={[styles.optionsContainer, { top: insets.top + spacing.lg }]}>
           <View style={styles.card}>
             <Text style={styles.cardHeader}>What are we drinking?</Text>
-            {DRINKS.map((drink, i) => (
-              <View key={drink.value}>
-                <TouchableOpacity
-                  style={styles.optionButton}
-                  onPress={() => handleSelect(drink.value)}
-                  disabled={submitting}
-                >
-                  <Text style={styles.optionText}>{drink.label}</Text>
-                </TouchableOpacity>
-                {i < DRINKS.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
+            <Text style={styles.cardHint}>Choose 2–3</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.list}>
+              {DRINKS.map((drink, i) => {
+                const isSelected = selected.includes(drink.value);
+                return (
+                  <View key={drink.value}>
+                    <TouchableOpacity
+                      style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                      onPress={() => toggle(drink.value)}
+                      disabled={submitting}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                        {drink.label}
+                      </Text>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </TouchableOpacity>
+                    {i < DRINKS.length - 1 && <View style={styles.divider} />}
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.divider} />
+            <TouchableOpacity
+              style={[styles.nextButton, !canSubmit && styles.nextButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!canSubmit || submitting}
+            >
+              <Text style={[styles.nextButtonText, !canSubmit && styles.nextButtonTextDisabled]}>
+                {submitting ? 'Saving…' : 'Next →'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -95,7 +128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   card: {
-    width: 160,
+    width: 210,
     backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: radius.xl,
     overflow: 'hidden',
@@ -108,21 +141,64 @@ const styles = StyleSheet.create({
   cardHeader: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingBottom: 2,
     fontSize: 11,
     fontWeight: '700',
     color: '#f43f5e',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  cardHint: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+    fontSize: 10,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  list: {
+    maxHeight: 280,
+  },
   optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
+  optionButtonSelected: {
+    backgroundColor: 'rgba(184,50,85,0.07)',
+  },
   optionText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '500',
     color: '#111827',
   },
+  optionTextSelected: {
+    color: '#B83255',
+    fontWeight: '700',
+  },
+  checkmark: {
+    fontSize: 12,
+    color: '#B83255',
+    fontWeight: '700',
+    marginLeft: 4,
+  },
   divider: { height: 1, backgroundColor: '#f3f4f6' },
+  nextButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#B83255',
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#e5e7eb',
+  },
+  nextButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  nextButtonTextDisabled: {
+    color: '#9ca3af',
+  },
 });

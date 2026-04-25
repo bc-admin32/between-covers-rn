@@ -148,8 +148,8 @@ export default function ReadingPreferencesScreen() {
   const [genre, setGenre] = useState<string[]>([]);
   const [comfortBoundaries, setComfortBoundaries] = useState<string[]>([]);
   const [spiceLevel, setSpiceLevel] = useState<string | null>(null);
-  const [snack, setSnack] = useState<string | null>(null);
-  const [drink, setDrink] = useState<string | null>(null);
+  const [snack, setSnack] = useState<string[]>([]);
+  const [drink, setDrink] = useState<string[]>([]);
   const [readingLocation, setReadingLocation] = useState<string | null>(null);
 
   useEffect(() => {
@@ -159,8 +159,8 @@ export default function ReadingPreferencesScreen() {
       setGenre(Array.isArray(data.genre) ? data.genre : []);
       setComfortBoundaries(Object.keys(data.comfortBoundaries ?? {}));
       setSpiceLevel(data.spiceLevel ?? null);
-      setSnack(data.snack ?? null);
-      setDrink(data.drink ?? null);
+      setSnack(data.snack ?? []);
+      setDrink(data.drink ?? []);
       setReadingLocation(data.readingLocation ?? null);
       setSaved(true);
       setLoading(false);
@@ -232,12 +232,12 @@ export default function ReadingPreferencesScreen() {
             <ChipGroup options={SPICE_OPTIONS} selected={spiceLevel} onSelect={(v) => { Haptics.selectionAsync(); setSpiceLevel(v); markUnsaved(); }} />
           </PrefCard>
 
-          <PrefCard label="Favorite Snack">
-            <ChipGroup options={SNACK_OPTIONS} selected={snack} onSelect={(v) => { Haptics.selectionAsync(); setSnack(v); markUnsaved(); }} />
+          <PrefCard label="Favorite Snacks">
+            <MultiChipGroup options={SNACK_OPTIONS} value={snack} onChange={(v) => { Haptics.selectionAsync(); setSnack(v); markUnsaved(); }} />
           </PrefCard>
 
-          <PrefCard label="Favorite Drink">
-            <ChipGroup options={DRINK_OPTIONS} selected={drink} onSelect={(v) => { Haptics.selectionAsync(); setDrink(v); markUnsaved(); }} />
+          <PrefCard label="Favorite Drinks">
+            <MultiChipGroup options={DRINK_OPTIONS} value={drink} onChange={(v) => { Haptics.selectionAsync(); setDrink(v); markUnsaved(); }} />
           </PrefCard>
 
           <PrefCard label="Reading Location">

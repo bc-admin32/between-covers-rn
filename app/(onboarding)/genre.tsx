@@ -7,8 +7,6 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-
-
 const GENRES = [
   { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
   { value: 'ROMANTIC_SUSPENSE', label: '🕵️ Romantic Suspense', sub: 'bodyguards · detectives · mysteries · thrillers' },
@@ -22,11 +20,13 @@ const GENRES = [
 export default function GenreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
+  // TODO: upload final v2 video to S3 before launch; owner will provide HeyGen-produced files
   const player = useVideoPlayer(
-    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Genre.mp4',
+    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/v2/Genre.mp4',
     (p) => {
       p.loop = false;
       p.play();
@@ -38,11 +38,18 @@ export default function GenreScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSelect = async (value: string) => {
+  const toggle = (value: string) => {
     if (submitting) return;
+    setSelected((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (submitting || selected.length < 1) return;
     setSubmitting(true);
     try {
-      const res = await apiPost('/onboarding/submit', { step: 'L5Gen', value: [value] });
+      const res = await apiPost('/onboarding/submit', { step: 'L5Gen', value: selected });
       if (res?.nextRoute) {
         router.replace(normalizeRoute(res.nextRoute) as any);
         return;
@@ -50,6 +57,8 @@ export default function GenreScreen() {
     } catch {}
     setSubmitting(false);
   };
+
+  const canSubmit = selected.length >= 1;
 
   return (
     <View style={styles.container}>
@@ -64,21 +73,40 @@ export default function GenreScreen() {
         <View style={[styles.optionsContainer, { top: insets.top + spacing.lg }]}>
           <View style={styles.card}>
             <Text style={styles.cardHeader}>What's your go-to genre?</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {GENRES.map((genre, i) => (
-                <View key={genre.value}>
-                  <TouchableOpacity
-                    style={styles.optionButton}
-                    onPress={() => handleSelect(genre.value)}
-                    disabled={submitting}
-                  >
-                    <Text style={styles.optionLabel}>{genre.label}</Text>
-                    <Text style={styles.optionSub}>{genre.sub}</Text>
-                  </TouchableOpacity>
-                  {i < GENRES.length - 1 && <View style={styles.divider} />}
-                </View>
-              ))}
+            <Text style={styles.cardHint}>Choose one or more</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.list}>
+              {GENRES.map((genre, i) => {
+                const isSelected = selected.includes(genre.value);
+                return (
+                  <View key={genre.value}>
+                    <TouchableOpacity
+                      style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                      onPress={() => toggle(genre.value)}
+                      disabled={submitting}
+                    >
+                      <View style={styles.optionContent}>
+                        <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+                          {genre.label}
+                        </Text>
+                        <Text style={styles.optionSub}>{genre.sub}</Text>
+                      </View>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </TouchableOpacity>
+                    {i < GENRES.length - 1 && <View style={styles.divider} />}
+                  </View>
+                );
+              })}
             </ScrollView>
+            <View style={styles.divider} />
+            <TouchableOpacity
+              style={[styles.nextButton, !canSubmit && styles.nextButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!canSubmit || submitting}
+            >
+              <Text style={[styles.nextButtonText, !canSubmit && styles.nextButtonTextDisabled]}>
+                {submitting ? 'Saving…' : 'Next →'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -112,26 +140,71 @@ const styles = StyleSheet.create({
   cardHeader: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingBottom: 2,
     fontSize: 11,
     fontWeight: '700',
     color: '#f43f5e',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  cardHint: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+    fontSize: 10,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  list: {
+    maxHeight: 320,
+  },
   optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  optionButtonSelected: {
+    backgroundColor: 'rgba(184,50,85,0.07)',
+  },
+  optionContent: {
+    flex: 1,
   },
   optionLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#111827',
   },
+  optionLabelSelected: {
+    color: '#B83255',
+    fontWeight: '700',
+  },
   optionSub: {
     fontSize: 12,
     color: '#6b7280',
     marginTop: 2,
   },
+  checkmark: {
+    fontSize: 12,
+    color: '#B83255',
+    fontWeight: '700',
+    marginLeft: 8,
+  },
   divider: { height: 1, backgroundColor: '#f3f4f6' },
+  nextButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#B83255',
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#e5e7eb',
+  },
+  nextButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  nextButtonTextDisabled: {
+    color: '#9ca3af',
+  },
 });

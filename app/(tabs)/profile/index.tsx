@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { signOut } from '../../../lib/signout';
+import { FeedbackModal } from '../../../components/FeedbackModal';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost, apiPatch } from '../../../lib/api';
@@ -61,6 +62,7 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -218,12 +220,15 @@ export default function ProfileScreen() {
         <View style={styles.menu}>
           <MenuRow icon="person-outline" label="Account & Settings" onPress={() => router.push('/(tabs)/profile/account' as any)} />
           <MenuRow icon="heart-outline" label="Reading Preferences" onPress={() => router.push('/(tabs)/profile/preferences' as any)} />
+          <MenuRow icon="chatbubble-outline" label="Share Feedback" onPress={() => setFeedbackOpen(true)} />
           <MenuRow icon="document-text-outline" label="Legal" onPress={() => router.push('/(tabs)/profile/legal' as any)} />
           <MenuRow icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </View>
   );
 }

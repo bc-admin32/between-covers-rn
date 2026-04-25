@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, radius, colors } from '../../lib/theme';
@@ -18,6 +18,11 @@ const POLICIES = [
 export default function AcceptanceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ mode?: string }>();
+
+  // mode: "onboarding" (default) | "reaccept" — set by authResolve when policy version changes
+  const isReaccept = params.mode === 'reaccept';
+
   const [openedDocs, setOpenedDocs] = useState<Set<string>>(new Set());
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -30,21 +35,39 @@ export default function AcceptanceScreen() {
     if (!canContinue || submitting) return;
     setSubmitting(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     try {
+      if (isReaccept) {
+        // Post-onboarding policy re-acceptance: writes new acceptedPolicyVersion
+        // via bcAcceptLegal Lambda, then routes to /home.
+        await apiPost('/legal/accept', { context: 'policy-update' });
+        router.replace('/home' as any);
+        return;
+      }
+
+      // Standard onboarding flow (step L2Acc)
       const res = await apiPost('/onboarding/submit', { step: 'L2Acc' });
       if (res?.nextRoute) {
         router.replace(normalizeRoute(res.nextRoute) as any);
         return;
       }
-    } catch {}
+    } catch (err) {
+      console.error('[Acceptance] submit failed:', err);
+    }
     setSubmitting(false);
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Before You Continue…</Text>
-        <Text style={styles.subtitle}>Please review and accept our policies to proceed.</Text>
+        <Text style={styles.title}>
+          {isReaccept ? 'Our Policies Have Updated' : 'Before You Continue…'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isReaccept
+            ? 'Please review and re-accept our updated policies to continue.'
+            : 'Please review and accept our policies to proceed.'}
+        </Text>
 
         <View style={styles.card}>
           {POLICIES.map((p, i) => {
