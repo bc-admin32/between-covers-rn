@@ -52,7 +52,7 @@ export default function AcceptanceScreen() {
         return;
       }
     } catch (err) {
-      console.error('[Acceptance] submit failed:', err);
+      console.error('submit failed:', err);
     }
     setSubmitting(false);
   };
