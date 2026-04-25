@@ -310,7 +310,7 @@ export default function HomeScreen() {
       style={styles.container}
       imageStyle={{ opacity: 0.75 }}
     >
-      <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} source="trial" />
       <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
 
         {/* GREETING */}

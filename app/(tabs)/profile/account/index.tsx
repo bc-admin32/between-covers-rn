@@ -3,13 +3,14 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert, Switch,
 } from 'react-native';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft, CaretRight, Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
 import { signOut } from '../../../../lib/signout';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import { FeedbackModal } from '../../../../components/FeedbackModal';
 
 function SectionCard({ title, children, danger }: {
   title: string; children: React.ReactNode; danger?: boolean;
@@ -53,6 +54,7 @@ export default function AccountSettingsScreen() {
   const [notifStatus, setNotifStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -163,6 +165,11 @@ export default function AccountSettingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <FeedbackModal
+        visible={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        source="profile"
+      />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* HEADER */}
@@ -301,6 +308,24 @@ export default function AccountSettingsScreen() {
             </View>
           </SectionCard>
 
+          {/* SHARE YOUR THOUGHTS */}
+          <SectionCard title="Share Your Thoughts">
+            <TouchableOpacity
+              style={styles.feedbackRow}
+              onPress={() => setFeedbackOpen(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.feedbackRowLeft}>
+                <Heart size={22} color="#B83255" weight="regular" />
+                <View style={styles.feedbackRowText}>
+                  <Text style={styles.feedbackRowLabel}>Share Feedback</Text>
+                  <Text style={styles.feedbackRowHelper}>I'd love to hear how Between Covers is feeling for you.</Text>
+                </View>
+              </View>
+              <CaretRight size={18} color="rgba(15,42,72,0.35)" weight="bold" />
+            </TouchableOpacity>
+          </SectionCard>
+
           {/* DANGER ZONE */}
           <SectionCard title="Danger Zone" danger>
             <TouchableOpacity
@@ -370,6 +395,11 @@ const styles = StyleSheet.create({
   tzOptionText: { fontSize: 12, color: '#0F2A48' },
   tzOptionTextSelected: { color: '#fff', fontWeight: '600' },
   tzOptionTextDisabled: { color: '#A9C0D4' },
+  feedbackRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  feedbackRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  feedbackRowText: { flex: 1 },
+  feedbackRowLabel: { fontSize: 14, color: '#0F2A48', fontWeight: '600' },
+  feedbackRowHelper: { fontSize: 12, color: '#A9C0D4', marginTop: 2, lineHeight: 16 },
   deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(184,50,85,0.3)', alignItems: 'center', justifyContent: 'center' },
   deactivateButtonText: { fontSize: 13, color: '#8A5A58' },
   deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#B83255', alignItems: 'center', justifyContent: 'center' },
