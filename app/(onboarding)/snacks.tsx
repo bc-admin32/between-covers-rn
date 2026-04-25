@@ -17,8 +17,7 @@ const SNACKS = [
   { value: 'NONE', label: '✨ No Snack' },
 ];
 
-const MIN = 2;
-const MAX = 3;
+const MIN = 1;
 
 export default function SnacksScreen() {
   const router = useRouter();
@@ -45,7 +44,6 @@ export default function SnacksScreen() {
     if (submitting) return;
     setSelected((prev) => {
       if (prev.includes(value)) return prev.filter((v) => v !== value);
-      if (prev.length >= MAX) return prev;
       return [...prev, value];
     });
   };
@@ -65,6 +63,11 @@ export default function SnacksScreen() {
 
   const canSubmit = selected.length >= MIN;
 
+  const hintText =
+    selected.length === 0
+      ? 'Pick at least 1'
+      : `${selected.length} selected`;
+
   return (
     <View style={styles.container}>
       <VideoView
@@ -78,7 +81,7 @@ export default function SnacksScreen() {
         <View style={[styles.optionsContainer, { top: insets.top + spacing.lg }]}>
           <View style={styles.card}>
             <Text style={styles.cardHeader}>What are we munching on?</Text>
-            <Text style={styles.cardHint}>Choose 2–3</Text>
+            <Text style={styles.cardHint}>{hintText}</Text>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.list}>
               {SNACKS.map((snack, i) => {
                 const isSelected = selected.includes(snack.value);

@@ -60,6 +60,11 @@ export default function GenreScreen() {
 
   const canSubmit = selected.length >= 1;
 
+  const hintText =
+    selected.length === 0
+      ? 'Pick at least 1'
+      : `${selected.length} selected`;
+
   return (
     <View style={styles.container}>
       <VideoView
@@ -73,7 +78,7 @@ export default function GenreScreen() {
         <View style={[styles.optionsContainer, { top: insets.top + spacing.lg }]}>
           <View style={styles.card}>
             <Text style={styles.cardHeader}>What's your go-to genre?</Text>
-            <Text style={styles.cardHint}>Choose one or more</Text>
+            <Text style={styles.cardHint}>{hintText}</Text>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.list}>
               {GENRES.map((genre, i) => {
                 const isSelected = selected.includes(genre.value);
