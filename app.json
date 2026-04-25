@@ -5,14 +5,13 @@
     "owner": "betweencovers",
     "version": "1.0.0",
     "orientation": "portrait",
-    "_iconTodo": "TODO: drop in final brand assets — replace icon.png and adaptive-icon.png before App Store submission",
     "icon": "./assets/icon.png",
     "scheme": "com.betweencovers.app",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0d0d0d"
+      "backgroundColor": "#E7AEB7"
     },
    "ios": {
       "supportsTablet": false,
@@ -33,10 +32,9 @@
       "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d0d0d"
+        "backgroundColor": "#E7AEB7"
       },
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
