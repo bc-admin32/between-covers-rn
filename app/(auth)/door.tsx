@@ -198,11 +198,10 @@ export default function DoorScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.headline}>Step inside.</Text>
+      <Text style={styles.headline}>Your next obsession is waiting.</Text>
 
       <Text style={styles.body}>
-        The next 7 days are on us.{'\n'}
-        Find your next obsession, settle into the vibe, and stay for the conversations.
+        Find your next obsession, settle into the vibe, and stay for the conversations. Your first 7 days are on us.
       </Text>
 
       <View style={styles.plans}>
@@ -257,11 +256,11 @@ export default function DoorScreen() {
           {purchasing ? (
             <ActivityIndicator color="#FDFAF6" />
           ) : (
-            <Text style={styles.primaryBtnText}>Start your free trial</Text>
+            <Text style={styles.primaryBtnText}>Start your free 7-day trial</Text>
           )}
         </TouchableOpacity>
 
-        <Text style={styles.microcopy}>No charge today. Renews after trial unless canceled.</Text>
+        <Text style={styles.microcopy}>Instant access. Cancel anytime.</Text>
 
         <TouchableOpacity
           onPress={handleRestore}

@@ -194,8 +194,8 @@ export default function HardPaywallScreen() {
       <Text style={styles.headline}>Continue your experience.</Text>
 
       <Text style={styles.body}>
-        Keep going.{'\n'}
-        Stay connected to the stories, the space, and everything you've made yours.
+        Your free trial has come to an end—but you don't have to leave.{'\n'}
+        Stay connected to the stories, the space, and everything you've found here.
       </Text>
 
       <View style={styles.plans}>
