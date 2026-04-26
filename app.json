@@ -13,6 +13,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#E7AEB7"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#B83255"
+    },
    "ios": {
       "supportsTablet": false,
       "buildNumber": "7",
@@ -23,6 +27,7 @@
         "NSCameraUsageDescription": "Between Covers uses your camera to update your profile photo.",
         "NSPhotoLibraryUsageDescription": "Between Covers uses your photo library to update your profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Between Covers saves your photo to your library.",
+        "NSFaceIDUsageDescription": "Between Covers uses Face ID to keep your account secure.",
         "LSApplicationQueriesSchemes": ["spotify"]
       }
 
@@ -34,9 +39,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E7AEB7"
       },
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "permissions": []
     },
     "plugins": [
       "expo-router",
@@ -67,7 +70,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#B83255"
         }
       ]
