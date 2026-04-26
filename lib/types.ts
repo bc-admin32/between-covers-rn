@@ -38,10 +38,35 @@ export type RoomJoinResponse = {
   sessionExpirationTime?: string;
   tokenExpirationTime?: string;
   attendanceSk: string;
+  isPreEvent: boolean;
   room: {
     roomId: string;
     name: string;
     gameType: string | null;
     description: string;
   };
+};
+
+// Multi-room shape used by LobbyModal + RoomScreen via /live/{eventId}.
+// Inline LiveEvent definitions remain in app/live/event/index.tsx and
+// app/(tabs)/home/index.tsx (each with the subset of fields it actually
+// uses); this is the canonical shape for the multi-room consumers.
+export type LiveEvent = {
+  eventId: string;
+  title: string;
+  description: string | null;
+  eventType: 'AUTHOR_EVENT' | 'DANCE_PARTY' | 'IRIS_LIVE';
+  liveType?: 'gameNight' | 'giveaway' | 'justVibing';
+  hostName: string;
+  coverUrl: string | null;
+  scheduledAt: string;
+  endsAt: string;
+  status: 'SCHEDULED' | 'ACTIVE' | 'ENDED';
+  rsvpCount: number;
+  bookTitle?: string | null;
+  closingMessage?: string | null;
+  ratingsEnabled?: boolean;
+  ratingPrompt?: { show: boolean };
+  rooms?: LiveRoom[];
+  roomStates?: Record<string, RoomState | null>;
 };
