@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform,
+  Platform, Keyboard,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -185,6 +185,21 @@ export default function LoungeThreadScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    // Android uses keyboardDidShow/Hide instead
+    const showSubAndroid = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSubAndroid = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      showSubAndroid.remove();
+      hideSubAndroid.remove();
+    };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -326,8 +341,8 @@ export default function LoungeThreadScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
     >
       {toast && (
         <View style={styles.toast} pointerEvents="none">
@@ -405,7 +420,7 @@ export default function LoungeThreadScreen() {
           <Text style={styles.closedSubtext}>Thanks for being part of it ✦</Text>
         </View>
       ) : (
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
+        <View style={[styles.composer, { paddingBottom: keyboardVisible ? Math.max(insets.bottom, 0) + 8 : Math.max(insets.bottom, 0) + 64 }]}>
           {replyingTo && (
             <View style={styles.replyingToBar}>
               <Text style={styles.replyingToText}>↩ Replying to <Text style={styles.replyingToName}>@{replyingTo.displayName}</Text></Text>
