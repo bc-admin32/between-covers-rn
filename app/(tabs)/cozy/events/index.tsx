@@ -22,6 +22,10 @@ type EventStatus = {
   playerState: PlayerState;
 };
 
+// TODO (v1.0.1): wire QuickRatingModal here once Cozy Events Lambdas expose
+// ratingPrompt + eventType on /cozy/home (or /cozy/events/status), analogous
+// to commit d858fce on /live/{eventId}. Frontend stays dumb until backend
+// returns the prompt signal.
 type BCEvent = {
   sk?: string;
   eventId?: string;
