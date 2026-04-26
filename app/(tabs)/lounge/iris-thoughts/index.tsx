@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
-  Platform, TextInput,
+  Platform, TextInput, Keyboard,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -144,6 +144,21 @@ export default function IrisThoughtsScreen() {
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    // Android uses keyboardDidShow/Hide instead
+    const showSubAndroid = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSubAndroid = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      showSubAndroid.remove();
+      hideSubAndroid.remove();
+    };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -225,8 +240,8 @@ export default function IrisThoughtsScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       {toast && (
         <View style={styles.toast} pointerEvents="none">
@@ -253,7 +268,7 @@ export default function IrisThoughtsScreen() {
 
         {(thread?.body ?? paramPrompt) ? (
           <View style={styles.threadBody}>
-            <Text style={styles.threadBodyText}>{thread?.body ?? paramPrompt}</Text>
+            <Text style={styles.threadBodyText} maxFontSizeMultiplier={1.3}>{thread?.body ?? paramPrompt}</Text>
           </View>
         ) : null}
       </View>
@@ -276,7 +291,7 @@ export default function IrisThoughtsScreen() {
 
       {/* COMPOSER — show if threadId is available, even on replies error */}
       {threadId && (
-        <View style={[styles.composer, { paddingBottom: insets.bottom + 65 }]}>
+        <View style={[styles.composer, { paddingBottom: keyboardVisible ? insets.bottom + 8 : insets.bottom + 65 }]}>
           {showEmojiTray && (
             <View style={styles.emojiTray}>
               {EMOJI_TRAY.map((emoji) => (
@@ -336,7 +351,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic' },
   headerReplies: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_600SemiBold' },
   threadBody: { backgroundColor: '#FDFAF6', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#E8D5E5' },
-  threadBodyText: { fontSize: 18, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 26 },
+  threadBodyText: { fontSize: 15, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 22 },
   threadBodyAuthor: { fontSize: 10, color: '#9B6B9B', fontFamily: 'Nunito_700Bold', marginTop: spacing.xs },
   messages: { flex: 1 },
   messagesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 120 },
