@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 import QuickRatingModal from '../../../components/QuickRatingModal';
+import type { LiveRoom } from '../../../lib/types';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
@@ -35,6 +36,7 @@ type LiveEvent = {
   bookTitle?: string | null;
   closingMessage?: string | null;
   gameState?: GameState | null;
+  rooms?: LiveRoom[];
   ratingsEnabled?: boolean;
   ratingPrompt?: {
     show: boolean;
@@ -76,6 +78,14 @@ export default function LiveEventScreen() {
           apiGet<{ event: LiveEvent }>(`/live/${eventId}`),
           apiGet<{ displayName: string; photoUrl: string | null }>('/profile'),
         ]);
+
+        // Defensive: multi-room IRIS_LIVE events should only enter via the home banner → LobbyModal.
+        // If we somehow landed here (deep link, stale notification), bounce back to home.
+        if (eventRes.event.rooms && eventRes.event.rooms.length > 0) {
+          router.replace('/' as any);
+          return;
+        }
+
         setEvent(eventRes.event);
         setProfile(profileRes);
         const rsvpRes = await apiGet<{ rsvpd: boolean }>(`/live/${eventId}/rsvp`);

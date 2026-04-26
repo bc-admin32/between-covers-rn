@@ -12,7 +12,9 @@ import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { FeedbackModal } from '../../../components/FeedbackModal';
+import LobbyModal from '../../../components/live/LobbyModal';
 import * as LocalAuthentication from 'expo-local-authentication';
+import type { LiveRoom } from '../../../lib/types';
 
 function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
   const today = new Date().toLocaleDateString('en-CA', { timeZone });
@@ -29,6 +31,8 @@ type LiveEvent = {
   title: string;
   eventType: 'AUTHOR_EVENT' | 'DANCE_PARTY' | 'IRIS_LIVE';
   status: string;
+  scheduledAt?: string;
+  rooms?: LiveRoom[];
 };
 
 type HomeData = {
@@ -147,6 +151,8 @@ export default function HomeScreen() {
     setFocusCount((c) => c + 1);
   }, []));
   const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
+  const [lobbyOpen, setLobbyOpen] = useState(false);
+  const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [watched, setWatched] = useState(false);
   const [showTrialOverlay, setShowTrialOverlay] = useState(false);
@@ -273,8 +279,17 @@ export default function HomeScreen() {
   useEffect(() => {
     apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
       .then((res) => {
-        const active = res.events.find((e) => e.status === 'ACTIVE');
-        setActiveEvent(active ?? null);
+        const eligible = res.events.find((e) => {
+          if (e.status === 'ACTIVE') return true;
+          // Multi-room IRIS_LIVE: show banner from 5 min before scheduled start.
+          // Dead branch until backend brief lands rooms[] on /live/active responses.
+          if (e.status === 'SCHEDULED' && e.eventType === 'IRIS_LIVE' && e.rooms?.length && e.scheduledAt) {
+            const minsUntil = (new Date(e.scheduledAt).getTime() - Date.now()) / 60_000;
+            return minsUntil <= 5 && minsUntil >= -0.5;
+          }
+          return false;
+        });
+        setActiveEvent(eligible ?? null);
       })
       .catch(() => {});
   }, []);
@@ -331,6 +346,13 @@ export default function HomeScreen() {
 
   const handleLiveBanner = () => {
     if (!activeEvent) return;
+    // Multi-room IRIS_LIVE → lobby modal; everything else → existing single-room route.
+    // The rooms[] check no-ops until the backend brief returns rooms on /live responses.
+    if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms && activeEvent.rooms.length > 0) {
+      setLobbyEventId(activeEvent.eventId);
+      setLobbyOpen(true);
+      return;
+    }
     router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
   };
 
@@ -381,6 +403,16 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+      {lobbyEventId && (
+        <LobbyModal
+          eventId={lobbyEventId}
+          visible={lobbyOpen}
+          onClose={() => {
+            setLobbyOpen(false);
+            setLobbyEventId(null);
+          }}
+        />
+      )}
       <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
 
         {/* GREETING */}
