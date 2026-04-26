@@ -298,10 +298,7 @@ export default function HomeScreen() {
 
   const handleLiveBanner = () => {
     if (!activeEvent) return;
-    const dest = activeEvent.eventType === 'IRIS_LIVE'
-      ? `/(tabs)/lounge?eventId=${activeEvent.eventId}`
-      : `/(tabs)/lounge?eventId=${activeEvent.eventId}`;
-    router.push(dest as any);
+    router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
   };
 
   return (

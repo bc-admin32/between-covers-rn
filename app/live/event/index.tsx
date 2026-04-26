@@ -9,6 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
+import QuickRatingModal from '../../../components/QuickRatingModal';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
@@ -34,6 +35,10 @@ type LiveEvent = {
   bookTitle?: string | null;
   closingMessage?: string | null;
   gameState?: GameState | null;
+  ratingsEnabled?: boolean;
+  ratingPrompt?: {
+    show: boolean;
+  };
 };
 
 type ChatMessage = {
@@ -59,6 +64,7 @@ export default function LiveEventScreen() {
   const [sending, setSending] = useState(false);
   const [profile, setProfile] = useState<{ displayName: string; photoUrl: string | null } | null>(null);
   const [gameBannerExpanded, setGameBannerExpanded] = useState(true);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -128,6 +134,12 @@ export default function LiveEventScreen() {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (event?.ratingPrompt?.show === true) {
+      setShowRatingModal(true);
+    }
+  }, [event?.ratingPrompt?.show]);
 
   const handleRSVP = async () => {
     if (!eventId) return;
@@ -334,6 +346,16 @@ export default function LiveEventScreen() {
             </TouchableOpacity>
           </View>
         </>
+      )}
+
+      {showRatingModal && event && (
+        <QuickRatingModal
+          eventId={event.eventId}
+          eventType={event.eventType}
+          eventTitle={event.title}
+          onClose={() => setShowRatingModal(false)}
+          onSkip={() => setShowRatingModal(false)}
+        />
       )}
     </KeyboardAvoidingView>
   );
