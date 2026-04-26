@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   threadDivider: { height: 1, backgroundColor: 'rgba(196,168,130,0.25)', marginBottom: spacing.sm },
   threadCardIris: { borderColor: '#E8D5E5' },
   threadCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  threadCardLabel: { flex: 1, fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold', flex: 1 },
+  threadCardLabel: { flex: 1, fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold' },
   threadCardLabelIris: { color: '#9B6B9B' },
   threadCardReplies: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_600SemiBold', flexShrink: 0, marginLeft: 8 },
   threadCardAuthor: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
