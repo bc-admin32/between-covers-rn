@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import QuickRatingModal from '../../../../components/QuickRatingModal';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -22,10 +23,13 @@ type EventStatus = {
   playerState: PlayerState;
 };
 
-// TODO (v1.0.1): wire QuickRatingModal here once Cozy Events Lambdas expose
-// ratingPrompt + eventType on /cozy/home (or /cozy/events/status), analogous
-// to commit d858fce on /live/{eventId}. Frontend stays dumb until backend
-// returns the prompt signal.
+type LiveEventDetails = {
+  eventId: string;
+  eventType: 'AUTHOR_EVENT' | 'DANCE_PARTY' | 'IRIS_LIVE';
+  title: string;
+  ratingPrompt?: { show: boolean };
+};
+
 type BCEvent = {
   sk?: string;
   eventId?: string;
@@ -286,6 +290,9 @@ export default function CozyEventsScreen() {
   const [event, setEvent] = useState<BCEvent | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab | null>(null);
+  const [liveEvent, setLiveEvent] = useState<LiveEventDetails | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const eventIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     async function load() {
@@ -307,11 +314,32 @@ export default function CozyEventsScreen() {
       try {
         const statusRes = await apiGet('/cozy/events/status');
         setStatus(statusRes);
+        if (eventIdRef.current) {
+          const liveRes = await apiGet<{ event: LiveEventDetails }>(`/live/${eventIdRef.current}`);
+          setLiveEvent(liveRes.event);
+        }
       } catch {}
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    eventIdRef.current = event?.eventId;
+  }, [event?.eventId]);
+
+  useEffect(() => {
+    if (!event?.eventId) return;
+    apiGet<{ event: LiveEventDetails }>(`/live/${event.eventId}`)
+      .then((res) => setLiveEvent(res.event))
+      .catch(() => {});
+  }, [event?.eventId]);
+
+  useEffect(() => {
+    if (liveEvent?.ratingPrompt?.show === true) {
+      setShowRatingModal(true);
+    }
+  }, [liveEvent?.ratingPrompt?.show]);
 
   const playerState: PlayerState = !loaded ? 'loading' : (status?.playerState ?? 'offline');
   const isLive = playerState === 'live';
@@ -322,6 +350,15 @@ export default function CozyEventsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {showRatingModal && liveEvent && (
+        <QuickRatingModal
+          eventId={liveEvent.eventId}
+          eventType={liveEvent.eventType}
+          eventTitle={liveEvent.title}
+          onClose={() => setShowRatingModal(false)}
+          onSkip={() => setShowRatingModal(false)}
+        />
+      )}
       {modalTab && event && (
         <EventModal event={event} initialTab={modalTab} onClose={() => setModalTab(null)} />
       )}
