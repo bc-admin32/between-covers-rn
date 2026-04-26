@@ -11,6 +11,8 @@ import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
 import { signOut } from '../../../../lib/signout';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { FeedbackModal } from '../../../../components/FeedbackModal';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 function SectionCard({ title, children, danger }: {
   title: string; children: React.ReactNode; danger?: boolean;
@@ -55,6 +57,10 @@ export default function AccountSettingsScreen() {
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('Biometric');
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricReady, setBiometricReady] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -73,6 +79,49 @@ export default function AccountSettingsScreen() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadBiometric() {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        const available = compatible && enrolled;
+        let label = 'Biometric';
+        if (available) {
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+            label = 'Face ID';
+          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+            label = 'Touch ID';
+          }
+        }
+        const stored = await SecureStore.getItemAsync('bc_biometric_enabled');
+        if (mounted) {
+          setBiometricAvailable(available);
+          setBiometricLabel(label);
+          setBiometricEnabled(stored === 'true');
+          setBiometricReady(true);
+        }
+      } catch {
+        if (mounted) setBiometricReady(true);
+      }
+    }
+    loadBiometric();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleBiometricToggle = async (v: boolean) => {
+    await Haptics.selectionAsync();
+    setBiometricEnabled(v);
+    if (v) {
+      await SecureStore.setItemAsync('bc_biometric_enabled', 'true');
+    } else {
+      await SecureStore.setItemAsync('bc_biometric_enabled', 'false');
+      await SecureStore.deleteItemAsync('bc_id_token');
+      await SecureStore.deleteItemAsync('bc_access_token');
+    }
+  };
 
   const saveChanges = async () => {
     if (loadFailed) return;
@@ -308,6 +357,25 @@ export default function AccountSettingsScreen() {
             </View>
           </SectionCard>
 
+          {/* SECURITY */}
+          <SectionCard title="Security">
+            <View style={styles.toggleRow}>
+              <View style={styles.biometricLabelWrap}>
+                <Text style={styles.toggleLabel}>Sign in with {biometricLabel}</Text>
+                {!biometricAvailable && biometricReady && (
+                  <Text style={styles.biometricHelper}>Set up {biometricLabel} in your device settings to use this feature.</Text>
+                )}
+              </View>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={handleBiometricToggle}
+                disabled={!biometricAvailable || !biometricReady}
+                trackColor={{ false: 'rgba(15,42,72,0.12)', true: '#6B9AB8' }}
+                thumbColor="#fff"
+              />
+            </View>
+          </SectionCard>
+
           {/* SHARE YOUR THOUGHTS */}
           <SectionCard title="Share Your Thoughts">
             <TouchableOpacity
@@ -400,6 +468,8 @@ const styles = StyleSheet.create({
   feedbackRowText: { flex: 1 },
   feedbackRowLabel: { fontSize: 14, color: '#0F2A48', fontWeight: '600' },
   feedbackRowHelper: { fontSize: 12, color: '#A9C0D4', marginTop: 2, lineHeight: 16 },
+  biometricLabelWrap: { flex: 1, marginRight: spacing.md },
+  biometricHelper: { fontSize: 11, color: '#A9C0D4', marginTop: 4, lineHeight: 15 },
   deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(184,50,85,0.3)', alignItems: 'center', justifyContent: 'center' },
   deactivateButtonText: { fontSize: 13, color: '#8A5A58' },
   deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#B83255', alignItems: 'center', justifyContent: 'center' },

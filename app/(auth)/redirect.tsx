@@ -60,10 +60,23 @@ export default function RedirectScreen() {
         await SecureStore.setItemAsync('bc_access_token', accessToken);
 
         try {
+          const profileRes = await fetch(`${API_BASE}/profile`, {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const profile = await profileRes.json();
+
           const compatible = await LocalAuthentication.hasHardwareAsync();
           const enrolled = await LocalAuthentication.isEnrolledAsync();
-          if (compatible && enrolled) {
+          const deviceSupportsBiometric = compatible && enrolled;
+
+          if (profile.biometricPreferred === true && deviceSupportsBiometric) {
             await SecureStore.setItemAsync('bc_biometric_enabled', 'true');
+          } else if (!profile.biometricPreferred && deviceSupportsBiometric) {
+            const dismissed = await SecureStore.getItemAsync('bc_biometric_prompt_dismissed');
+            const existing = await SecureStore.getItemAsync('bc_biometric_enabled');
+            if (!existing && !dismissed) {
+              await SecureStore.setItemAsync('bc_biometric_prompt_pending', 'true');
+            }
           }
         } catch {}
 

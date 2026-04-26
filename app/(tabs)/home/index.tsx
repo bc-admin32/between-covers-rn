@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ImageBackground, Animated, Easing, Linking,
+  ActivityIndicator, ImageBackground, Animated, Easing, Linking, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -12,6 +12,7 @@ import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { FeedbackModal } from '../../../components/FeedbackModal';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
   const today = new Date().toLocaleDateString('en-CA', { timeZone });
@@ -151,6 +152,8 @@ export default function HomeScreen() {
   const [showTrialOverlay, setShowTrialOverlay] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isTrialDay6, setIsTrialDay6] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('Biometric');
   const markedRef = useRef(false);
   const overlayOpenRef = useRef(false);
   const isTrialDay6Ref = useRef(false);
@@ -182,6 +185,36 @@ export default function HomeScreen() {
         }
       } catch {}
     });
+  }, []);
+
+  // One-time biometric opt-in prompt — fires when redirect.tsx flagged it pending
+  useEffect(() => {
+    let mounted = true;
+    async function checkBiometricPrompt() {
+      const pending = await SecureStore.getItemAsync('bc_biometric_prompt_pending');
+      if (pending !== 'true') return;
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!compatible || !enrolled) {
+        await SecureStore.deleteItemAsync('bc_biometric_prompt_pending');
+        return;
+      }
+      let label = 'Biometric';
+      try {
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          label = 'Face ID';
+        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          label = 'Touch ID';
+        }
+      } catch {}
+      if (mounted) {
+        setBiometricLabel(label);
+        setShowBiometricPrompt(true);
+      }
+    }
+    checkBiometricPrompt();
+    return () => { mounted = false; };
   }, []);
 
   // When the video ends naturally, either close or show the trial-day-6 overlay
@@ -301,6 +334,23 @@ export default function HomeScreen() {
     router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
   };
 
+  const dismissBiometricPrompt = async () => {
+    await SecureStore.setItemAsync('bc_biometric_prompt_dismissed', 'true');
+    await SecureStore.deleteItemAsync('bc_biometric_prompt_pending');
+    setShowBiometricPrompt(false);
+  };
+
+  const enableBiometric = async () => {
+    await SecureStore.setItemAsync('bc_biometric_enabled', 'true');
+    await SecureStore.deleteItemAsync('bc_biometric_prompt_pending');
+    try {
+      await apiPost('/user/biometric', { preferred: true });
+    } catch {
+      // Local enable applies; cross-device sync just doesn't happen this time
+    }
+    setShowBiometricPrompt(false);
+  };
+
   return (
     <ImageBackground
       source={{ uri: bgUrl }}
@@ -308,6 +358,29 @@ export default function HomeScreen() {
       imageStyle={{ opacity: 0.75 }}
     >
       <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} source="trial" />
+      <Modal
+        visible={showBiometricPrompt}
+        transparent
+        animationType="slide"
+        onRequestClose={dismissBiometricPrompt}
+      >
+        <TouchableOpacity style={styles.bioPromptOverlay} activeOpacity={1} onPress={dismissBiometricPrompt} />
+        <View style={styles.bioPromptSheet}>
+          <View style={styles.bioPromptHandle} />
+          <View style={styles.bioPromptContent}>
+            <Text style={styles.bioPromptTitle}>Sign in faster next time</Text>
+            <Text style={styles.bioPromptBody}>
+              Use {biometricLabel} to sign in to Between Covers without entering your details every time. You can change this anytime in Account & Settings.
+            </Text>
+            <TouchableOpacity style={styles.bioPromptPrimary} onPress={enableBiometric}>
+              <Text style={styles.bioPromptPrimaryText}>Enable {biometricLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.bioPromptSecondary} onPress={dismissBiometricPrompt}>
+              <Text style={styles.bioPromptSecondaryText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
 
         {/* GREETING */}
@@ -576,4 +649,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: 'rgba(255,255,255,0.45)',
   },
+  bioPromptOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,42,72,0.5)' },
+  bioPromptSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#FDFAF6',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingBottom: 40,
+  },
+  bioPromptHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#D7E2E9', alignSelf: 'center', marginTop: 12 },
+  bioPromptContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
+  bioPromptTitle: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', textAlign: 'center' },
+  bioPromptBody: { fontSize: 14, fontWeight: '300', color: '#3d352e', lineHeight: 22, textAlign: 'center', marginBottom: spacing.sm },
+  bioPromptPrimary: { paddingVertical: 14, borderRadius: 999, backgroundColor: '#B83255', alignItems: 'center' },
+  bioPromptPrimaryText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  bioPromptSecondary: { paddingVertical: 12, alignItems: 'center' },
+  bioPromptSecondaryText: { fontSize: 13, color: '#6A5969' },
 });
