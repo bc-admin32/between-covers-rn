@@ -12,73 +12,32 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import { apiPost } from '../lib/api';
 
-/**
- * QuickRatingModal — post-event rating prompt.
- *
- * TODO (host wiring): the lounge does not yet have a live-event view.
- * The home screen's live banner navigates to /(tabs)/lounge?eventId=...
- * but app/(tabs)/lounge/index.tsx ignores the eventId param. Until a
- * live-event view exists, this modal has no host. To wire it up:
- *   1. Build a live-event view (e.g. app/(tabs)/lounge/event/[eventId].tsx
- *      or extend lounge/index.tsx to handle the eventId query param).
- *   2. On view mount, capture an entry timestamp:
- *        const entryRef = useRef(Date.now());
- *   3. Poll /live (or use a real-time channel when added) and detect when
- *      the event status flips ACTIVE → ENDED.
- *   4. On status change to ENDED:
- *        const elapsed = Date.now() - entryRef.current;
- *        if (elapsed >= 2 * 60 * 1000) {
- *          const rated = await SecureStore.getItemAsync(`bc_rated_event_${eventId}`);
- *          if (rated !== 'true') setShowRating(true);
- *        }
- *   5. Render <QuickRatingModal visible={showRating} onClose={...}
- *               eventId={...} eventTitle={...} eventType={...} />
- *
- * The modal handles its own SecureStore write on send/skip/close so the
- * host doesn't re-prompt on the same event.
- */
+// QuickRatingModal — post-event rating prompt.
+// Mounted conditionally by the host (`{showRatingModal && <QuickRatingModal ... />}`).
+// Backend drives whether to show via /live/{eventId}.ratingPrompt.show; this
+// component does no local dedup. The only ways to dismiss are Submit (after
+// picking ≥1 star) or "Maybe later" (when onSkip is provided). Backdrop taps,
+// swipe-down, and Android back are all no-ops by design.
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 const MAX_COMMENT = 200;
 
 type Props = {
-  visible: boolean;
-  onClose: () => void;
   eventId: string;
-  eventTitle: string;
   eventType: 'AUTHOR_EVENT' | 'DANCE_PARTY' | 'IRIS_LIVE';
+  eventTitle?: string;
+  onClose: () => void;
+  onSkip?: () => void;
 };
 
-export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventType }: Props) {
+export default function QuickRatingModal({ eventId, eventType, eventTitle, onClose, onSkip }: Props) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const markRated = async () => {
-    try {
-      await SecureStore.setItemAsync(`bc_rated_event_${eventId}`, 'true');
-    } catch {}
-  };
-
-  const close = () => {
-    setRating(0);
-    setComment('');
-    setSubmitting(false);
-    setSubmitted(false);
-    setError(null);
-    onClose();
-  };
-
-  const handleSkip = async () => {
-    if (submitting) return;
-    await markRated();
-    close();
-  };
 
   const handleSend = async () => {
     if (rating === 0 || submitting) return;
@@ -91,9 +50,8 @@ export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventT
         rating,
         comment: comment.trim() || null,
       });
-      await markRated();
       setSubmitted(true);
-      setTimeout(() => close(), 1500);
+      setTimeout(() => onClose(), 1500);
     } catch {
       setError('Something went wrong. Please try again.');
       setSubmitting(false);
@@ -105,12 +63,11 @@ export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventT
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleSkip}>
+    <Modal visible transparent animationType="slide" onRequestClose={() => {}}>
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableOpacity style={styles.backdrop} onPress={handleSkip} activeOpacity={1} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
@@ -121,7 +78,7 @@ export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventT
           ) : (
             <>
               <Image source={{ uri: IRIS_AVATAR }} style={styles.avatar} />
-              <Text style={styles.header}>How was the {eventTitle}?</Text>
+              <Text style={styles.header}>How was the {eventTitle ?? 'event'}?</Text>
 
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -164,9 +121,14 @@ export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventT
                     <Text style={styles.sendBtnText}>Send</Text>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSkip} disabled={submitting} style={styles.skipBtn}>
-                  <Text style={styles.skipBtnText}>Skip</Text>
-                </TouchableOpacity>
+                {onSkip && (
+                  <TouchableOpacity
+                    onPress={onSkip}
+                    style={styles.maybeLaterBtn}
+                  >
+                    <Text style={styles.maybeLaterText}>Maybe later</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </>
           )}
@@ -178,7 +140,6 @@ export function QuickRatingModal({ visible, onClose, eventId, eventTitle, eventT
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     backgroundColor: '#FDFAF6',
     borderTopLeftRadius: 24,
@@ -223,8 +184,8 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { backgroundColor: '#D4C4C4' },
   sendBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  skipBtn: { paddingVertical: 10, alignItems: 'center' },
-  skipBtnText: { fontSize: 13, color: '#6A5969' },
+  maybeLaterBtn: { paddingVertical: 8, alignItems: 'center', marginTop: 4 },
+  maybeLaterText: { fontSize: 13, color: 'rgba(196,168,130,0.6)' },
   successContainer: { paddingVertical: 32, alignItems: 'center' },
   successText: { fontSize: 17, color: '#1A1A2E', fontWeight: '600' },
 });
