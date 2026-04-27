@@ -7,6 +7,7 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
@@ -39,6 +40,7 @@ function timeAgo(iso: string): string {
 }
 
 function getInitials(name: string): string {
+  if (!name || typeof name !== 'string') return '?';
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
@@ -124,6 +126,7 @@ function MessageBubble({ reply, onReact, threadId, onBlock, onToast }: {
 export default function IrisThoughtsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
   // Explicitly decode in case Expo Router leaves %23 etc. un-decoded — the
   // Lambda pk check does a literal startsWith("IRIS#CHAT#") and will reject
@@ -241,7 +244,7 @@ export default function IrisThoughtsScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      keyboardVerticalOffset={tabBarHeight + 50}
     >
       {toast && (
         <View style={styles.toast} pointerEvents="none">

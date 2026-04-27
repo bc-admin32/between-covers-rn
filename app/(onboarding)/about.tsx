@@ -15,9 +15,8 @@ export default function AboutScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [pressed, setPressed] = useState(false);
 
-  // TODO: upload final v2 video to S3 before launch; owner will provide HeyGen-produced files
   const player = useVideoPlayer(
-    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/v2/About.mp4',
+    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/About.mp4',
     (p) => {
       p.loop = false;
       p.play();
@@ -61,7 +60,7 @@ export default function AboutScreen() {
             disabled={submitting}
           >
             <Text style={[styles.buttonText, pressed && styles.buttonTextPressed]}>
-              {submitting ? 'Entering…' : 'Step Inside'}
+              {submitting ? 'Entering…' : 'Start Exploring'}
             </Text>
           </TouchableOpacity>
         </View>

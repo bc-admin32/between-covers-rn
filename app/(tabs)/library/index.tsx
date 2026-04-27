@@ -174,7 +174,7 @@ export default function LibraryScreen() {
                 <TouchableOpacity
                   key={item.workId}
                   style={styles.gridItem}
-                  onPress={() => router.push(`/(tabs)/library/details?workId=${item.workId}` as any)}
+                  onPress={() => router.push(`/book?workId=${item.workId}` as any)}
                 >
                   <View style={styles.coverWrapper}>
                     {item.coverUrl ? (
@@ -202,7 +202,7 @@ export default function LibraryScreen() {
                     i === 0 && styles.listItemFirst,
                     i === items.length - 1 && styles.listItemLast,
                   ]}
-                  onPress={() => router.push(`/(tabs)/library/details?workId=${item.workId}` as any)}
+                  onPress={() => router.push(`/book?workId=${item.workId}` as any)}
                 >
                   <View style={styles.listCover}>
                     {item.coverUrl ? (

@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 
@@ -88,7 +89,10 @@ export default function LoungeScreen() {
   const handleEulaAccept = async () => {
     setEulaAccepting(true);
     try {
-      const res = await apiPost<{ loungeTermsAcceptedAt?: string }>('/legal/accept');
+      const res = await apiPost<{ loungeTermsAcceptedAt?: string }>('/legal/accept', {
+        context: 'lounge',
+        appVersion: Constants.expoConfig?.version ?? 'unknown',
+      });
       const acceptedAt = res?.loungeTermsAcceptedAt ?? new Date().toISOString();
       // Update both local state and the module-level cache so the modal
       // doesn't re-fire if the component remounts before the next API refresh.

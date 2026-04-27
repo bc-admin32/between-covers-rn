@@ -4,6 +4,7 @@ import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, radius, colors } from '../../lib/theme';
 
@@ -38,15 +39,23 @@ export default function AcceptanceScreen() {
 
     try {
       if (isReaccept) {
-        // Post-onboarding policy re-acceptance: writes new acceptedPolicyVersion
-        // via bcAcceptLegal Lambda, then routes to /home.
-        await apiPost('/legal/accept', { context: 'policy-update' });
-        router.replace('/home' as any);
+        const res = await apiPost('/onboarding/submit', {
+          step: 'L2Acc',
+          mode: 'reaccept',
+          appVersion: Constants.expoConfig?.version ?? 'unknown',
+        });
+        if (res?.nextRoute?.startsWith('/')) {
+          router.replace(normalizeRoute(res.nextRoute) as any);
+        } else {
+          router.replace('/home' as any);
+        }
         return;
       }
 
-      // Standard onboarding flow (step L2Acc)
-      const res = await apiPost('/onboarding/submit', { step: 'L2Acc' });
+      const res = await apiPost('/onboarding/submit', {
+        step: 'L2Acc',
+        appVersion: Constants.expoConfig?.version ?? 'unknown',
+      });
       if (res?.nextRoute) {
         router.replace(normalizeRoute(res.nextRoute) as any);
         return;

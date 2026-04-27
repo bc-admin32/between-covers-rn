@@ -168,7 +168,7 @@ export default function ProfileScreen() {
 
   const photoToShow = user.photoUrl ?? DEFAULT_PHOTO;
   const isFounding = user?.recognition?.foundingMember?.isFounding === true;
-  const genres: string[] = Array.isArray(user.genre) ? user.genre.filter((g: string) => GENRE_LABELS[g]) : [];
+  const genres: string[] = Array.isArray(user.genres) ? user.genres.filter((g: string) => GENRE_LABELS[g]) : [];
   const spiceLabel = user.spiceLevel ? SPICE_LABELS[user.spiceLevel] : null;
   const spiceGlyph = user.spiceLevel ? SPICE_GLYPHS[user.spiceLevel] : null;
 

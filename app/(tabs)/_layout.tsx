@@ -76,6 +76,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="library"
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('library', { screen: 'index' });
+          },
+        })}
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (

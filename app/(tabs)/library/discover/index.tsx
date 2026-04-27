@@ -165,7 +165,7 @@ export default function LibraryDiscoverScreen() {
                 return (
                   <View key={book.workId} style={styles.gridItem}>
                     <TouchableOpacity
-                      onPress={() => router.push(`/(tabs)/library/details?workId=${book.workId}` as any)}
+                      onPress={() => router.push(`/book?workId=${book.workId}` as any)}
                     >
                       <View style={styles.coverWrapper}>
                         {book.coverUrl ? (

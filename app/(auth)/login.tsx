@@ -113,7 +113,7 @@ export default function LoginScreen() {
         <View style={styles.biometricContainer}>
           <TouchableOpacity style={styles.biometricButton} onPress={handleBiometricLogin}>
             <Text style={styles.biometricIcon}>🔒</Text>
-            <Text style={styles.biometricText}>Sign in with Face ID</Text>
+            <Text style={styles.biometricText}>Log in with Face ID</Text>
           </TouchableOpacity>
           <Text style={styles.orText}>or choose another sign in method below</Text>
         </View>
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   biometricButton: {
     width: '100%',
     height: 56,
-    backgroundColor: '#0F2A48',
+    backgroundColor: '#B83255',
     borderRadius: radius.md,
     flexDirection: 'row',
     alignItems: 'center',

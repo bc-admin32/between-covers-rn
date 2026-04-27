@@ -26,9 +26,8 @@ export default function SnacksScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
-  // TODO: upload final v2 video to S3 before launch; owner will provide HeyGen-produced files
   const player = useVideoPlayer(
-    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/v2/Snacks.mp4',
+    'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Snacks.mp4',
     (p) => {
       p.loop = false;
       p.play();

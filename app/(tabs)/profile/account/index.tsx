@@ -3,14 +3,14 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert, Switch,
 } from 'react-native';
-import { CaretLeft, CaretRight, Heart } from 'phosphor-react-native';
+import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
 import { signOut } from '../../../../lib/signout';
 import { spacing, radius, colors } from '../../../../lib/theme';
-import { FeedbackModal } from '../../../../components/FeedbackModal';
+import { ChurnFeedbackModal } from '../../../../components/ChurnFeedbackModal';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
@@ -54,9 +54,12 @@ export default function AccountSettingsScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [savingBiometric, setSavingBiometric] = useState(false);
+  const [biometricStatus, setBiometricStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [churnModalVisible, setChurnModalVisible] = useState(false);
+  const [churnAction, setChurnAction] = useState<'deactivate' | 'delete'>('deactivate');
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricLabel, setBiometricLabel] = useState('Biometric');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -113,13 +116,25 @@ export default function AccountSettingsScreen() {
 
   const handleBiometricToggle = async (v: boolean) => {
     await Haptics.selectionAsync();
-    setBiometricEnabled(v);
-    if (v) {
-      await SecureStore.setItemAsync('bc_biometric_enabled', 'true');
-    } else {
-      await SecureStore.setItemAsync('bc_biometric_enabled', 'false');
-      await SecureStore.deleteItemAsync('bc_id_token');
-      await SecureStore.deleteItemAsync('bc_access_token');
+    setBiometricEnabled(v); // optimistic UI update
+    setSavingBiometric(true);
+    setBiometricStatus('saving');
+
+    try {
+      // Persist the preference to the user record FIRST.
+      await apiPatch('/profile', { biometricPreferred: v });
+
+      await SecureStore.setItemAsync('bc_biometric_enabled', v ? 'true' : 'false');
+
+      setBiometricStatus('saved');
+      setTimeout(() => setBiometricStatus('idle'), 2000);
+    } catch {
+      // Rollback the toggle visually; don't wipe tokens (user is still signed in)
+      setBiometricEnabled(!v);
+      setBiometricStatus('error');
+      setTimeout(() => setBiometricStatus('idle'), 3000);
+    } finally {
+      setSavingBiometric(false);
     }
   };
 
@@ -164,8 +179,13 @@ export default function AccountSettingsScreen() {
     }
   };
 
-  const deactivateAccount = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  const openDeactivateChurnModal = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    setChurnAction('deactivate');
+    setChurnModalVisible(true);
+  };
+
+  const confirmDeactivateAccount = () => {
     Alert.alert(
       'Deactivate Account',
       'Are you sure you want to deactivate your account? You can reactivate it later by signing back in.',
@@ -177,7 +197,7 @@ export default function AccountSettingsScreen() {
             setDeactivating(true);
             try {
               await apiPost('/account/deactivate', {});
-              await signOut();
+              await signOut({ force: true });
               router.replace('/(auth)/login' as any);
             } finally {
               setDeactivating(false);
@@ -188,8 +208,13 @@ export default function AccountSettingsScreen() {
     );
   };
 
-  const deleteAccount = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  const openDeleteChurnModal = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    setChurnAction('delete');
+    setChurnModalVisible(true);
+  };
+
+  const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
       'Are you absolutely sure you want to permanently delete your account? This action cannot be undone.',
@@ -201,7 +226,7 @@ export default function AccountSettingsScreen() {
             setDeleting(true);
             try {
               await apiPost('/account/delete', {});
-              await signOut();
+              await signOut({ force: true });
               router.replace('/(auth)/login' as any);
             } finally {
               setDeleting(false);
@@ -214,11 +239,6 @@ export default function AccountSettingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <FeedbackModal
-        visible={feedbackOpen}
-        onClose={() => setFeedbackOpen(false)}
-        source="profile"
-      />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* HEADER */}
@@ -365,40 +385,25 @@ export default function AccountSettingsScreen() {
                 {!biometricAvailable && biometricReady && (
                   <Text style={styles.biometricHelper}>Set up {biometricLabel} in your device settings to use this feature.</Text>
                 )}
+                {biometricStatus === 'saving' && <Text style={styles.notifStatusText}>Saving…</Text>}
+                {biometricStatus === 'saved' && <Text style={[styles.notifStatusText, { color: '#2E9E68' }]}>Saved ✓</Text>}
+                {biometricStatus === 'error' && <Text style={[styles.notifStatusText, { color: '#B83255' }]}>Failed to save</Text>}
               </View>
               <Switch
                 value={biometricEnabled}
                 onValueChange={handleBiometricToggle}
-                disabled={!biometricAvailable || !biometricReady}
+                disabled={!biometricAvailable || !biometricReady || savingBiometric}
                 trackColor={{ false: 'rgba(15,42,72,0.12)', true: '#6B9AB8' }}
                 thumbColor="#fff"
               />
             </View>
           </SectionCard>
 
-          {/* SHARE YOUR THOUGHTS */}
-          <SectionCard title="Share Your Thoughts">
-            <TouchableOpacity
-              style={styles.feedbackRow}
-              onPress={() => setFeedbackOpen(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.feedbackRowLeft}>
-                <Heart size={22} color="#B83255" weight="regular" />
-                <View style={styles.feedbackRowText}>
-                  <Text style={styles.feedbackRowLabel}>Share Feedback</Text>
-                  <Text style={styles.feedbackRowHelper}>I'd love to hear how Between Covers is feeling for you.</Text>
-                </View>
-              </View>
-              <CaretRight size={18} color="rgba(15,42,72,0.35)" weight="bold" />
-            </TouchableOpacity>
-          </SectionCard>
-
           {/* DANGER ZONE */}
           <SectionCard title="Danger Zone" danger>
             <TouchableOpacity
               style={styles.deactivateButton}
-              onPress={deactivateAccount}
+              onPress={openDeactivateChurnModal}
               disabled={deactivating || loadFailed}
             >
               <Text style={styles.deactivateButtonText}>
@@ -407,7 +412,7 @@ export default function AccountSettingsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteButton}
-              onPress={deleteAccount}
+              onPress={openDeleteChurnModal}
               disabled={deleting || loadFailed}
             >
               <Text style={styles.deleteButtonText}>
@@ -420,6 +425,20 @@ export default function AccountSettingsScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <ChurnFeedbackModal
+        visible={churnModalVisible}
+        action={churnAction}
+        onClose={() => setChurnModalVisible(false)}
+        onContinue={() => {
+          setChurnModalVisible(false);
+          if (churnAction === 'deactivate') {
+            confirmDeactivateAccount();
+          } else {
+            confirmDeleteAccount();
+          }
+        }}
+      />
     </View>
   );
 }
@@ -463,11 +482,6 @@ const styles = StyleSheet.create({
   tzOptionText: { fontSize: 12, color: '#0F2A48' },
   tzOptionTextSelected: { color: '#fff', fontWeight: '600' },
   tzOptionTextDisabled: { color: '#A9C0D4' },
-  feedbackRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  feedbackRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
-  feedbackRowText: { flex: 1 },
-  feedbackRowLabel: { fontSize: 14, color: '#0F2A48', fontWeight: '600' },
-  feedbackRowHelper: { fontSize: 12, color: '#A9C0D4', marginTop: 2, lineHeight: 16 },
   biometricLabelWrap: { flex: 1, marginRight: spacing.md },
   biometricHelper: { fontSize: 11, color: '#A9C0D4', marginTop: 4, lineHeight: 15 },
   deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(184,50,85,0.3)', alignItems: 'center', justifyContent: 'center' },

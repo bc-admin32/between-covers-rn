@@ -4,13 +4,13 @@ import {
   StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
-import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
+import VerdictRating, { Verdict } from '../../components/rating/VerdictRating';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet, apiPost, apiPatch, apiDelete } from '../../../../lib/api';
-import { spacing, radius, colors } from '../../../../lib/theme';
+import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
+import { spacing, radius, colors } from '../../lib/theme';
 
 const AFFILIATE_TAG = 'betweencovers-20';
 const RETAILER_LABELS: Record<string, string> = {
@@ -94,6 +94,8 @@ export default function BookDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { workId } = useLocalSearchParams<{ workId: string }>();
 
+  const handleBack = () => router.back();
+
   const [data, setData] = useState<BookDetailResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -154,7 +156,7 @@ export default function BookDetailsScreen() {
         onPress: async () => {
           try {
             await apiDelete(`/library/${workId}`);
-            router.back();
+            handleBack();
           } catch {
             Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
           }
@@ -195,7 +197,7 @@ export default function BookDetailsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.unavailableHeader}>
-          <TouchableOpacity style={styles.unavailableBack} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.unavailableBack} onPress={() => handleBack()}>
             <CaretLeft size={20} color="#0F2A48" weight="bold" />
           </TouchableOpacity>
         </View>
@@ -215,7 +217,7 @@ export default function BookDetailsScreen() {
                     onPress: async () => {
                       try {
                         await apiDelete(`/library/${workId}`);
-                        router.back();
+                        handleBack();
                       } catch {
                         Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
                       }
@@ -227,8 +229,8 @@ export default function BookDetailsScreen() {
               <Text style={styles.unavailableRemoveText}>Remove from Library</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity onPress={() => router.back()} style={styles.unavailableBackLink}>
-            <Text style={styles.unavailableBackLinkText}>← Back to Library</Text>
+          <TouchableOpacity onPress={() => handleBack()} style={styles.unavailableBackLink}>
+            <Text style={styles.unavailableBackLinkText}>← Back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -259,7 +261,7 @@ export default function BookDetailsScreen() {
 
           <TouchableOpacity
             style={[styles.backButton, { top: insets.top + 12 }]}
-            onPress={() => router.back()}
+            onPress={() => handleBack()}
           >
             <CaretLeft size={20} color="#fff" weight="bold" />
           </TouchableOpacity>
@@ -407,8 +409,8 @@ export default function BookDetailsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
   hero: { height: 300, overflow: 'hidden', backgroundColor: '#0F2A48' },
-  
-    
+
+
     backButton: {
     position: 'absolute',
     left: 20,

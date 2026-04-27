@@ -145,22 +145,22 @@ export default function ReadingPreferencesScreen() {
   const [saved, setSaved] = useState(true);
 
   const [readingTime, setReadingTime] = useState<string | null>(null);
-  const [genre, setGenre] = useState<string[]>([]);
+  const [genres, setGenres] = useState<string[]>([]);
   const [comfortBoundaries, setComfortBoundaries] = useState<string[]>([]);
   const [spiceLevel, setSpiceLevel] = useState<string | null>(null);
-  const [snack, setSnack] = useState<string[]>([]);
-  const [drink, setDrink] = useState<string[]>([]);
+  const [snacks, setSnacks] = useState<string[]>([]);
+  const [drinks, setDrinks] = useState<string[]>([]);
   const [readingLocation, setReadingLocation] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       const data = await apiGet('/profile');
       setReadingTime(data.readingTime?.preferredWindow ?? null);
-      setGenre(Array.isArray(data.genre) ? data.genre : []);
+      setGenres(Array.isArray(data.genres) ? data.genres : []);
       setComfortBoundaries(Object.keys(data.comfortBoundaries ?? {}));
       setSpiceLevel(data.spiceLevel ?? null);
-      setSnack(data.snack ?? []);
-      setDrink(data.drink ?? []);
+      setSnacks(data.snacks ?? []);
+      setDrinks(data.drinks ?? []);
       setReadingLocation(data.readingLocation ?? null);
       setSaved(true);
       setLoading(false);
@@ -175,11 +175,11 @@ export default function ReadingPreferencesScreen() {
     comfortBoundaries.forEach((k) => (comfortMap[k] = true));
     await apiPatch('/profile', {
       readingTime: readingTime ? { preferredWindow: readingTime } : null,
-      genre,
+      genres,
       comfortBoundaries: comfortMap,
       spiceLevel,
-      snack,
-      drink,
+      snacks,
+      drinks,
       readingLocation,
     });
     setSaved(true);
@@ -218,7 +218,7 @@ export default function ReadingPreferencesScreen() {
           </PrefCard>
 
           <PrefCard label="Favorite Genres">
-            <MultiChipGroup options={TROPE_OPTIONS} value={genre} onChange={(v) => { Haptics.selectionAsync(); setGenre(v); markUnsaved(); }} />
+            <MultiChipGroup options={TROPE_OPTIONS} value={genres} onChange={(v) => { Haptics.selectionAsync(); setGenres(v); markUnsaved(); }} />
           </PrefCard>
 
           <PrefCard label="Comfort Boundaries">
@@ -233,11 +233,11 @@ export default function ReadingPreferencesScreen() {
           </PrefCard>
 
           <PrefCard label="Favorite Snacks">
-            <MultiChipGroup options={SNACK_OPTIONS} value={snack} onChange={(v) => { Haptics.selectionAsync(); setSnack(v); markUnsaved(); }} />
+            <MultiChipGroup options={SNACK_OPTIONS} value={snacks} onChange={(v) => { Haptics.selectionAsync(); setSnacks(v); markUnsaved(); }} />
           </PrefCard>
 
           <PrefCard label="Favorite Drinks">
-            <MultiChipGroup options={DRINK_OPTIONS} value={drink} onChange={(v) => { Haptics.selectionAsync(); setDrink(v); markUnsaved(); }} />
+            <MultiChipGroup options={DRINK_OPTIONS} value={drinks} onChange={(v) => { Haptics.selectionAsync(); setDrinks(v); markUnsaved(); }} />
           </PrefCard>
 
           <PrefCard label="Reading Location">

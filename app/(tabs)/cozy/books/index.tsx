@@ -103,7 +103,7 @@ export default function CozyBooksScreen() {
               <TouchableOpacity
                 key={book.workId ?? i}
                 style={styles.bookCard}
-                onPress={() => router.push(`/(tabs)/library/details?workId=${book.workId}` as any)}
+                onPress={() => router.push(`/book?workId=${book.workId}` as any)}
               >
                 <View style={styles.bookCover}>
                   <Image source={{ uri: book.coverUrl }} style={styles.bookCoverImage} />

@@ -50,8 +50,11 @@ export default function SplashScreen() {
             }
           }
 
-          // Token rejected — wipe and fall through to subscription check.
-          await signOut();
+          // Token rejected — force-hard wipe overrides the biometric-aware soft
+          // path because the stored token is invalid; soft would leave it in
+          // place and trigger the same /auth/resolve failure on every Face ID
+          // re-entry. Fall through to subscription check after the wipe.
+          await signOut({ force: true });
         } else {
           await waitForSplash();
         }

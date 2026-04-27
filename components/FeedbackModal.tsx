@@ -56,10 +56,12 @@ const Q5_OPTIONS = [
 type Props = {
   visible: boolean;
   onClose: () => void;
-  source: 'trial' | 'profile';
+  source?: 'trial' | 'profile';
 };
 
-export function FeedbackModal({ visible, onClose, source }: Props) {
+// `source` defaults to 'profile' — profile home is the canonical caller and
+// omits the prop. Other call sites (e.g. home/index.tsx for trial flow) pass it.
+export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
   const [overall, setOverall] = useState<string | null>(null);
   const [frequency, setFrequency] = useState<string | null>(null);
   const [intent, setIntent] = useState<string | null>(null);

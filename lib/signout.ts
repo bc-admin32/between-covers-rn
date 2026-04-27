@@ -12,15 +12,29 @@ const SECURE_STORE_KEYS = [
 ];
 
 /**
- * Fully signs the user out:
- * 1. Hits the Cognito /logout endpoint to invalidate the server-side session
- *    so the same social provider doesn't auto-re-authenticate on next login.
- * 2. Wipes all local SecureStore tokens and cache so the login screen starts fresh.
+ * Signs the user out. Soft (biometric-aware) by default, hard if forced.
  *
- * Call this before redirecting to /(auth)/login for both manual logout,
- * account deactivation, and account deletion.
+ * Soft (no args, or { force: false }):
+ *   If bc_biometric_enabled is 'true', returns immediately without invalidating
+ *   the Cognito session or wiping SecureStore. This lets the user re-enter via
+ *   Face ID / Touch ID without re-authenticating from scratch. Caller is still
+ *   responsible for navigating to the login screen.
+ *
+ * Hard ({ force: true }):
+ *   Always does the full sign-out — hits Cognito /logout to invalidate the
+ *   server-side session, then wipes all SecureStore keys. Use this whenever
+ *   stale tokens MUST be cleared to avoid a re-auth loop or to honor a backend
+ *   account-state change: account deactivation, account deletion, and
+ *   auth-resolve failure recovery (deactivated/suspended/not-found accounts).
  */
-export async function signOut(): Promise<void> {
+export async function signOut(opts: { force?: boolean } = {}): Promise<void> {
+  if (!opts.force) {
+    const biometricEnabled = await SecureStore.getItemAsync('bc_biometric_enabled');
+    if (biometricEnabled === 'true') {
+      return;
+    }
+  }
+
   // 1 — Invalidate the Cognito session server-side (fire and forget — don't
   //     block or surface an error if the network is unavailable).
   try {

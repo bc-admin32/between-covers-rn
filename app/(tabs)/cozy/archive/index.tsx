@@ -137,7 +137,7 @@ export default function CozyArchiveScreen() {
                 <Text style={styles.spotlightSubtitle}>I saw this and thought of you.</Text>
                 <TouchableOpacity
                   style={styles.spotlightCard}
-                  onPress={() => router.push(`/(tabs)/library/details?workId=${spotlightBook.workId}` as any)}
+                  onPress={() => router.push(`/book?workId=${spotlightBook.workId}` as any)}
                 >
                   <Image source={{ uri: spotlightBook.coverUrl }} style={styles.spotlightCover} />
                   <View style={styles.spotlightInfo}>
@@ -166,7 +166,7 @@ export default function CozyArchiveScreen() {
                     <TouchableOpacity
                       key={book?.workId ?? i}
                       style={styles.smallBookCard}
-                      onPress={() => router.push(`/(tabs)/library/details?workId=${book.workId}` as any)}
+                      onPress={() => router.push(`/book?workId=${book.workId}` as any)}
                     >
                       <View style={styles.smallBookCover}>
                         <Image source={{ uri: book.coverUrl }} style={styles.smallBookCoverImage} />

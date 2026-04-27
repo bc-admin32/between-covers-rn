@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { useIAP, restorePurchases as doRestorePurchases } from 'expo-iap';
+import { useIAP, restorePurchases as doRestorePurchases } from '../../lib/iap-shim';
 import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
 

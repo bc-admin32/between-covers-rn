@@ -90,8 +90,9 @@ export default function RedirectScreen() {
         if (!resolveRes.ok) {
           // Tokens were stored above — clear them now so index.tsx doesn't
           // enter a loop (find token → resolve fails → forceLogin → login →
-          // user logs in → tokens stored → repeat).
-          await signOut();
+          // user logs in → tokens stored → repeat). Force-hard wipe overrides
+          // the biometric-aware soft path because the tokens are invalid.
+          await signOut({ force: true });
           const body = await resolveRes.json().catch(() => null);
           const isGone = resolveRes.status === 404 || resolveRes.status === 403;
           const msg = (body?.message ?? '') as string;
