@@ -72,7 +72,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Image
-        source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/logo-shadow.png' }}
+        source={require('../assets/splash.png')}
         style={styles.logo}
         resizeMode="contain"
       />
@@ -82,13 +82,13 @@ export default function SplashScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0F2A48',
+    flex: 1,
+    backgroundColor: '#E7AEB7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 220,
-    height: 120,
+    width: '80%',
+    height: '80%',
   },
 });
