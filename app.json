@@ -19,7 +19,7 @@
     },
    "ios": {
       "supportsTablet": false,
-      "buildNumber": "7",
+      "buildNumber": "8",
       "bundleIdentifier": "com.betweencovers.app",
       "usesAppleSignIn": true,
       "infoPlist": {
