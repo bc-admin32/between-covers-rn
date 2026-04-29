@@ -40,19 +40,23 @@ type VisualItem = {
   movieId?: string;
 };
 
-type MindItem = {
-  headshotUrl: string;
+type AuthorSpotlight = {
+  id: string;
+  monthLabel: string;
   name: string;
-  type: 'author' | 'narrator';
-  quote: string;
+  role: 'author' | 'narrator';
+  headshotUrl: string;
+  quoteShort: string;
+  quoteFull: string;
+  quoteSource: string | null;
+  bioShort: string | null;
   bio: string;
-  fullBio: string;
-  sitWithMe?: string;
-  featuredBooks?: Array<{ workId: string; title: string; author: string; coverUrl: string }>;
-  instagramUrl?: string;
-  tiktokUrl?: string;
-  websiteUrl?: string;
-  promo?: { code: string; discount?: string; endDate?: string; label?: string };
+  sitWithMe: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  websiteUrl: string | null;
+  promo: { code?: string; label?: string; discount?: string; startDate?: string; endDate?: string } | null;
+  featuredBooks: Array<{ workId: string; title: string; author: string; coverUrl: string }>;
 };
 
 type CozyData = {
@@ -67,7 +71,7 @@ type CozyData = {
     LIFESTYLE?: VisualItem[];
     lifestyle?: VisualItem[];
     items?: VisualItem[];
-    mind?: MindItem[];
+    authorSpotlight?: AuthorSpotlight | null;
   };
 };
 
@@ -309,7 +313,7 @@ export default function CozyScreen() {
   const visual = data?.sections?.visual ?? [];
   const lifestyle = data?.sections ? resolveLifestyleItems(data.sections) : [];
   const displayBooks = getDailyBookSlice(books);
-  const mind = data?.sections?.mind?.[0] ?? null;
+  const authorSpotlight = data?.sections?.authorSpotlight ?? null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -401,7 +405,7 @@ export default function CozyScreen() {
         )}
 
         {/* MIND BEHIND THE MAGIC */}
-        {mind && data?.weekId && (
+        {authorSpotlight && data?.weekId && (
           <View style={styles.section}>
             <Divider />
             <SectionHeader title="The Mind Behind the Magic" />
@@ -414,21 +418,21 @@ export default function CozyScreen() {
               onPress={() => router.push(`/(tabs)/cozy/author?weekId=${data.weekId}` as any)}
             >
               <View style={styles.mindHeader}>
-                <Image source={{ uri: mind.headshotUrl }} style={styles.mindHeadshot} />
+                <Image source={{ uri: authorSpotlight.headshotUrl }} style={styles.mindHeadshot} />
                 <View style={styles.mindHeaderText}>
                   <Text style={styles.mindName}>
-                    {mind.name}
+                    {authorSpotlight.name}
                     <Text style={styles.mindType}>
-                      {mind.type === 'narrator' ? ', Narrator' : ', Author'}
+                      {authorSpotlight.role === 'narrator' ? ', Narrator' : ', Author'}
                     </Text>
                   </Text>
                 </View>
               </View>
-              {mind.quote && (
-                <Text style={styles.mindQuote}>"{mind.quote}"</Text>
+              {authorSpotlight.quoteShort && (
+                <Text style={styles.mindQuote}>"{authorSpotlight.quoteShort}"</Text>
               )}
-              {mind.bio && (
-                <Text style={styles.mindBio}>{mind.bio}</Text>
+              {authorSpotlight.bioShort && (
+                <Text style={styles.mindBio}>{authorSpotlight.bioShort}</Text>
               )}
               <View style={styles.mindCtaRow}>
                 <Text style={styles.mindCtaText}>Explore their books →</Text>

@@ -15,19 +15,23 @@ const CACHE_KEY = 'bc_cozy_cache';
 
 type FeaturedBook = { workId: string; title: string; author: string; coverUrl: string };
 
-type MindItem = {
-  headshotUrl: string;
+type AuthorSpotlight = {
+  id: string;
+  monthLabel: string;
   name: string;
-  type: 'author' | 'narrator';
-  quote: string;
+  role: 'author' | 'narrator';
+  headshotUrl: string;
+  quoteShort: string;
+  quoteFull: string;
+  quoteSource: string | null;
+  bioShort: string | null;
   bio: string;
-  fullBio: string;
-  sitWithMe?: string;
-  featuredBooks?: FeaturedBook[];
-  instagramUrl?: string;
-  tiktokUrl?: string;
-  websiteUrl?: string;
-  promo?: { code: string; discount?: string; endDate?: string; label?: string };
+  sitWithMe: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  websiteUrl: string | null;
+  promo: { code?: string; label?: string; discount?: string; startDate?: string; endDate?: string } | null;
+  featuredBooks: FeaturedBook[];
 };
 
 async function openLink(url: string) {
@@ -78,7 +82,7 @@ export default function AuthorDetailScreen() {
   const insets = useSafeAreaInsets();
   useLocalSearchParams<{ weekId?: string }>();
 
-  const [mind, setMind] = useState<MindItem | null>(null);
+  const [spotlight, setSpotlight] = useState<AuthorSpotlight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -89,17 +93,17 @@ export default function AuthorDetailScreen() {
         const cached = await SecureStore.getItemAsync(CACHE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
-          const cachedMind = parsed?.active?.sections?.mind?.[0] ?? null;
-          if (cachedMind) {
-            setMind(cachedMind);
+          const cachedSpotlight = parsed?.active?.sections?.authorSpotlight ?? null;
+          if (cachedSpotlight) {
+            setSpotlight(cachedSpotlight);
             haveData = true;
             setLoading(false);
           }
         }
-        const response = await apiGet<{ active?: { sections?: { mind?: MindItem[] } } }>('/cozy/home');
-        const fresh = response?.active?.sections?.mind?.[0] ?? null;
+        const response = await apiGet<{ active?: { sections?: { authorSpotlight?: AuthorSpotlight | null } } }>('/cozy/home');
+        const fresh = response?.active?.sections?.authorSpotlight ?? null;
         if (fresh) {
-          setMind(fresh);
+          setSpotlight(fresh);
           haveData = true;
         } else if (!haveData) {
           setError(true);
@@ -113,7 +117,7 @@ export default function AuthorDetailScreen() {
     load();
   }, []);
 
-  if (loading && !mind) {
+  if (loading && !spotlight) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={colors.primary} />
@@ -121,7 +125,7 @@ export default function AuthorDetailScreen() {
     );
   }
 
-  if (error || !mind) {
+  if (error || !spotlight) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl }]}>
         <Text style={styles.errorText}>Spotlight not available</Text>
@@ -132,10 +136,10 @@ export default function AuthorDetailScreen() {
     );
   }
 
-  const typeLabel = mind.type === 'narrator' ? 'Narrator' : 'Author';
-  const hasSocial = !!(mind.instagramUrl || mind.tiktokUrl || mind.websiteUrl);
-  const hasPromo = !!mind.promo?.code;
-  const hasBooks = !!mind.featuredBooks && mind.featuredBooks.length > 0;
+  const typeLabel = spotlight.role === 'narrator' ? 'Narrator' : 'Author';
+  const hasSocial = !!(spotlight.instagramUrl || spotlight.tiktokUrl || spotlight.websiteUrl);
+  const hasPromo = !!spotlight.promo?.code;
+  const hasBooks = spotlight.featuredBooks.length > 0;
 
   return (
     <View style={styles.container}>
@@ -145,41 +149,41 @@ export default function AuthorDetailScreen() {
       >
         {/* HERO */}
         <View style={[styles.hero, { paddingTop: insets.top }]}>
-          <Image source={{ uri: mind.headshotUrl }} style={styles.heroImage} />
+          <Image source={{ uri: spotlight.headshotUrl }} style={styles.heroImage} />
         </View>
 
         {/* HEADER */}
         <View style={styles.headerBlock}>
           <Text style={styles.eyebrow}>The Mind Behind the Magic</Text>
-          <Text style={styles.name}>{mind.name}</Text>
+          <Text style={styles.name}>{spotlight.name}</Text>
           <Text style={styles.typeLabel}>{typeLabel}</Text>
         </View>
 
         {/* SIT WITH ME */}
-        {mind.sitWithMe && (
+        {spotlight.sitWithMe && (
           <View style={styles.swmSection}>
             <SitWithMeDivider />
-            <Text style={styles.swmText}>"{mind.sitWithMe}"</Text>
+            <Text style={styles.swmText}>"{spotlight.sitWithMe}"</Text>
           </View>
         )}
 
         {/* FULL BIO */}
-        {mind.fullBio && (
+        {spotlight.bio && (
           <View style={styles.bodySection}>
-            <Text style={styles.bioText}>{mind.fullBio}</Text>
+            <Text style={styles.bioText}>{spotlight.bio}</Text>
           </View>
         )}
 
         {/* BOOKS */}
         {hasBooks && (
           <View style={styles.bodySection}>
-            <Text style={styles.sectionTitle}>{`Books by ${mind.name}`}</Text>
+            <Text style={styles.sectionTitle}>{`Books by ${spotlight.name}`}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.scrollRow}
             >
-              {mind.featuredBooks!.map((book) => (
+              {spotlight.featuredBooks.map((book) => (
                 <TouchableOpacity
                   key={book.workId}
                   style={styles.smallBookCard}
@@ -201,26 +205,26 @@ export default function AuthorDetailScreen() {
           <View style={styles.bodySection}>
             <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>Connect</Text>
             <View style={styles.socialRow}>
-              {mind.instagramUrl && (
+              {spotlight.instagramUrl && (
                 <TouchableOpacity
                   style={styles.socialButton}
-                  onPress={() => openLink(mind.instagramUrl!)}
+                  onPress={() => openLink(spotlight.instagramUrl!)}
                 >
                   <Ionicons name="logo-instagram" size={22} color="#0F2A48" />
                 </TouchableOpacity>
               )}
-              {mind.tiktokUrl && (
+              {spotlight.tiktokUrl && (
                 <TouchableOpacity
                   style={styles.socialButton}
-                  onPress={() => openLink(mind.tiktokUrl!)}
+                  onPress={() => openLink(spotlight.tiktokUrl!)}
                 >
                   <FontAwesome5 name="tiktok" size={20} color="#0F2A48" />
                 </TouchableOpacity>
               )}
-              {mind.websiteUrl && (
+              {spotlight.websiteUrl && (
                 <TouchableOpacity
                   style={styles.socialButton}
-                  onPress={() => openLink(mind.websiteUrl!)}
+                  onPress={() => openLink(spotlight.websiteUrl!)}
                 >
                   <Ionicons name="globe-outline" size={22} color="#0F2A48" />
                 </TouchableOpacity>
@@ -233,12 +237,12 @@ export default function AuthorDetailScreen() {
         {hasPromo && (
           <View style={styles.bodySection}>
             <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>Special Offer</Text>
-            {mind.promo!.label && (
-              <Text style={styles.promoHeadline}>{mind.promo!.label}</Text>
+            {spotlight.promo!.label && (
+              <Text style={styles.promoHeadline}>{spotlight.promo!.label}</Text>
             )}
-            <PromoCode code={mind.promo!.code} />
-            {mind.promo!.endDate && (
-              <Text style={styles.promoEndDate}>Through {formatEndDate(mind.promo!.endDate)}</Text>
+            <PromoCode code={spotlight.promo!.code!} />
+            {spotlight.promo!.endDate && (
+              <Text style={styles.promoEndDate}>Through {formatEndDate(spotlight.promo!.endDate)}</Text>
             )}
           </View>
         )}
