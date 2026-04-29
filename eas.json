@@ -7,12 +7,18 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleGooglePlayDebug"
+      },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     },
     "preview": {
       "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleGooglePlayRelease"
+      },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1"
       }
@@ -21,6 +27,22 @@
       "autoIncrement": true,
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1"
+      }
+    },
+    "production-ios": {
+      "extends": "production"
+    },
+    "production-google": {
+      "extends": "production",
+      "android": {
+        "gradleCommand": ":app:bundleGooglePlayRelease"
+      }
+    },
+    "production-amazon": {
+      "extends": "production",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleAmazonRelease"
       }
     }
   },

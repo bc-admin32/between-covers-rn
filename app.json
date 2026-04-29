@@ -34,7 +34,7 @@
     },
     "android": {
       "package": "com.betweencovers.app",
-      "versionCode": 7,
+      "versionCode": 10,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E7AEB7"
