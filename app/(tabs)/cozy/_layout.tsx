@@ -9,6 +9,7 @@ export default function CozyLayout() {
       <Stack.Screen name="archive/index" />
       <Stack.Screen name="books/index" />
       <Stack.Screen name="events/index" />
+      <Stack.Screen name="author/index" />
     </Stack>
   );
 }
