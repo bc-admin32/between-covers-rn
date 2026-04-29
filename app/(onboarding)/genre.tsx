@@ -7,6 +7,9 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
+const VIDEO_DURATION_S = 33;
+const REVEAL_AT_PCT = 0.70;
+
 const GENRES = [
   { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
   { value: 'ROMANTIC_SUSPENSE', label: '🕵️ Romantic Suspense', sub: 'bodyguards · detectives · mysteries · thrillers' },
@@ -33,7 +36,10 @@ export default function GenreScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowOptions(true), 39000);
+    const timer = setTimeout(
+      () => setShowOptions(true),
+      VIDEO_DURATION_S * 1000 * REVEAL_AT_PCT
+    );
     return () => clearTimeout(timer);
   }, []);
 
