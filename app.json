@@ -64,7 +64,12 @@
         }
       ],
       "expo-secure-store",
-      "expo-iap",
+      [
+        "react-native-iap",
+        {
+          "paymentProvider": "both"
+        }
+      ],
       "expo-video",
       "expo-image-picker",
       [

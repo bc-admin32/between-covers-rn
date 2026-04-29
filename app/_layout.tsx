@@ -10,6 +10,7 @@ import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
 import { colors } from '../lib/theme';
 import { configureNotificationHandler, registerForPushNotifications } from '../lib/notifications';
+import { withIAPContext } from '../lib/iap-shim';
 
 configureNotificationHandler();
 
@@ -19,7 +20,7 @@ configureNotificationHandler();
 // SplashScreen.preventAutoHideAsync() holds the splash open until ready.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
@@ -120,3 +121,5 @@ export default function RootLayout() {
     </>
   );
 }
+
+export default withIAPContext(RootLayout);

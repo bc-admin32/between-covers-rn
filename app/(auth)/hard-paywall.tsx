@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import { useIAP, restorePurchases as doRestorePurchases } from '../../lib/iap-shim';
+import { useIAP, restorePurchases as doRestorePurchases, getResolvedPlatform } from '../../lib/iap-shim';
 import { normalizeRoute } from '../../lib/routes';
 
 const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
@@ -73,7 +73,7 @@ export default function HardPaywallScreen() {
             body: JSON.stringify({
               productId: currentPurchase.productId,
               transactionId: currentPurchase.transactionId,
-              platform: 'ios',
+              platform: getResolvedPlatform(),
               originalPurchaseDate: currentPurchase.transactionDate
                 ? new Date(currentPurchase.transactionDate).toISOString()
                 : new Date().toISOString(),
@@ -135,6 +135,7 @@ export default function HardPaywallScreen() {
         request: {
           ios: { sku },
           android: { skus: [sku] },
+          amazon: { sku },
         },
         type: 'subs',
       });
