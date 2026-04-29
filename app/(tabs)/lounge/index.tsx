@@ -159,7 +159,13 @@ export default function LoungeScreen() {
               The Lounge is a space for our community to connect over the books and stories we love.
               {'\n\n'}
               By participating you agree to our{' '}
-              <Text style={styles.eulaLink}>Community Guidelines</Text>
+              <Text
+                style={styles.eulaLink}
+                onPress={() => router.push('/legal/document?doc=community-guidelines' as any)}
+                suppressHighlighting
+              >
+                Community Guidelines
+              </Text>
               {' '}— keep it kind, keep it real, and keep it Between Covers.
               {'\n\n'}
               We reserve the right to remove content or suspend accounts that violate these guidelines.
@@ -471,7 +477,7 @@ const styles = StyleSheet.create({
   },
   eulaTitle: { fontSize: 22, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', marginBottom: spacing.md },
   eulaBody: { fontSize: 14, color: '#6A5550', fontFamily: 'Nunito_400Regular', lineHeight: 22, marginBottom: spacing.lg },
-  eulaLink: { color: '#B83255', fontFamily: 'Nunito_600SemiBold' },
+  eulaLink: { color: '#B83255', fontFamily: 'Nunito_600SemiBold', textDecorationLine: 'underline' },
   eulaAcceptBtn: {
     backgroundColor: '#B83255', borderRadius: 999, paddingVertical: 14,
     alignItems: 'center',
