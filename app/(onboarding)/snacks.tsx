@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useEvent } from 'expo';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
@@ -7,7 +8,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 33;
+const REVEAL_AT_S = 28;
 
 const SNACKS = [
   { value: 'POPCORN', label: '🍿 Popcorn' },
@@ -32,31 +33,29 @@ export default function SnacksScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Snacks.mp4',
     (p) => {
       p.loop = false;
+      // Default is 0 (event disabled). Must be non-zero for timeUpdate to fire.
+      p.timeUpdateEventInterval = 0.25;
       p.play();
     }
   );
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (player.currentTime >= REVEAL_AT_S) {
-        setShowOptions(true);
-        clearInterval(interval);
-      }
-    }, 200);
+  const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: 0, bufferedPosition: 0 });
 
-    // Safety net: force reveal after the video would have ended even if
-    // expo-video never advances currentTime (network/load failure).
-    const safetyMs = (REVEAL_AT_S + 10) * 1000;
+  useEffect(() => {
+    if (currentTime >= REVEAL_AT_S) {
+      setShowOptions(true);
+    }
+  }, [currentTime]);
+
+  // Safety net: if the video fails to load entirely (network error),
+  // reveal after a generous wall-clock fallback so the user can still
+  // proceed. Only fires if currentTime never advances.
+  useEffect(() => {
     const safetyTimer = setTimeout(() => {
       setShowOptions(true);
-      clearInterval(interval);
-    }, safetyMs);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(safetyTimer);
-    };
-  }, [player]);
+    }, (REVEAL_AT_S + 15) * 1000);
+    return () => clearTimeout(safetyTimer);
+  }, []);
 
   const toggle = (value: string) => {
     if (submitting) return;
