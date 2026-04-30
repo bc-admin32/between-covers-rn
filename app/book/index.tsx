@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
+import { track } from '../../lib/analytics';
 import { spacing, radius, colors } from '../../lib/theme';
 
 const RETAILER_LABELS: Record<string, string> = {
@@ -118,6 +119,10 @@ export default function BookDetailsScreen() {
         title: data.work.title,
         primaryAuthor: data.work.primaryAuthor,
         coverUrl: data.work.coverUrl,
+        status,
+      });
+      track('book_added_to_library', {
+        workId: data.work.workId,
         status,
       });
       setSavedStatus(status);

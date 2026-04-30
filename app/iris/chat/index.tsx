@@ -7,6 +7,7 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPost } from '../../../lib/api';
+import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
@@ -76,6 +77,11 @@ export default function IrisChatScreen() {
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
+
+    track('iris_chat_sent', {
+      chars: text.length,
+      hasBookContext: !!bookTitle,
+    });
 
     const userMsg: Message = { id: `user-${Date.now()}`, role: 'user', text };
     setMessages((prev) => [...prev, userMsg]);

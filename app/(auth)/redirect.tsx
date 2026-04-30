@@ -6,6 +6,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
+import { track } from '../../lib/analytics';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -111,6 +112,12 @@ export default function RedirectScreen() {
         setStatus(`Routing to ${result?.nextRoute}…`);
 
         if (result?.nextRoute?.startsWith('/')) {
+          // Fire signup_completed only when this OAuth flow lands a new user
+          // in onboarding — returning logins skip the event.
+          if (typeof result.nextRoute === 'string' && result.nextRoute.includes('(onboarding)')) {
+            const method = (params.method as string | undefined) ?? 'unknown';
+            track('signup_completed', { method });
+          }
           router.replace(normalizeRoute(result.nextRoute) as any);
         } else {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');

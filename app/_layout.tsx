@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
+import { initAnalytics, track } from '../lib/analytics';
 
 // Fonts are natively bundled via expo-font plugin in app.json.
 // We still call useFonts() so they're registered under these exact keys
@@ -52,6 +53,12 @@ function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    initAnalytics().then(() => {
+      track('app_open', { coldStart: true });
+    });
+  }, []);
 
   useEffect(() => {
     const handleDeepLink = ({ url }: { url: string }) => {

@@ -13,6 +13,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases, getResolvedPlatform } from '../../lib/iap-shim';
 import { normalizeRoute } from '../../lib/routes';
+import { track } from '../../lib/analytics';
 
 const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 const ANNUAL_PRODUCT_ID  = 'com.betweencovers.app.membership.annual';
@@ -41,6 +42,10 @@ export default function HardPaywallScreen() {
   const finishingRef = useRef(false);
 
   useEffect(() => {
+    track('paywall_shown', { type: 'hard', source: 'trial_end' });
+  }, []);
+
+  useEffect(() => {
     const t = setTimeout(() => setLoading(false), 8000);
     return () => clearTimeout(t);
   }, []);
@@ -61,6 +66,12 @@ export default function HardPaywallScreen() {
     const confirm = async () => {
       try {
         await finishTransaction({ purchase: currentPurchase, isConsumable: false });
+
+        track('subscription_started', {
+          platform: getResolvedPlatform(),
+          plan: currentPurchase.productId === ANNUAL_PRODUCT_ID ? 'annual' : 'monthly',
+          trial: false,
+        });
 
         const idToken = await SecureStore.getItemAsync('bc_id_token');
         if (idToken) {

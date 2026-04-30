@@ -7,6 +7,7 @@ import { normalizeRoute } from '../../lib/routes';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../lib/theme';
+import { track } from '../../lib/analytics';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -81,12 +82,17 @@ export default function LoginScreen() {
 
   async function handleSocialLogin(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple') {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const method =
+      provider === 'Google' ? 'google'
+      : provider === 'SignInWithApple' ? 'apple'
+      : 'amazon';
+    track('signup_started', { method });
     const url = buildCognitoUrl(provider);
     const result = await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
     if (result.type === 'success') {
       try {
         const code = new URL(result.url).searchParams.get('code');
-        if (code) router.push(`/(auth)/redirect?code=${code}` as any);
+        if (code) router.push(`/(auth)/redirect?code=${code}&method=${method}` as any);
       } catch {}
     }
   }

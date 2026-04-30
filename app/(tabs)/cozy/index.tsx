@@ -9,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { MovieDetailSheet } from './media/index';
 import { apiGet } from '../../../lib/api';
+import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 
 const CACHE_KEY = 'bc_cozy_cache';
@@ -269,6 +270,19 @@ export default function CozyScreen() {
     };
     load();
   }, []);
+
+  // Fire one cozy_section_viewed per section that actually renders for this user.
+  // Only fires once per data load (the data identity is the dep), so it's not
+  // re-firing on every re-render.
+  useEffect(() => {
+    if (!data?.sections) return;
+    const sections = data.sections;
+    if (sections.spotlight?.book) track('cozy_section_viewed', { section: 'spotlight' });
+    if (sections.authorSpotlight) track('cozy_section_viewed', { section: 'mind' });
+    if (sections.books && sections.books.length > 0) track('cozy_section_viewed', { section: 'books' });
+    if (sections.visual && sections.visual.length > 0) track('cozy_section_viewed', { section: 'visual' });
+    if (resolveLifestyleItems(sections).length > 0) track('cozy_section_viewed', { section: 'lifestyle' });
+  }, [data]);
 
   // Mirrors the web handleItemClick — category drives the action
   const handleItemClick = (item: VisualItem) => {
