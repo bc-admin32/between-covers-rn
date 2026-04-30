@@ -61,6 +61,10 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Cached photoUrl can be stale (user changed it on another device, S3 key
+  // rotated, etc.). Gate the avatar Image render on API confirmation so the
+  // user never sees an old photo flash before the fresh one loads.
+  const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -74,6 +78,7 @@ export default function ProfileScreen() {
         }
         const result = await apiGet('/profile');
         setUser(result);
+        setPhotoConfirmed(true);
         await SecureStore.setItemAsync('bc_profile_cache', JSON.stringify(result));
         setLoading(false);
       } catch {
@@ -182,7 +187,11 @@ export default function ProfileScreen() {
             {isFounding && <Text style={styles.foundingBadge}>✦ Founding Member</Text>}
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
               <View style={styles.avatarWrapper}>
-                <Image source={{ uri: photoToShow }} style={styles.avatar} />
+                {photoConfirmed ? (
+                  <Image source={{ uri: photoToShow }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]} />
+                )}
               </View>
               <View style={styles.cameraButton}>
                 <Text style={styles.cameraButtonText}>📷</Text>
@@ -244,6 +253,7 @@ const styles = StyleSheet.create({
   avatarContainer: { alignItems: 'center', gap: spacing.sm },
   avatarWrapper: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: '#C0C8D0', overflow: 'hidden' },
   avatar: { width: 96, height: 96 },
+  avatarPlaceholder: { backgroundColor: 'rgba(255,255,255,0.15)' },
   cameraButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   cameraButtonText: { fontSize: 13 },
   displayName: { fontSize: 42, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 48 },

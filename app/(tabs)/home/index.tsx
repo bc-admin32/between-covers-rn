@@ -23,8 +23,6 @@ function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
 }
 
 const CACHE_KEY = 'bc_home_cache';
-const BG_CACHE_KEY = 'bc_home_bg';
-const DEFAULT_BG = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/loc_default.jpg';
 
 type LiveEvent = {
   eventId: string;
@@ -134,15 +132,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
-  const [bgUrl, setBgUrl] = useState(DEFAULT_BG);
-
-  // Restore the user's last known background immediately from cache
-  // so returning users never see the default background flash.
-  useEffect(() => {
-    SecureStore.getItemAsync(BG_CACHE_KEY).then((cached) => {
-      if (cached) setBgUrl(cached);
-    });
-  }, []);
+  // bgUrl stays null until the API confirms which background to render.
+  // Showing a default or a stale-cached URL caused a 3–5s flash on cold start
+  // when the cached/default URL didn't match the user's current setting.
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [focusCount, setFocusCount] = useState(0);
@@ -263,10 +256,8 @@ export default function HomeScreen() {
           return;
         }
         setData(json);
-        // Update and persist the background from the live API response.
         if (json.background?.imageUrl) {
           setBgUrl(json.background.imageUrl);
-          SecureStore.setItemAsync(BG_CACHE_KEY, json.background.imageUrl).catch(() => {});
         }
         await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(json));
       } catch {
@@ -310,9 +301,9 @@ export default function HomeScreen() {
 
   if (!data) {
     return (
-      <ImageBackground source={{ uri: DEFAULT_BG }} style={styles.loading} imageStyle={{ opacity: 0.75 }}>
+      <View style={styles.loading}>
         <ActivityIndicator color="#B83255" />
-      </ImageBackground>
+      </View>
     );
   }
 
@@ -375,7 +366,10 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground
-      source={{ uri: bgUrl }}
+      // Empty URI → ImageBackground skips fetching and the View's
+      // backgroundColor shows through as a solid placeholder until the API
+      // confirms which background to render.
+      source={bgUrl ? { uri: bgUrl } : { uri: '' }}
       style={styles.container}
       imageStyle={{ opacity: 0.75 }}
     >

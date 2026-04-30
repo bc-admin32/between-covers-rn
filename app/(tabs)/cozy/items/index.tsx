@@ -6,7 +6,6 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 
@@ -101,7 +100,7 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
           {item.affiliateLink && (
             <TouchableOpacity
               style={styles.shopButton}
-              onPress={() => WebBrowser.openBrowserAsync(item.affiliateLink!)}
+              onPress={() => Linking.openURL(item.affiliateLink!).catch(() => {})}
             >
               <Text style={styles.shopButtonText}>Shop Ingredients →</Text>
             </TouchableOpacity>
@@ -229,20 +228,25 @@ export default function CozyItemsScreen() {
                       style={[styles.ctaButton, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
                       onPress={() => {
                         if (isRecipe) { setActiveRecipe(item); return; }
-                        if (actionLink) {
-                          const isSpotify = actionLink.includes('spotify.com') || actionLink.startsWith('spotify:');
-                          if (isSpotify) {
-                            const spotifyUri = actionLink
-                              .replace('https://open.spotify.com/', 'spotify:')
-                              .replace('/playlist/', ':playlist:')
-                              .replace('/track/', ':track:')
-                              .replace('/album/', ':album:');
-                            Linking.canOpenURL(spotifyUri).then((canOpen) =>
-                              Linking.openURL(canOpen ? spotifyUri : actionLink)
-                            ).catch(() => {});
-                          } else {
-                            WebBrowser.openBrowserAsync(actionLink);
-                          }
+                        if (!actionLink) return;
+                        // Cozy Lifestyle URLs are admin-supplied and arbitrary
+                        // (Spotify, YouTube, Pinterest, retailer pages, …).
+                        // Linking.openURL hands off to the OS, which picks the
+                        // installed app when available and falls back to Safari
+                        // otherwise. WebBrowser.openBrowserAsync chokes on
+                        // Spotify's redirect chain.
+                        const isSpotify = actionLink.includes('spotify.com') || actionLink.startsWith('spotify:');
+                        if (isSpotify) {
+                          const spotifyUri = actionLink
+                            .replace('https://open.spotify.com/', 'spotify:')
+                            .replace('/playlist/', ':playlist:')
+                            .replace('/track/', ':track:')
+                            .replace('/album/', ':album:');
+                          Linking.canOpenURL(spotifyUri).then((canOpen) =>
+                            Linking.openURL(canOpen ? spotifyUri : actionLink)
+                          ).catch(() => {});
+                        } else {
+                          Linking.openURL(actionLink).catch(() => {});
                         }
                       }}
                       disabled={!isRecipe && !actionLink}

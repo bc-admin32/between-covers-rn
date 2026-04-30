@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, Modal, Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -86,6 +86,19 @@ export default function LoungeScreen() {
     load();
   }, []);
 
+  // The EULA Modal renders above the navigator stack, so pushing /legal/document
+  // while it's visible would put the doc *behind* the modal. Instead we close
+  // the modal before navigating, then re-open it here on focus return — but only
+  // if terms are still unaccepted. handleEulaAccept clears that flag, so once
+  // the user accepts, the modal won't reappear.
+  useFocusEffect(
+    useCallback(() => {
+      if (data && !data.loungeTermsAcceptedAt) {
+        setEulaModal(true);
+      }
+    }, [data])
+  );
+
   const handleEulaAccept = async () => {
     setEulaAccepting(true);
     try {
@@ -161,7 +174,10 @@ export default function LoungeScreen() {
               By participating you agree to our{' '}
               <Text
                 style={styles.eulaLink}
-                onPress={() => router.push('/legal/document?doc=community-guidelines' as any)}
+                onPress={() => {
+                  setEulaModal(false);
+                  router.push('/legal/document?doc=community-guidelines' as any);
+                }}
                 suppressHighlighting
               >
                 Community Guidelines
