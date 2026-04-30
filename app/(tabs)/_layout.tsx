@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../../lib/api';
+import { registerForPushNotifications } from '../../lib/pushNotifications';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   HouseSimple,
@@ -44,6 +45,10 @@ export default function TabLayout() {
     apiGet<{ events: { status: string }[] }>('/live?status=ACTIVE')
       .then((res) => setHasLiveEvent(res.events.some((e) => e.status === 'ACTIVE')))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    registerForPushNotifications();
   }, []);
 
   return (
