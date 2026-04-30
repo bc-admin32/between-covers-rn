@@ -40,6 +40,7 @@ export default function GenreScreen() {
   const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: 0, bufferedPosition: 0 });
 
   useEffect(() => {
+    console.log('[genre-timing]', { currentTime, REVEAL_AT_S, willReveal: currentTime >= REVEAL_AT_S });
     if (currentTime >= REVEAL_AT_S) {
       setShowOptions(true);
     }
