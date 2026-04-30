@@ -7,6 +7,9 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
+const VIDEO_DURATION_S = 34;
+const REVEAL_AT_PCT = 0.92;
+
 const SNACKS = [
   { value: 'POPCORN', label: '🍿 Popcorn' },
   { value: 'CHOCOLATE', label: '🍫 Chocolate' },
@@ -35,7 +38,10 @@ export default function SnacksScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowOptions(true), 29000);
+    const timer = setTimeout(
+      () => setShowOptions(true),
+      VIDEO_DURATION_S * 1000 * REVEAL_AT_PCT
+    );
     return () => clearTimeout(timer);
   }, []);
 

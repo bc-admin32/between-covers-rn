@@ -8,6 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { radius, spacing } from '../../lib/theme';
 
+const VIDEO_DURATION_S = 58;
+const REVEAL_AT_PCT = 0.80;
+
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -24,7 +27,10 @@ export default function AboutScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowButton(true), 89000);
+    const timer = setTimeout(
+      () => setShowButton(true),
+      VIDEO_DURATION_S * 1000 * REVEAL_AT_PCT
+    );
     return () => clearTimeout(timer);
   }, []);
 
