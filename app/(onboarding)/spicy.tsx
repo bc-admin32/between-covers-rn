@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useEvent } from 'expo';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -7,7 +8,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-
+const REVEAL_AT_S = 22;
 
 const SPICE_LEVELS = [
   { value: 'NONE', label: '🫖 Clean & cozy' },
@@ -27,13 +28,28 @@ export default function SpicyScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Spicy.mp4',
     (p) => {
       p.loop = false;
+      // Default is 0 (event disabled). Must be non-zero for timeUpdate to fire.
+      p.timeUpdateEventInterval = 0.25;
       p.play();
     }
   );
 
+  const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: 0, bufferedPosition: 0 });
+
   useEffect(() => {
-    const timer = setTimeout(() => setShowOptions(true), 21000);
-    return () => clearTimeout(timer);
+    if (currentTime >= REVEAL_AT_S) {
+      setShowOptions(true);
+    }
+  }, [currentTime]);
+
+  // Safety net: if the video fails to load entirely (network error),
+  // reveal after a generous wall-clock fallback so the user can still
+  // proceed. Only fires if currentTime never advances.
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      setShowOptions(true);
+    }, (REVEAL_AT_S + 15) * 1000);
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const handleSelect = async (value: string) => {

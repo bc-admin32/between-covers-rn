@@ -8,7 +8,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 18;
+const REVEAL_AT_S = 20;
 
 const DRINKS = [
   { value: 'TEA', label: '🍵 Tea' },

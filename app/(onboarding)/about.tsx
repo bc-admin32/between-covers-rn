@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 50;
+const REVEAL_AT_S = 48;
 
 export default function AboutScreen() {
   const router = useRouter();

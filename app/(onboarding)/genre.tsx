@@ -8,7 +8,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 28;
+const REVEAL_AT_S = 31;
 
 const GENRES = [
   { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
