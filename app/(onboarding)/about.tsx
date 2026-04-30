@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
 const VIDEO_DURATION_S = 58;
-const REVEAL_AT_PCT = 0.80;
+const REVEAL_AT_PCT = 0.65;
 
 export default function AboutScreen() {
   const router = useRouter();

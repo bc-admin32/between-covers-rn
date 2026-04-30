@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
 const VIDEO_DURATION_S = 22;
-const REVEAL_AT_PCT = 0.92;
+const REVEAL_AT_PCT = 0.97;
 
 const DRINKS = [
   { value: 'TEA', label: '🍵 Tea' },
