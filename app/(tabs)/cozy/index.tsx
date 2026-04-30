@@ -40,6 +40,25 @@ type VisualItem = {
   movieId?: string;
 };
 
+type AuthorSpotlight = {
+  id: string;
+  monthLabel: string;
+  name: string;
+  role: 'author' | 'narrator';
+  headshotUrl: string;
+  quoteShort: string;
+  quoteFull: string;
+  quoteSource: string | null;
+  bioShort: string | null;
+  bio: string;
+  sitWithMe: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+  websiteUrl: string | null;
+  promo: { code?: string; label?: string; discount?: string; startDate?: string; endDate?: string } | null;
+  featuredBooks: Array<{ workId: string; title: string; author: string; coverUrl: string }>;
+};
+
 type CozyData = {
   weekId: string;
   theme: { title: string; tagline: string };
@@ -52,6 +71,7 @@ type CozyData = {
     LIFESTYLE?: VisualItem[];
     lifestyle?: VisualItem[];
     items?: VisualItem[];
+    authorSpotlight?: AuthorSpotlight | null;
   };
 };
 
@@ -293,6 +313,7 @@ export default function CozyScreen() {
   const visual = data?.sections?.visual ?? [];
   const lifestyle = data?.sections ? resolveLifestyleItems(data.sections) : [];
   const displayBooks = getDailyBookSlice(books);
+  const authorSpotlight = data?.sections?.authorSpotlight ?? null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -378,6 +399,43 @@ export default function CozyScreen() {
                 )}
                 <Text style={styles.spotlightTitle}>{spotlightBook.title}</Text>
                 <Text style={styles.spotlightAuthor}>{spotlightBook.primaryAuthor}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* MIND BEHIND THE MAGIC */}
+        {authorSpotlight && data?.weekId && (
+          <View style={styles.section}>
+            <Divider />
+            <SectionHeader title="The Mind Behind the Magic" />
+            <Text style={styles.spotlightSubtitle}>
+              The storyteller behind worlds you can't quite leave.
+            </Text>
+            <TouchableOpacity
+              style={styles.mindCard}
+              activeOpacity={0.85}
+              onPress={() => router.push(`/(tabs)/cozy/author?weekId=${data.weekId}` as any)}
+            >
+              <View style={styles.mindHeader}>
+                <Image source={{ uri: authorSpotlight.headshotUrl }} style={styles.mindHeadshot} />
+                <View style={styles.mindHeaderText}>
+                  <Text style={styles.mindName}>
+                    {authorSpotlight.name}
+                    <Text style={styles.mindType}>
+                      {authorSpotlight.role === 'narrator' ? ', Narrator' : ', Author'}
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+              {authorSpotlight.quoteShort && (
+                <Text style={styles.mindQuote}>"{authorSpotlight.quoteShort}"</Text>
+              )}
+              {authorSpotlight.bioShort && (
+                <Text style={styles.mindBio}>{authorSpotlight.bioShort}</Text>
+              )}
+              <View style={styles.mindCtaRow}>
+                <Text style={styles.mindCtaText}>Explore their books →</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -510,6 +568,17 @@ const styles = StyleSheet.create({
   recipeEmpty: { fontSize: 14, fontStyle: 'italic', color: '#9c8f7e' },
   shopButton: { marginTop: spacing.lg, paddingVertical: 14, borderRadius: 999, backgroundColor: '#0F2A48', alignItems: 'center' },
   shopButtonText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  // Mind / Author spotlight card
+  mindCard: { width: '100%', backgroundColor: '#FDF5F7', borderWidth: 1, borderColor: '#F0DCE2', borderRadius: 16, padding: 16, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  mindHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 },
+  mindHeadshot: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F0DCE2' },
+  mindHeaderText: { flex: 1 },
+  mindName: { fontSize: 18, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', lineHeight: 22 },
+  mindType: { fontSize: 14, fontFamily: 'Cormorant_700Bold_Italic', color: '#8a7c6e', fontWeight: '400' },
+  mindQuote: { fontSize: 13, fontStyle: 'italic', color: '#8a7c6e', lineHeight: 20, marginBottom: 10 },
+  mindBio: { fontSize: 12, fontWeight: '300', color: '#3d352e', lineHeight: 19, marginBottom: 14 },
+  mindCtaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  mindCtaText: { fontSize: 12, fontWeight: '700', color: '#B83255', letterSpacing: 0.4 },
   // Promo code
   promoContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fde8ed', borderRadius: 8, padding: 6, marginTop: 4 },
   promoText: { flex: 1 },
