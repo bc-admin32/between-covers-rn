@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
 import { spacing, radius, colors } from '../../lib/theme';
 
-const AFFILIATE_TAG = 'betweencovers-20';
 const RETAILER_LABELS: Record<string, string> = {
   bookshop: 'Bookshop',
   amazon: 'Amazon',
@@ -56,18 +55,6 @@ type BookDetailResponse = {
   ratingSummary: RatingSummary | null;
   userCommunityRating: string | null;
 };
-
-function withAffiliateTag(retailer: string, url: string): string {
-  if (retailer !== 'amazon' && retailer !== 'audible') return url;
-  try {
-    const u = new URL(url);
-    u.searchParams.set('tag', AFFILIATE_TAG);
-    return u.toString();
-  } catch {
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}tag=${AFFILIATE_TAG}`;
-  }
-}
 
 function computeScore(ratingSummary: RatingSummary | null): number | null {
   if (!ratingSummary || ratingSummary.totalRatings === 0) return null;
@@ -182,7 +169,9 @@ export default function BookDetailsScreen() {
 
   async function handleRetailerClick(retailer: string, url: string) {
     try { await apiPatch('/profile', { preferredRetailer: retailer }); } catch {}
-    await WebBrowser.openBrowserAsync(withAffiliateTag(retailer, url));
+    // Backend builds the full retailer URL (including any affiliate tags
+    // and deep links). Frontend opens whatever URL it receives.
+    await WebBrowser.openBrowserAsync(url);
   }
 
   if (!loaded) {
