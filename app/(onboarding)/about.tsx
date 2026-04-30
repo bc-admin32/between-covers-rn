@@ -8,8 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { radius, spacing } from '../../lib/theme';
 
-const VIDEO_DURATION_S = 58;
-const REVEAL_AT_PCT = 0.65;
+const REVEAL_AT_S = 38;
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -27,12 +26,26 @@ export default function AboutScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(
-      () => setShowButton(true),
-      VIDEO_DURATION_S * 1000 * REVEAL_AT_PCT
-    );
-    return () => clearTimeout(timer);
-  }, []);
+    const interval = setInterval(() => {
+      if (player.currentTime >= REVEAL_AT_S) {
+        setShowButton(true);
+        clearInterval(interval);
+      }
+    }, 200);
+
+    // Safety net: force reveal after the video would have ended even if
+    // expo-video never advances currentTime (network/load failure).
+    const safetyMs = (REVEAL_AT_S + 10) * 1000;
+    const safetyTimer = setTimeout(() => {
+      setShowButton(true);
+      clearInterval(interval);
+    }, safetyMs);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(safetyTimer);
+    };
+  }, [player]);
 
   const handleStart = async () => {
     if (submitting) return;

@@ -7,8 +7,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const VIDEO_DURATION_S = 34;
-const REVEAL_AT_PCT = 0.97;
+const REVEAL_AT_S = 33;
 
 const SNACKS = [
   { value: 'POPCORN', label: '🍿 Popcorn' },
@@ -38,12 +37,26 @@ export default function SnacksScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(
-      () => setShowOptions(true),
-      VIDEO_DURATION_S * 1000 * REVEAL_AT_PCT
-    );
-    return () => clearTimeout(timer);
-  }, []);
+    const interval = setInterval(() => {
+      if (player.currentTime >= REVEAL_AT_S) {
+        setShowOptions(true);
+        clearInterval(interval);
+      }
+    }, 200);
+
+    // Safety net: force reveal after the video would have ended even if
+    // expo-video never advances currentTime (network/load failure).
+    const safetyMs = (REVEAL_AT_S + 10) * 1000;
+    const safetyTimer = setTimeout(() => {
+      setShowOptions(true);
+      clearInterval(interval);
+    }, safetyMs);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(safetyTimer);
+    };
+  }, [player]);
 
   const toggle = (value: string) => {
     if (submitting) return;
