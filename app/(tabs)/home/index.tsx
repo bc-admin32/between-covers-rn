@@ -23,6 +23,7 @@ function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
 }
 
 const CACHE_KEY = 'bc_home_cache';
+const DEFAULT_BG = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/loc_default.jpg';
 
 type LiveEvent = {
   eventId: string;
@@ -132,10 +133,11 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
-  // bgUrl stays null until the API confirms which background to render.
-  // Showing a default or a stale-cached URL caused a 3–5s flash on cold start
-  // when the cached/default URL didn't match the user's current setting.
-  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  // Init with DEFAULT_BG so cold start renders a generic, non-personalized
+  // image (no leak across users) instead of flashing the previous user's
+  // cached background. The setBgUrl call after the API resolves swaps in
+  // the user's real background once.
+  const [bgUrl, setBgUrl] = useState(DEFAULT_BG);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [focusCount, setFocusCount] = useState(0);
@@ -245,11 +247,10 @@ export default function HomeScreen() {
     const load = async () => {
       setLoadError(false);
       try {
-        const cached = await SecureStore.getItemAsync(CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (!parsed.nextRoute) setData(parsed);
-        }
+        // No SecureStore hydration here — render the loading state until
+        // the API confirms which user's home this is. Showing the previous
+        // user's cached home for the API roundtrip leaks data across
+        // accounts. signOut() also wipes CACHE_KEY, but defense in depth.
         const json = await apiGet<HomeData>('/home/resolve');
         if (json.nextRoute?.startsWith('/')) {
           router.replace(normalizeRoute(json.nextRoute) as any);
@@ -301,9 +302,9 @@ export default function HomeScreen() {
 
   if (!data) {
     return (
-      <View style={styles.loading}>
+      <ImageBackground source={{ uri: DEFAULT_BG }} style={styles.loading} imageStyle={{ opacity: 0.75 }}>
         <ActivityIndicator color="#B83255" />
-      </View>
+      </ImageBackground>
     );
   }
 
@@ -366,10 +367,7 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground
-      // Empty URI → ImageBackground skips fetching and the View's
-      // backgroundColor shows through as a solid placeholder until the API
-      // confirms which background to render.
-      source={bgUrl ? { uri: bgUrl } : { uri: '' }}
+      source={{ uri: bgUrl }}
       style={styles.container}
       imageStyle={{ opacity: 0.75 }}
     >

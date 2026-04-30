@@ -28,6 +28,13 @@ type LoungeData = {
 // Module-level in-memory cache — no size limit, survives tab switches.
 let loungeCache: LoungeData | null = null;
 
+// Called by signOut() to drop a previous user's lounge data before the next
+// user's session begins. Without this, the in-memory cache outlives the
+// SecureStore wipe and leaks across accounts.
+export function resetLoungeCache() {
+  loungeCache = null;
+}
+
 function formatWeekRange(startDate: string, endDate: string): string {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -176,7 +183,12 @@ export default function LoungeScreen() {
                 style={styles.eulaLink}
                 onPress={() => {
                   setEulaModal(false);
-                  router.push('/legal/document?doc=community-guidelines' as any);
+                  // Brief delay so the modal dismiss animation completes before
+                  // navigation; otherwise the new route may render before the
+                  // Modal is fully torn down (causing the same z-index conflict).
+                  setTimeout(() => {
+                    router.push('/legal/document?doc=community-guidelines' as any);
+                  }, 300);
                 }}
                 suppressHighlighting
               >

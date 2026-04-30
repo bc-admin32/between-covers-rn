@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal, TextInput,
-  StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import QuickRatingModal from '../../../../components/QuickRatingModal';
@@ -417,7 +416,7 @@ export default function CozyEventsScreen() {
                   {buttonState !== 'coming_soon' && buttonState !== 'submit_questions' && !showSubmitButton && (
                     <TouchableOpacity
                       style={styles.primaryButton}
-                      onPress={() => event.eventLink && WebBrowser.openBrowserAsync(event.eventLink)}
+                      onPress={() => event.eventLink && Linking.openURL(event.eventLink).catch(() => {})}
                       disabled={!event.eventLink}
                     >
                       <Text style={styles.primaryButtonText}>

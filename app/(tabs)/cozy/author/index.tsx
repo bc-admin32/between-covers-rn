@@ -7,7 +7,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
 import { spacing, colors } from '../../../../lib/theme';
 
@@ -35,10 +34,11 @@ type AuthorSpotlight = {
 };
 
 async function openLink(url: string) {
-  const isHttp = url.startsWith('http://') || url.startsWith('https://');
-  isHttp
-    ? WebBrowser.openBrowserAsync(url).catch(() => {})
-    : Linking.openURL(url).catch(() => {});
+  // Linking.openURL hands off to the OS, which picks the installed app
+  // (Spotify, YouTube, Instagram, …) when available and falls back to
+  // Safari otherwise. WebBrowser.openBrowserAsync chokes on Spotify's
+  // redirect chain and similar deep-linkable services.
+  Linking.openURL(url).catch(() => {});
 }
 
 function formatEndDate(iso: string): string {

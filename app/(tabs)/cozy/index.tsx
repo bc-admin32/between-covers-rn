@@ -6,7 +6,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
 import { MovieDetailSheet } from './media/index';
 import { apiGet } from '../../../lib/api';
 import { track } from '../../../lib/analytics';
@@ -105,6 +104,10 @@ function isPromoActive(endDate?: string): boolean {
 }
 
 async function openLink(url: string) {
+  // Cozy URLs are admin-supplied and arbitrary. Linking.openURL hands off
+  // to the OS, which picks the installed app (Spotify, YouTube, …) when
+  // available and falls back to Safari otherwise. WebBrowser.openBrowserAsync
+  // chokes on Spotify's redirect chain.
   const isSpotify = url.includes('spotify.com') || url.startsWith('spotify:');
   if (isSpotify) {
     const spotifyUri = url
@@ -116,10 +119,7 @@ async function openLink(url: string) {
     Linking.openURL(canOpen ? spotifyUri : url).catch(() => {});
     return;
   }
-  const isHttp = url.startsWith('http://') || url.startsWith('https://');
-  isHttp
-    ? WebBrowser.openBrowserAsync(url).catch(() => {})
-    : Linking.openURL(url).catch(() => {});
+  Linking.openURL(url).catch(() => {});
 }
 
 /* ─── PROMO CODE ─── */
@@ -173,7 +173,7 @@ function RecipeModal({ item, onClose }: { item: VisualItem; onClose: () => void 
           {item.affiliateLink && (
             <TouchableOpacity
               style={styles.shopButton}
-              onPress={() => WebBrowser.openBrowserAsync(item.affiliateLink!)}
+              onPress={() => Linking.openURL(item.affiliateLink!).catch(() => {})}
             >
               <Text style={styles.shopButtonText}>Shop Ingredients →</Text>
             </TouchableOpacity>
