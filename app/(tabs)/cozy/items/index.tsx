@@ -6,6 +6,7 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 
@@ -226,27 +227,21 @@ export default function CozyItemsScreen() {
                     {showPromo && <PromoCode code={item.promo!.discountCode!} />}
                     <TouchableOpacity
                       style={[styles.ctaButton, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
-                      onPress={() => {
+                      onPress={async () => {
                         if (isRecipe) { setActiveRecipe(item); return; }
                         if (!actionLink) return;
-                        // Cozy Lifestyle URLs are admin-supplied and arbitrary
-                        // (Spotify, YouTube, Pinterest, retailer pages, …).
-                        // Linking.openURL hands off to the OS, which picks the
-                        // installed app when available and falls back to Safari
-                        // otherwise. WebBrowser.openBrowserAsync chokes on
-                        // Spotify's redirect chain.
-                        const isSpotify = actionLink.includes('spotify.com') || actionLink.startsWith('spotify:');
-                        if (isSpotify) {
-                          const spotifyUri = actionLink
-                            .replace('https://open.spotify.com/', 'spotify:')
-                            .replace('/playlist/', ':playlist:')
-                            .replace('/track/', ':track:')
-                            .replace('/album/', ':album:');
-                          Linking.canOpenURL(spotifyUri).then((canOpen) =>
-                            Linking.openURL(canOpen ? spotifyUri : actionLink)
-                          ).catch(() => {});
-                        } else {
-                          Linking.openURL(actionLink).catch(() => {});
+                        // Universal Links handle Spotify (and most other apps)
+                        // directly from the https:// URL — no manual scheme
+                        // conversion needed. WebBrowser is the fallback for
+                        // the rare case Linking can't resolve a handler.
+                        try {
+                          await Linking.openURL(actionLink);
+                        } catch {
+                          try {
+                            await WebBrowser.openBrowserAsync(actionLink);
+                          } catch {
+                            // Both failed — silently give up.
+                          }
                         }
                       }}
                       disabled={!isRecipe && !actionLink}

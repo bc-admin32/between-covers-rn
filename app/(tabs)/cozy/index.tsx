@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 import { MovieDetailSheet } from './media/index';
 import { apiGet } from '../../../lib/api';
 import { track } from '../../../lib/analytics';
@@ -104,22 +105,24 @@ function isPromoActive(endDate?: string): boolean {
 }
 
 async function openLink(url: string) {
-  // Cozy URLs are admin-supplied and arbitrary. Linking.openURL hands off
-  // to the OS, which picks the installed app (Spotify, YouTube, …) when
-  // available and falls back to Safari otherwise. WebBrowser.openBrowserAsync
-  // chokes on Spotify's redirect chain.
-  const isSpotify = url.includes('spotify.com') || url.startsWith('spotify:');
-  if (isSpotify) {
-    const spotifyUri = url
-      .replace('https://open.spotify.com/', 'spotify:')
-      .replace('/playlist/', ':playlist:')
-      .replace('/track/', ':track:')
-      .replace('/album/', ':album:');
-    const canOpen = await Linking.canOpenURL(spotifyUri);
-    Linking.openURL(canOpen ? spotifyUri : url).catch(() => {});
-    return;
+  // For ALL admin-supplied URLs (including Spotify), try Linking.openURL
+  // first. iOS Universal Links route open.spotify.com URLs to the Spotify
+  // app when installed, and to Safari otherwise. No manual URI conversion
+  // needed — converting strips query params Spotify's URI scheme rejects.
+  try {
+    await Linking.openURL(url);
+  } catch {
+    // Fallback for the rare case where Linking.openURL throws (malformed
+    // URL, no handler at all). Use the in-app browser so the user still
+    // gets a usable preview.
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      // Both failed — silently give up. User stays on the current screen
+      // with no error popup, which is better UX than the iOS
+      // "Couldn't Open Link" alert.
+    }
   }
-  Linking.openURL(url).catch(() => {});
 }
 
 /* ─── PROMO CODE ─── */
