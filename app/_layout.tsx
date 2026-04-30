@@ -5,13 +5,9 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
 import { colors } from '../lib/theme';
-import { configureNotificationHandler, registerForPushNotifications } from '../lib/notifications';
-
-configureNotificationHandler();
 
 // Fonts are natively bundled via expo-font plugin in app.json.
 // We still call useFonts() so they're registered under these exact keys
@@ -81,12 +77,9 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-  // Push notifications: register once logged in, handle taps → lounge
+  // Notification taps → route into the lounge.
+  // Token registration lives in (tabs)/_layout.tsx so it only runs post-auth.
   useEffect(() => {
-    SecureStore.getItemAsync('bc_id_token').then((token) => {
-      if (token) registerForPushNotifications().catch(() => {});
-    });
-
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       if (data?.type === 'iris_live' || data?.screen === 'lounge') {
