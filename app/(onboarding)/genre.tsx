@@ -5,6 +5,7 @@ import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
@@ -31,6 +32,8 @@ export default function GenreScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Genre.mp4',
     (p) => {
       p.loop = false;
+      p.playbackRate = 1.2;
+      p.preservesPitch = true;
       // Default is 0 (event disabled). Must be non-zero for timeUpdate to fire.
       p.timeUpdateEventInterval = 0.25;
       p.play();
@@ -120,6 +123,9 @@ export default function GenreScreen() {
                 );
               })}
             </ScrollView>
+            <View style={styles.scrollHint}>
+              <CaretDown size={14} color="#B83255" weight="bold" />
+            </View>
             <View style={styles.divider} />
             <TouchableOpacity
               style={[styles.nextButton, !canSubmit && styles.nextButtonDisabled]}
@@ -213,6 +219,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   divider: { height: 1, backgroundColor: '#f3f4f6' },
+  scrollHint: { alignItems: 'center', paddingVertical: 4 },
   nextButton: {
     paddingVertical: 12,
     alignItems: 'center',

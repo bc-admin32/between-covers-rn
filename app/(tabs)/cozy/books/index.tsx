@@ -52,7 +52,7 @@ export default function CozyBooksScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>This Month's Bookshelf</Text>
-            <Text style={styles.headerTitle}>Iris's Picks</Text>
+            <Text style={styles.headerTitle}>This Month's Bookshelf</Text>
           </View>
         </View>
         <TouchableOpacity

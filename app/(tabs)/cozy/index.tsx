@@ -11,6 +11,7 @@ import { MovieDetailSheet } from './media/index';
 import { apiGet } from '../../../lib/api';
 import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
+import { parseLocalEndOfDay } from '../../../lib/dateUtils';
 
 const CACHE_KEY = 'bc_cozy_cache';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
@@ -101,7 +102,7 @@ function resolveLifestyleItems(sections: CozyData['sections']): VisualItem[] {
 
 function isPromoActive(endDate?: string): boolean {
   if (!endDate) return false;
-  return new Date() <= new Date(endDate);
+  return new Date() <= parseLocalEndOfDay(endDate);
 }
 
 async function openLink(url: string) {
@@ -462,7 +463,7 @@ export default function CozyScreen() {
         {displayBooks.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Iris' Picks"
+              title="This Month's Bookshelf"
               onViewAll={() => router.push('/(tabs)/cozy/books' as any)}
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
@@ -496,11 +497,11 @@ export default function CozyScreen() {
           </View>
         )}
 
-        {/* COZY LIFESTYLE PICKS */}
+        {/* COZY EXTRAS */}
         {lifestyle.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Cozy Lifestyle Picks"
+              title="Cozy Extras"
               onViewAll={() => router.push('/(tabs)/cozy/items' as any)}
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>

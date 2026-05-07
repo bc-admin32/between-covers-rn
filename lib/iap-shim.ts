@@ -104,7 +104,7 @@ export type WithIAPContext = <P extends object>(
 // ── Expo Go stub ─────────────────────────────────────────────────────────
 function useIAPStub(): IAPHookReturn {
   const stubSubs: ShimSubscription[] = [
-    { id: 'com.betweencovers.app.membership.monthly', displayPrice: '$10.99', title: 'Monthly (DEV STUB)' },
+    { id: 'com.betweencovers.app.membership.monthly', displayPrice: '$9.99', title: 'Monthly (DEV STUB)' },
     { id: 'com.betweencovers.app.membership.annual',  displayPrice: '$89.99', title: 'Annual (DEV STUB)' },
   ];
 

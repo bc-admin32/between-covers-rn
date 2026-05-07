@@ -202,7 +202,7 @@ export default function DoorScreen() {
   const annualProduct  = subscriptions.find((s) => s.id === ANNUAL_PRODUCT_ID);
   const monthlyProduct = subscriptions.find((s) => s.id === MONTHLY_PRODUCT_ID);
   const annualPriceLabel  = annualProduct  ? `${annualProduct.displayPrice}/year`  : '$89.99/year';
-  const monthlyPriceLabel = monthlyProduct ? `${monthlyProduct.displayPrice}/month` : '$10.99/month';
+  const monthlyPriceLabel = monthlyProduct ? `${monthlyProduct.displayPrice}/month` : '$9.99/month';
 
   return (
     <ScrollView

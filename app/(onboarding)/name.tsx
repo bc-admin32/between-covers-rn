@@ -19,6 +19,8 @@ export default function NameScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Name.mp4',
     (p) => {
       p.loop = false;
+      p.playbackRate = 1.2;
+      p.preservesPitch = true;
       p.play();
     }
   );

@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
+import { parseLocalDate } from '../../../lib/dateUtils';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
@@ -36,13 +37,13 @@ export function resetLoungeCache() {
 }
 
 function formatWeekRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
   return `${start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { day: 'numeric' })}, ${end.getFullYear()}`;
 }
 
 function formatMonth(startDate: string): string {
-  return new Date(startDate).toLocaleDateString('en-US', { month: 'long' });
+  return parseLocalDate(startDate).toLocaleDateString('en-US', { month: 'long' });
 }
 
 function Divider() {

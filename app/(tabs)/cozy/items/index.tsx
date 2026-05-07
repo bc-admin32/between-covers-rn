@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -25,7 +26,7 @@ type LifestyleItem = {
 
 function isPromoActive(endDate?: string): boolean {
   if (!endDate) return false;
-  return new Date() <= new Date(endDate);
+  return new Date() <= parseLocalEndOfDay(endDate);
 }
 
 function ctaLabel(category?: string): string {
@@ -162,7 +163,7 @@ export default function CozyItemsScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>The Little Things</Text>
-            <Text style={styles.headerTitle}>Cozy Lifestyle Picks</Text>
+            <Text style={styles.headerTitle}>Cozy Extras</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/items' as any)}>
@@ -173,7 +174,7 @@ export default function CozyItemsScreen() {
       {/* IRIS NOTE */}
       <View style={styles.irisNote}>
         <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>Small comforts to make your reading time even cozier.</Text>
+        <Text style={styles.irisNoteText}>Recipes, playlists, drinks & cozy extras inspired by this month's theme.</Text>
       </View>
 
       {/* COUNT */}

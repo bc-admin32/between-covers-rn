@@ -160,7 +160,7 @@ export default function CozyArchiveScreen() {
             {/* IRIS PICKS */}
             {books.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader title="Iris' Picks" />
+                <SectionHeader title="This Month's Bookshelf" />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
                   {books.map((book, i) => (
                     <TouchableOpacity
@@ -200,7 +200,7 @@ export default function CozyArchiveScreen() {
             {/* LIFESTYLE */}
             {lifestyle.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader title="Cozy Lifestyle Picks" />
+                <SectionHeader title="Cozy Extras" />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
                   {lifestyle.map((item, i) => (
                     <View key={item?.sk ?? i} style={styles.mediaCard}>

@@ -138,6 +138,10 @@ export default function AcceptanceScreen() {
             {submitting ? 'Continuing…' : 'Continue'}
           </Text>
         </TouchableOpacity>
+
+        <Text style={styles.policyNote}>
+          By continuing, you agree to our policies. They can also be viewed anytime in your profile settings.
+        </Text>
       </ScrollView>
     </View>
   );
@@ -266,5 +270,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  policyNote: {
+    marginTop: spacing.md,
+    fontSize: 12,
+    color: '#0F2A48',
+    opacity: 0.7,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: spacing.sm,
   },
 });

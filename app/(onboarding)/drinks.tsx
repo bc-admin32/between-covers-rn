@@ -33,6 +33,8 @@ export default function DrinksScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Drinks.mp4',
     (p) => {
       p.loop = false;
+      p.playbackRate = 1.2;
+      p.preservesPitch = true;
       // Default is 0 (event disabled). Must be non-zero for timeUpdate to fire.
       p.timeUpdateEventInterval = 0.25;
       p.play();
