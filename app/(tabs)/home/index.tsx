@@ -609,13 +609,13 @@ const styles = StyleSheet.create({
   },
   irisAvatar: { width: 96, height: 96, borderRadius: 48 },
   irisAvatarRing: {
-    borderWidth: 2.5,
-    borderColor: 'rgba(15, 42, 72, 0.2)',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
   irisLabel: {
     color: '#fff',

@@ -494,12 +494,12 @@ const styles = StyleSheet.create({
   },
   irisFabImage: { width: 48, height: 48, borderRadius: 24 },
   irisFabRing: {
-    borderWidth: 2.5,
-    borderColor: 'rgba(15, 42, 72, 0.2)',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });
