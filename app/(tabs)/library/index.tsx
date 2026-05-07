@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
+import { parseLocalDate } from '../../../lib/dateUtils';
 
 type LibraryItem = {
   workId: string;
@@ -222,7 +223,10 @@ export default function LibraryScreen() {
                   )}
                   {item.status === 'FINISHED' && item.finishedAt && (
                     <Text style={styles.listMeta}>
-                      {new Date(item.finishedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                      {(/^\d{4}-\d{2}-\d{2}$/.test(item.finishedAt)
+                        ? parseLocalDate(item.finishedAt)
+                        : new Date(item.finishedAt)
+                      ).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                     </Text>
                   )}
                 </TouchableOpacity>
