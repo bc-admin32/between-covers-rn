@@ -150,7 +150,8 @@ export default function HardPaywallScreen() {
         },
         type: 'subs',
       });
-    } catch {
+    } catch (err: any) {
+      showError(err?.message ?? 'Purchase failed. Please try again.');
       setPurchasing(false);
     }
   };
