@@ -463,7 +463,7 @@ export default function CozyScreen() {
         {displayBooks.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="This Month's Bookshelf"
+              title="On Iris's Shelf"
               onViewAll={() => router.push('/(tabs)/cozy/books' as any)}
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
