@@ -470,7 +470,7 @@ export default function HomeScreen() {
                 >
                   <Image
                     source={{ uri: iris.staticImageUrl ?? 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
-                    style={styles.irisAvatar}
+                    style={[styles.irisAvatar, styles.irisAvatarRing]}
                   />
                   <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
                 </TouchableOpacity>
@@ -491,7 +491,7 @@ export default function HomeScreen() {
             >
               <Image
                 source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
-                style={styles.irisAvatar}
+                style={[styles.irisAvatar, styles.irisAvatarRing]}
               />
               <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
             </TouchableOpacity>
@@ -608,6 +608,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(169,192,212,0.5)',
   },
   irisAvatar: { width: 96, height: 96, borderRadius: 48 },
+  irisAvatarRing: {
+    borderWidth: 2.5,
+    borderColor: 'rgba(15, 42, 72, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
   irisLabel: {
     color: '#fff',
     fontSize: 12,
