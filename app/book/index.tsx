@@ -393,7 +393,7 @@ export default function BookDetailsScreen() {
       >
         <Image
           source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
-          style={styles.irisFabImage}
+          style={[styles.irisFabImage, styles.irisFabRing]}
         />
       </TouchableOpacity>
     </View>
@@ -493,4 +493,13 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   irisFabImage: { width: 48, height: 48, borderRadius: 24 },
+  irisFabRing: {
+    borderWidth: 2.5,
+    borderColor: 'rgba(15, 42, 72, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
 });
