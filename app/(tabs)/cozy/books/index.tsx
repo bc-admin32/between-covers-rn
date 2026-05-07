@@ -51,8 +51,8 @@ export default function CozyBooksScreen() {
             <CaretLeft size={20} color="#0F2A48" weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>Featured Books</Text>
-            <Text style={styles.headerTitle}>This Month's Bookshelf</Text>
+            <Text style={styles.headerLabel}>This Month's Bookshelf</Text>
+            <Text style={styles.headerTitle}>On Iris's Shelf</Text>
           </View>
         </View>
         <TouchableOpacity
