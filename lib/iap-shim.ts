@@ -215,9 +215,26 @@ if (!isExpoGo) {
             const product: any = (real.subscriptions ?? []).find(
               (p: any) => p.productId === sku,
             );
-            const offerToken: string | undefined =
-              product?.subscriptionOfferDetails?.[0]?.offerToken;
-            return { sku, offerToken: offerToken ?? '' };
+
+            if (!product) {
+              console.warn('[iap-shim] No product found for sku', sku, 'in', (real.subscriptions ?? []).length, 'fetched subscriptions');
+              throw new Error(`Subscription product unavailable: ${sku}. Please try again or contact support.`);
+            }
+
+            const offers = product?.subscriptionOfferDetails;
+            if (!Array.isArray(offers) || offers.length === 0) {
+              console.warn('[iap-shim] No subscriptionOfferDetails for sku', sku, 'product:', JSON.stringify(product));
+              throw new Error(`Subscription offer unavailable: ${sku}. Please try again or contact support.`);
+            }
+
+            // Walk offers; pick first with non-empty offerToken
+            const usableOffer = offers.find((o: any) => typeof o?.offerToken === 'string' && o.offerToken.length > 0);
+            if (!usableOffer) {
+              console.warn('[iap-shim] No usable offerToken in', offers.length, 'offers for sku', sku, 'offers:', JSON.stringify(offers));
+              throw new Error(`Subscription offer token missing: ${sku}. Please try again or contact support.`);
+            }
+
+            return { sku, offerToken: usableOffer.offerToken };
           });
           await real.requestSubscription({ subscriptionOffers });
         } else {
