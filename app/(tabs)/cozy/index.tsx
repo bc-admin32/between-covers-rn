@@ -516,18 +516,6 @@ export default function CozyScreen() {
           </View>
         )}
 
-        {/* SHARE A RECIPE — community submission entry */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.submitCard}
-          onPress={() => router.push('/submissions/recipe' as any)}
-        >
-          <Text style={styles.submitCardBody}>
-            Have a recipe that pairs perfectly with your favorite read?
-          </Text>
-          <Text style={styles.submitCardCta}>Share it →</Text>
-        </TouchableOpacity>
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -618,34 +606,4 @@ const styles = StyleSheet.create({
   promoCopyButtonActive: { backgroundColor: '#B83255' },
   promoCopyText: { fontSize: 10, fontWeight: '600', color: '#B83255' },
   promoCopyTextActive: { color: '#fff' },
-  // Community submission card — bottom of Cozy
-  submitCard: {
-    width: '100%',
-    backgroundColor: '#FDF5F7',
-    borderWidth: 1,
-    borderColor: '#F0DCE2',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    shadowColor: '#0F2A48',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    marginTop: spacing.sm,
-  },
-  submitCardBody: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    color: '#6A5969',
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  submitCardCta: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#B83255',
-    letterSpacing: 0.4,
-    textAlign: 'right',
-  },
 });

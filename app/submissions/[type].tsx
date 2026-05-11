@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost } from '../../lib/api';
 import { signOut } from '../../lib/signout';
 import { spacing } from '../../lib/theme';
@@ -28,8 +29,9 @@ type Profile = {
   isStaff?: boolean;
 };
 
-const RECIPE_NAME_MAX = 80;
-const TEXT_MAX = 280;
+const RECIPE_NAME_MAX = 100;
+const WHY_LOVE_MAX = 500;
+const WHY_FEATURED_MAX = 1000;
 
 function hasEntitlementSignal(p: Profile): boolean {
   return 'isStaff' in p || 'subscriptionStatus' in p || 'subscriptionEndDate' in p;
@@ -78,6 +80,14 @@ export default function SubmissionForm() {
   const [creatorWhere, setCreatorWhere] = useState('');
   const [pairsWellWith, setPairsWellWith] = useState('');
 
+  // Recipe photo upload state.
+  // Mirrors profile/index.tsx's uploadPhoto pattern but against the recipe-specific
+  // endpoint that returns the final photoUrl in step 1 — no confirm step needed.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoLocalUri, setPhotoLocalUri] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   // Author/narrator state
   const [featureType, setFeatureType] = useState<'author' | 'narrator' | 'both' | null>(null);
   const [authorName, setAuthorName] = useState('');
@@ -114,7 +124,7 @@ export default function SubmissionForm() {
       if (!recipeName.trim()) e.recipeName = 'Please add a recipe name.';
       else if (recipeName.length > RECIPE_NAME_MAX) e.recipeName = `Please keep this under ${RECIPE_NAME_MAX} characters.`;
       if (!whyLove.trim()) e.whyLove = 'Please share why you love it.';
-      else if (whyLove.length > TEXT_MAX) e.whyLove = `Please keep this under ${TEXT_MAX} characters.`;
+      else if (whyLove.length > WHY_LOVE_MAX) e.whyLove = `Please keep this under ${WHY_LOVE_MAX} characters.`;
       if (!source) e.source = 'Please choose one.';
       if (source === 'original') {
         if (!originalMode) e.originalMode = 'Please choose one.';
@@ -135,7 +145,7 @@ export default function SubmissionForm() {
       if (!featureType) e.featureType = 'Please choose one.';
       if (!authorName.trim()) e.authorName = 'Please add their name.';
       if (!whyFeatured.trim()) e.whyFeatured = 'Please share why we should feature them.';
-      else if (whyFeatured.length > TEXT_MAX) e.whyFeatured = `Please keep this under ${TEXT_MAX} characters.`;
+      else if (whyFeatured.length > WHY_FEATURED_MAX) e.whyFeatured = `Please keep this under ${WHY_FEATURED_MAX} characters.`;
       if (!authorLink.trim()) e.authorLink = 'Please add a link to their website or social.';
       else if (!isValidUrl(authorLink)) e.authorLink = 'Please add a valid web link (starting with http or https).';
     }
@@ -161,6 +171,7 @@ export default function SubmissionForm() {
       p.link = recipeLink.trim();
     }
     if (pairsWellWith.trim()) p.pairsWellWith = pairsWellWith.trim();
+    if (photoUrl) p.photoUrl = photoUrl;
     return p;
   }
 
@@ -173,6 +184,73 @@ export default function SubmissionForm() {
     };
     if (favoriteBook.trim()) p.favoriteBook = favoriteBook.trim();
     return p;
+  }
+
+  // Picks a photo, requests a presigned URL via POST /submissions/photo-upload-url,
+  // PUTs the blob to S3, and stashes the final CDN URL in form state. Unlike the
+  // profile flow, the response carries the final photoUrl directly — there is no
+  // confirm step (the recipe submission Lambda accepts it inline on submit).
+  async function pickAndUploadPhoto() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      const contentType = asset.mimeType ?? 'image/jpeg';
+
+      // Reset previous state before starting a fresh upload (handles retry case).
+      setPhotoError(null);
+      setPhotoUrl(null);
+      setPhotoLocalUri(asset.uri);
+      setPhotoUploading(true);
+
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      // Step 1 — request presigned URL + final photoUrl in one call.
+      const { uploadUrl, photoUrl: finalUrl } = await apiPost<{ uploadUrl: string; photoUrl: string }>(
+        '/submissions/photo-upload-url',
+        { contentType }
+      );
+
+      // Step 2 — read local URI as blob (XHR is reliable for local URIs on RN
+      // where fetch on file:// / ph:// is platform-flaky; matches profile pattern).
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = () => reject(new Error('Failed to read image file'));
+        xhr.responseType = 'blob';
+        xhr.open('GET', asset.uri, true);
+        xhr.send();
+      });
+
+      // Step 3 — PUT directly to S3 using the presigned URL.
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: blob,
+      });
+      if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`);
+
+      // No step 4 — finalUrl from step 1 is already the CDN URL we ship in the submission.
+      setPhotoUrl(finalUrl);
+      setPhotoLocalUri(null);
+    } catch {
+      setPhotoError('Photo upload failed. Tap to retry.');
+      setPhotoLocalUri(null);
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  function removePhoto() {
+    setPhotoUrl(null);
+    setPhotoLocalUri(null);
+    setPhotoError(null);
   }
 
   async function handleSubmit() {
@@ -332,6 +410,12 @@ export default function SubmissionForm() {
             <RecipeFields
               recipeName={recipeName} setRecipeName={setRecipeName}
               whyLove={whyLove} setWhyLove={setWhyLove}
+              photoUrl={photoUrl}
+              photoLocalUri={photoLocalUri}
+              photoUploading={photoUploading}
+              photoError={photoError}
+              onPickPhoto={pickAndUploadPhoto}
+              onRemovePhoto={removePhoto}
               source={source} setSource={(v) => { setSource(v); setOriginalMode(null); }}
               originalMode={originalMode} setOriginalMode={setOriginalMode}
               ingredients={ingredients} setIngredients={setIngredients}
@@ -354,17 +438,15 @@ export default function SubmissionForm() {
           )}
 
           <Text style={styles.contactNote}>
-            {profile?.email
-              ? `If your submission is featured, we'll reach out at ${profile.email}.`
-              : "If your submission is featured, we'll reach out by email."}
+            If your submission is featured, we&apos;ll be in touch.
           </Text>
 
           {submitError && <Text style={styles.submitError}>{submitError}</Text>}
 
           <TouchableOpacity
-            style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
+            style={[styles.primaryButton, (submitting || photoUploading) && styles.primaryButtonDisabled]}
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || photoUploading}
             activeOpacity={0.8}
           >
             {submitting ? (
@@ -446,6 +528,12 @@ function RadioGroup<T extends string>({
 type RecipeFieldsProps = {
   recipeName: string; setRecipeName: (v: string) => void;
   whyLove: string; setWhyLove: (v: string) => void;
+  photoUrl: string | null;
+  photoLocalUri: string | null;
+  photoUploading: boolean;
+  photoError: string | null;
+  onPickPhoto: () => void;
+  onRemovePhoto: () => void;
   source: 'original' | 'third_party' | null;
   setSource: (v: 'original' | 'third_party') => void;
   originalMode: 'write' | 'link' | null;
@@ -482,7 +570,7 @@ function RecipeFields(p: RecipeFieldsProps) {
         label="Why you love it"
         error={p.errors.whyLove}
         count={p.whyLove.length}
-        max={TEXT_MAX}
+        max={WHY_LOVE_MAX}
       >
         <TextInput
           value={p.whyLove}
@@ -492,8 +580,50 @@ function RecipeFields(p: RecipeFieldsProps) {
           style={[styles.input, styles.inputMultiline]}
           multiline
           textAlignVertical="top"
-          maxLength={TEXT_MAX + 40}
+          maxLength={WHY_LOVE_MAX + 40}
         />
+      </Field>
+
+      <Field
+        label="Photo (optional)"
+        helper="Add a photo of your recipe."
+      >
+        {p.photoUrl ? (
+          <View>
+            <Image source={{ uri: p.photoUrl }} style={styles.photoThumbnail} />
+            <TouchableOpacity onPress={p.onRemovePhoto} style={styles.removePhotoButton}>
+              <Text style={styles.removePhotoText}>Remove photo</Text>
+            </TouchableOpacity>
+          </View>
+        ) : p.photoUploading ? (
+          <View style={styles.photoBox}>
+            {p.photoLocalUri ? (
+              <Image source={{ uri: p.photoLocalUri }} style={[styles.photoThumbnail, styles.photoThumbnailDim]} />
+            ) : (
+              <View style={[styles.photoThumbnail, styles.photoUploadingBg]} />
+            )}
+            <View style={styles.photoUploadingOverlay}>
+              <ActivityIndicator color="#B83255" />
+            </View>
+          </View>
+        ) : p.photoError ? (
+          <TouchableOpacity
+            onPress={p.onPickPhoto}
+            style={[styles.photoThumbnail, styles.photoErrorBox]}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.photoErrorText}>{p.photoError}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={p.onPickPhoto}
+            style={[styles.photoThumbnail, styles.addPhotoButton]}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.addPhotoIcon}>＋</Text>
+            <Text style={styles.addPhotoLabel}>Add photo</Text>
+          </TouchableOpacity>
+        )}
       </Field>
 
       <Field label="This recipe is…" error={p.errors.source}>
@@ -663,7 +793,7 @@ function AuthorFields(p: AuthorFieldsProps) {
         label="Why we should feature them"
         error={p.errors.whyFeatured}
         count={p.whyFeatured.length}
-        max={TEXT_MAX}
+        max={WHY_FEATURED_MAX}
       >
         <TextInput
           value={p.whyFeatured}
@@ -673,7 +803,7 @@ function AuthorFields(p: AuthorFieldsProps) {
           style={[styles.input, styles.inputMultiline]}
           multiline
           textAlignVertical="top"
-          maxLength={TEXT_MAX + 40}
+          maxLength={WHY_FEATURED_MAX + 40}
         />
       </Field>
 
@@ -849,5 +979,72 @@ const styles = StyleSheet.create({
     fontSize: 14, color: '#6A5969',
     lineHeight: 22, textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+
+  // Photo upload — 160×120 (4:3, ~120 tall) thumbnail size shared across all four states
+  // (add / uploading / success / error) so layout doesn't shift between transitions.
+  photoBox: {
+    width: 160,
+    height: 120,
+    position: 'relative',
+  },
+  photoThumbnail: {
+    width: 160,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#E6EAF0',
+  },
+  photoThumbnailDim: { opacity: 0.35 },
+  photoUploadingBg: { backgroundColor: '#f0ede4' },
+  photoUploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15,42,72,0.18)',
+    borderRadius: 12,
+  },
+  addPhotoButton: {
+    borderWidth: 1,
+    borderColor: '#e0d8cc',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoIcon: {
+    fontSize: 28,
+    color: '#B83255',
+    lineHeight: 32,
+    marginBottom: 2,
+  },
+  addPhotoLabel: {
+    fontSize: 12,
+    color: '#B83255',
+    fontFamily: 'Nunito_600SemiBold',
+    letterSpacing: 0.3,
+  },
+  photoErrorBox: {
+    borderWidth: 1,
+    borderColor: '#F0DCE2',
+    backgroundColor: '#FDF5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  photoErrorText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#B83255',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  removePhotoButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  removePhotoText: {
+    fontSize: 12,
+    color: '#9c8f7e',
+    fontStyle: 'italic',
+    textDecorationLine: 'underline',
   },
 });
