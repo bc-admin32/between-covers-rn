@@ -586,7 +586,7 @@ function RecipeFields(p: RecipeFieldsProps) {
 
       <Field
         label="Photo (optional)"
-        helper="Add a photo of your recipe."
+        helper="A reference photo helps us bring your recipe to life — even a quick snap is perfect."
       >
         {p.photoUrl ? (
           <View>
