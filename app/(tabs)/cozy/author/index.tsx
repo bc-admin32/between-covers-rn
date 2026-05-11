@@ -247,6 +247,20 @@ export default function AuthorDetailScreen() {
           </View>
         )}
 
+        {/* SUGGEST A SPOTLIGHT — community submission entry */}
+        <View style={styles.bodySection}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.submitCard}
+            onPress={() => router.push('/submissions/author' as never)}
+          >
+            <Text style={styles.submitCardBody}>
+              Know an author or narrator we should spotlight?
+            </Text>
+            <Text style={styles.submitCardCta}>Tell us →</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* BACK */}
         <View style={styles.bodySection}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -296,4 +310,33 @@ const styles = StyleSheet.create({
   backButton: { alignSelf: 'center', borderWidth: 1, borderColor: '#ddd4c8', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, marginTop: spacing.md },
   backButtonText: { fontSize: 12, fontWeight: '400', color: '#9c8f7e', letterSpacing: 0.4 },
   errorText: { fontSize: 15, color: '#6A5969', textAlign: 'center', marginBottom: spacing.lg },
+  // Community submission card — bottom of the author/narrator spotlight detail
+  submitCard: {
+    width: '100%',
+    backgroundColor: '#FDF5F7',
+    borderWidth: 1,
+    borderColor: '#F0DCE2',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    shadowColor: '#0F2A48',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  submitCardBody: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: '#6A5969',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  submitCardCta: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B83255',
+    letterSpacing: 0.4,
+    textAlign: 'right',
+  },
 });

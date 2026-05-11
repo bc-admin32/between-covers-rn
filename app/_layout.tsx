@@ -117,6 +117,7 @@ function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="legal" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="book/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="submissions/[type]" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
