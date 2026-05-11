@@ -484,8 +484,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#fff',
     shadowColor: '#0F2A48',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
