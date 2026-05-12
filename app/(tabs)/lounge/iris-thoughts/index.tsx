@@ -265,17 +265,16 @@ export default function IrisThoughtsScreen() {
             </View>
           </View>
         </View>
-
-        {(thread?.body ?? paramPrompt) ? (
-          <View style={styles.threadBody}>
-            <Text style={styles.threadBodyText} maxFontSizeMultiplier={1.3}>{thread?.body ?? paramPrompt}</Text>
-          </View>
-        ) : null}
       </View>
 
       {/* MESSAGES */}
       {loading ? null : (
         <ScrollView ref={scrollRef} style={styles.messages} contentContainerStyle={styles.messagesContent} showsVerticalScrollIndicator={false}>
+          {(thread?.body ?? paramPrompt) ? (
+            <View style={styles.threadBody}>
+              <Text style={styles.threadBodyText} maxFontSizeMultiplier={1.3}>{thread?.body ?? paramPrompt}</Text>
+            </View>
+          ) : null}
           {replies.length === 0 ? (
             <View style={styles.emptyReplies}>
               <Text style={styles.emptyRepliesTitle}>Be the first to share your thoughts…</Text>
@@ -350,7 +349,7 @@ const styles = StyleSheet.create({
   headerLabel: { fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#9B6B9B', fontFamily: 'Nunito_700Bold' },
   headerTitle: { fontSize: 16, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic' },
   headerReplies: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_600SemiBold' },
-  threadBody: { backgroundColor: '#FDFAF6', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#E8D5E5' },
+  threadBody: { backgroundColor: '#FDFAF6', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#E8D5E5', marginBottom: spacing.md },
   threadBodyText: { fontSize: 15, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 22 },
   threadBodyAuthor: { fontSize: 10, color: '#9B6B9B', fontFamily: 'Nunito_700Bold', marginTop: spacing.xs },
   messages: { flex: 1 },
