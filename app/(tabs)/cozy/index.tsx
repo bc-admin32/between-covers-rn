@@ -453,7 +453,7 @@ export default function CozyScreen() {
                 <Text style={styles.mindBio}>{authorSpotlight.bioShort}</Text>
               )}
               <View style={styles.mindCtaRow}>
-                <Text style={styles.mindCtaText}>Explore their books →</Text>
+                <Text style={styles.mindCtaText}>Explore their work →</Text>
               </View>
             </TouchableOpacity>
           </View>
