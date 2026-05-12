@@ -14,9 +14,9 @@ import { parseLocalDate } from '../../../lib/dateUtils';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 type Section =
-  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean }
-  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean }
-  | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null }
+  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
+  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
+  | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null; replyCount?: number }
   | { type: 'POLL'; sk: string; pollId: string; question: string; options: PollOption[]; totalVotes: number; hasVoted: boolean; selectedOptionId: string | null; isHot: boolean }
   | { type: 'MONTHLY_PROMPT'; promptId: string; title: string; body: string; submissionsOpen: boolean; closesAt: string | null; submissionCount: number; userHasSubmitted: boolean; userSubmission: string | null; isHot: boolean; anonymous?: boolean };
 
@@ -245,6 +245,11 @@ export default function LoungeScreen() {
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
             </View>
+            {typeof primary.replyCount === 'number' && (
+              <Text style={styles.pollVoteCount}>
+                {primary.replyCount} {primary.replyCount === 1 ? 'reply' : 'replies'} ✦
+              </Text>
+            )}
           </View>
         )}
 
@@ -263,6 +268,11 @@ export default function LoungeScreen() {
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
+            {typeof secondary.replyCount === 'number' && (
+              <Text style={styles.pollVoteCount}>
+                {secondary.replyCount} {secondary.replyCount === 1 ? 'reply' : 'replies'} ✦
+              </Text>
+            )}
           </View>
         )}
 
