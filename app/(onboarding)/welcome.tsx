@@ -19,8 +19,6 @@ export default function WelcomeScreen() {
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Welcome.mp4',
     (p) => {
       p.loop = false;
-      p.playbackRate = 1.2;
-      p.preservesPitch = true;
     }
   );
 
