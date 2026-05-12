@@ -5,6 +5,7 @@ import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
@@ -119,6 +120,9 @@ export default function DrinksScreen() {
                 );
               })}
             </ScrollView>
+            <View style={styles.scrollHint}>
+              <CaretDown size={14} color="#B83255" weight="bold" />
+            </View>
             <View style={styles.divider} />
             <TouchableOpacity
               style={[styles.nextButton, !canSubmit && styles.nextButtonDisabled]}
@@ -204,6 +208,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   divider: { height: 1, backgroundColor: '#f3f4f6' },
+  scrollHint: { alignItems: 'center', paddingVertical: 4 },
   nextButton: {
     paddingVertical: 12,
     alignItems: 'center',
