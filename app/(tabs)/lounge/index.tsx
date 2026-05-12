@@ -237,7 +237,11 @@ export default function LoungeScreen() {
             <Text style={styles.cardTitle}>{primary.title}</Text>
             <Text style={styles.cardDescription}>{primary.description}</Text>
             <View style={styles.cardFooter}>
-              <Text style={styles.cardFooterNote}>💬 Chiming in</Text>
+              <Text style={styles.cardFooterNote}>
+                {typeof primary.replyCount === 'number' && primary.replyCount > 0
+                  ? `💬 ${primary.replyCount} ${primary.replyCount === 1 ? 'reply' : 'replies'}`
+                  : '💬 No replies yet'}
+              </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={() => router.push(`/lounge/thread?id=${encodeURIComponent(primary.threadId)}` as any)}
@@ -245,11 +249,6 @@ export default function LoungeScreen() {
                 <Text style={styles.primaryButtonText}>Spill Your Thoughts</Text>
               </TouchableOpacity>
             </View>
-            {typeof primary.replyCount === 'number' && (
-              <Text style={styles.pollVoteCount}>
-                {primary.replyCount} {primary.replyCount === 1 ? 'reply' : 'replies'} ✦
-              </Text>
-            )}
           </View>
         )}
 
