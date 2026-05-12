@@ -264,9 +264,6 @@ export default function IrisThoughtsScreen() {
               <Text style={styles.headerTitle}>{thread?.topicLabel ?? paramTitle ?? "This week's mood"}</Text>
             </View>
           </View>
-          {thread && (
-            <Text style={styles.headerReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
-          )}
         </View>
 
         {(thread?.body ?? paramPrompt) ? (
