@@ -12,6 +12,7 @@ import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate } from '../../../lib/dateUtils';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
+const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
 type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 type Section =
   | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
@@ -287,7 +288,14 @@ export default function LoungeScreen() {
             </View>
             <Text style={styles.cardDescription}>{iris.body}</Text>
             <View style={styles.irisCardFooter}>
-              <Text style={styles.cardFooterNote}>What do you think?</Text>
+              <View style={styles.irisReplyRow}>
+                <Image source={{ uri: IRIS_TEACUP }} style={styles.irisReplyIcon} resizeMode="contain" />
+                <Text style={styles.cardFooterNote}>
+                  {typeof iris.replyCount === 'number' && iris.replyCount > 0
+                    ? `${iris.replyCount} ${iris.replyCount === 1 ? 'reply' : 'replies'}`
+                    : 'No replies yet'}
+                </Text>
+              </View>
               <TouchableOpacity
                 style={styles.irisCtaButton}
                 onPress={() => iris?.threadId && router.push(
@@ -454,8 +462,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 23, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 28, marginBottom: spacing.sm },
   cardDescription: { fontSize: 13, color: '#6A5550', lineHeight: 20, marginBottom: spacing.md },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  irisCardFooter: { flexDirection: 'column', gap: spacing.sm, marginTop: spacing.xs },
-  irisCtaButton: { backgroundColor: '#B83255', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, alignSelf: 'flex-start' },
+  irisCardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  irisReplyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  irisReplyIcon: { width: 18, height: 18 },
+  irisCtaButton: { backgroundColor: '#B83255', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10 },
   cardFooterNote: { fontSize: 11, color: '#B09A7E' },
   primaryButton: { backgroundColor: '#B83255', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10 },
   primaryButtonDisabled: { backgroundColor: '#D4B5BF' },
