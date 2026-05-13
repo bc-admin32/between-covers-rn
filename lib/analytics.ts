@@ -18,7 +18,8 @@ type EventName =
   | 'subscription_started'
   | 'iris_chat_sent'
   | 'cozy_section_viewed'
-  | 'book_added_to_library';
+  | 'book_added_to_library'
+  | 'retailer_cta_tapped';
 
 type AnalyticsEvent = {
   eventId: string;

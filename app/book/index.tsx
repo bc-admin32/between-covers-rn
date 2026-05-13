@@ -12,13 +12,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { spacing, radius, colors } from '../../lib/theme';
-
-const RETAILER_LABELS: Record<string, string> = {
-  bookshop: 'Bookshop',
-  amazon: 'Amazon',
-  audible: 'Audible',
-};
-const ALLOWED_RETAILERS = ['bookshop', 'amazon', 'audible'];
+import {
+  getRetailerCTA,
+  RETAILERS,
+  RETAILER_PROFILE_ID,
+  type RetailerKey,
+  type RetailerCTAFields,
+} from '../../lib/retailerCta';
 
 const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: string }> = {
   trash:      { emoji: '🗑️', phrase: 'they say skip it',       color: '#E57373' },
@@ -47,8 +47,7 @@ type BookDetailResponse = {
     coverUrl: string | null;
     synopsis?: string | null;
     series?: string | null;
-    retailers: Record<string, string>;
-  };
+  } & RetailerCTAFields;
   libraryItem: {
     status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
     rating: Verdict | null;
@@ -172,8 +171,20 @@ export default function BookDetailsScreen() {
     setSavingRating(false);
   }
 
-  async function handleRetailerClick(retailer: string, url: string) {
-    try { await apiPatch('/profile', { preferredRetailer: retailer }); } catch {}
+  async function handleRetailerClick(
+    retailer: RetailerKey,
+    url: string,
+    validationStatus: string | null,
+    isFallback: boolean,
+  ) {
+    const profileId = RETAILER_PROFILE_ID[retailer];
+    track('retailer_cta_tapped', {
+      workId: data?.work.workId,
+      retailer: profileId,
+      validationStatus,
+      isFallback,
+    });
+    try { await apiPatch('/profile', { preferredRetailer: profileId }); } catch {}
     // Backend builds the full retailer URL (including any affiliate tags
     // and deep links). Frontend opens whatever URL it receives.
     await WebBrowser.openBrowserAsync(url);
@@ -232,7 +243,12 @@ export default function BookDetailsScreen() {
   }
 
   const { work, libraryItem } = data;
-  const retailers = Object.entries(work.retailers).filter(([key, url]) => ALLOWED_RETAILERS.includes(key) && !!url);
+  const retailerCTAs = RETAILERS
+    .map((key) => ({ key, cta: getRetailerCTA(work, key) }))
+    .filter((r): r is { key: RetailerKey; cta: Extract<ReturnType<typeof getRetailerCTA>, { visible: true }> } => r.cta.visible);
+  const preferredRetailerKey =
+    retailerCTAs.find((r) => RETAILER_PROFILE_ID[r.key] === data.preferredRetailer)?.key
+    ?? retailerCTAs[0]?.key;
   const score = computeScore(ratingSummary);
   const verdictKey = score ? scoreToVerdict(score) : null;
   const verdictInfo = verdictKey ? VERDICT_DISPLAY[verdictKey] : null;
@@ -363,21 +379,24 @@ export default function BookDetailsScreen() {
           <View style={styles.divider} />
 
           {/* PURCHASE */}
-          {retailers.length > 0 && (
+          {retailerCTAs.length > 0 && (
             <View style={styles.purchaseSection}>
               <Text style={styles.sectionLabel}>Purchase</Text>
               <View style={styles.retailerButtons}>
-                {retailers.map(([key, url]) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.retailerButton, key === (data.preferredRetailer ?? retailers[0][0]) && styles.retailerButtonActive]}
-                    onPress={() => handleRetailerClick(key, url)}
-                  >
-                    <Text style={[styles.retailerText, key === (data.preferredRetailer ?? retailers[0][0]) && styles.retailerTextActive]}>
-                      {RETAILER_LABELS[key] ?? key}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {retailerCTAs.map(({ key, cta }) => {
+                  const isPreferred = key === preferredRetailerKey;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.retailerButton, isPreferred && styles.retailerButtonActive]}
+                      onPress={() => handleRetailerClick(key, cta.url, cta.validationStatus, cta.isFallback)}
+                    >
+                      <Text style={[styles.retailerText, isPreferred && styles.retailerTextActive]}>
+                        {cta.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
