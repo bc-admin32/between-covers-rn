@@ -10,6 +10,7 @@ import { useFonts } from 'expo-font';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
 import { initAnalytics, track } from '../lib/analytics';
+import { captureFromUrl } from '../lib/attribution';
 
 // Fonts are natively bundled via expo-font plugin in app.json.
 // We still call useFonts() so they're registered under these exact keys
@@ -63,6 +64,7 @@ function RootLayout() {
   useEffect(() => {
     const handleDeepLink = ({ url }: { url: string }) => {
       console.log('GOT URL:', url);
+      captureFromUrl(url);
       if (url.includes('redirect')) {
         try {
           const code = new URL(url).searchParams.get('code');

@@ -7,6 +7,7 @@ import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
 import { track } from '../../lib/analytics';
+import { getAttribution, clearAttribution } from '../../lib/attribution';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -116,7 +117,13 @@ export default function RedirectScreen() {
           // in onboarding — returning logins skip the event.
           if (typeof result.nextRoute === 'string' && result.nextRoute.includes('(onboarding)')) {
             const method = (params.method as string | undefined) ?? 'unknown';
-            track('signup_completed', { method });
+            const attr = await getAttribution();
+            const payload = {
+              method,
+              ...(attr ? { acquisitionType: attr.type, ...(attr.campaign ? { acquisitionCampaign: attr.campaign } : {}) } : {})
+            };
+            track('signup_completed', payload);
+            if (attr) await clearAttribution();
           }
           router.replace(normalizeRoute(result.nextRoute) as any);
         } else {
