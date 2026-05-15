@@ -18,6 +18,13 @@ import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse } from '../../lib
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
+// Poll cadence: normally every 30s (matches backend chime tick).
+// During an active sketchTheScene game we poll faster so reveal transitions
+// (sketchPhase: playing → revealing → advance) render in near-real-time
+// instead of being missed in a 30s window.
+const POLL_NORMAL_MS = 30_000;
+const POLL_SKETCH_MS = 3_000;
+
 type ChatMessage = {
   id: string;
   sender: string;
@@ -131,7 +138,14 @@ export default function RoomScreen({
     }
   }, [messages]);
 
-  // Polling for event/room state
+  // ── Polling for event/room state ──
+  // Cadence adapts: 3s during active sketchTheScene game (catches reveal
+  // transitions in near-real-time), 30s otherwise.
+  // Re-initialized whenever active game type changes.
+  const isSketchActive =
+    liveRoom.gameType === 'sketchTheScene' &&
+    roomState?.activeGameType === 'sketchTheScene';
+
   useEffect(() => {
     if (!chatToken) return;
     let cancelled = false;
@@ -141,7 +155,6 @@ export default function RoomScreen({
         if (cancelled) return;
         if (res.event.status === 'ENDED') {
           wsRef.current?.close();
-          // Don't await leave — backend cleans dangling rows on event end
           onBackToLobby();
           return;
         }
@@ -155,12 +168,13 @@ export default function RoomScreen({
       }
     }
     poll();
-    const interval = setInterval(poll, 30_000);
+    const intervalMs = isSketchActive ? POLL_SKETCH_MS : POLL_NORMAL_MS;
+    const interval = setInterval(poll, intervalMs);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [chatToken, eventId, roomId]);
+  }, [chatToken, eventId, roomId, isSketchActive]);
 
   // App backgrounded — write leftAt for analytics (fire-and-forget)
   useEffect(() => {
@@ -174,14 +188,19 @@ export default function RoomScreen({
     return () => subscription.remove();
   }, [attendanceSk, eventId]);
 
-  // Sketch the Scene video
+  // ── Sketch the Scene ──
   const isSketchTheScene = liveRoom.gameType === 'sketchTheScene';
   const currentQuestion = roomState?.currentQuestion as
-    | { videoUrl?: string; artistName?: string }
+    | { videoUrl?: string; artistName?: string; isIntro?: boolean }
     | null
     | undefined;
   const videoUrl = isSketchTheScene ? currentQuestion?.videoUrl ?? null : null;
   const artistName = isSketchTheScene ? currentQuestion?.artistName ?? null : null;
+
+  // Reveal phase state — surfaces revealedAnswer as overlay, pauses video
+  const sketchPhase = roomState?.sketchPhase ?? null;
+  const revealedAnswer = roomState?.revealedAnswer ?? null;
+  const isRevealing = isSketchTheScene && sketchPhase === 'revealing' && !!revealedAnswer;
 
   const player = useVideoPlayer(videoUrl ?? '', (p) => {
     if (videoUrl) {
@@ -189,6 +208,16 @@ export default function RoomScreen({
       p.play();
     }
   });
+
+  // Pause the video player when reveal is on screen. The video has already
+  // finished playing per the backend state machine, but on slow networks it
+  // can still be buffering/looping when reveal fires. Belt-and-suspenders.
+  useEffect(() => {
+    if (!player) return;
+    if (isRevealing) {
+      try { player.pause(); } catch {}
+    }
+  }, [isRevealing, player]);
 
   async function handleSend() {
     if (!input.trim() || sending || !wsRef.current) return;
@@ -208,7 +237,6 @@ export default function RoomScreen({
     wsRef.current?.close();
     setChatToken(null);
     if (attendanceSk) {
-      // Fire-and-forget — analytics, not user-facing
       apiPost(`/live/${eventId}/rooms/leave`, { eventId, attendanceSk })
         .catch((err) => console.warn('Room leave write failed:', err));
     }
@@ -268,18 +296,31 @@ export default function RoomScreen({
               </View>
             )}
 
-            {videoUrl ? (
-              <VideoView
-                style={styles.video}
-                player={player}
-                allowsFullscreen={false}
-                nativeControls={false}
-              />
-            ) : (
-              <View style={styles.videoPlaceholder}>
-                <Text style={styles.videoPlaceholderText}>Waiting for the next round…</Text>
-              </View>
-            )}
+            {/* Video + Reveal overlay container. The video stays mounted; the */}
+            {/* overlay sits on top during reveal phase. */}
+            <View style={styles.videoWrapper}>
+              {videoUrl ? (
+                <VideoView
+                  style={styles.video}
+                  player={player}
+                  allowsFullscreen={false}
+                  nativeControls={false}
+                />
+              ) : (
+                <View style={styles.videoPlaceholder}>
+                  <Text style={styles.videoPlaceholderText}>Waiting for the next round…</Text>
+                </View>
+              )}
+
+              {isRevealing && (
+                <View style={styles.revealOverlay} pointerEvents="none">
+                  <View style={styles.revealCard}>
+                    <Text style={styles.revealLabel}>✦ The answer was</Text>
+                    <Text style={styles.revealAnswer}>{revealedAnswer}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
           </>
         )}
 
@@ -434,6 +475,7 @@ const styles = StyleSheet.create({
   },
   artistLabel: { fontSize: 12, color: 'rgba(253,250,246,0.6)', fontStyle: 'italic' },
   artistName: { fontSize: 12, color: '#FDFAF6', fontWeight: '600' },
+  videoWrapper: { width: '100%', position: 'relative' },
   video: { width: '100%', aspectRatio: 16 / 10, backgroundColor: '#000' },
   videoPlaceholder: {
     width: '100%',
@@ -443,6 +485,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   videoPlaceholderText: { fontSize: 13, color: 'rgba(253,250,246,0.5)', fontStyle: 'italic' },
+
+  // ── Reveal overlay (Sketch the Scene) ──
+  revealOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 42, 72, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  revealCard: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+  },
+  revealLabel: {
+    fontSize: 11,
+    letterSpacing: 2,
+    color: '#F5A3BC',
+    textTransform: 'uppercase',
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  revealAnswer: {
+    fontSize: 28,
+    color: '#FDFAF6',
+    fontStyle: 'italic',
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+
   pinnedBar: {
     backgroundColor: 'rgba(253,250,246,0.06)',
     borderLeftWidth: 3,

@@ -14,23 +14,45 @@ export type LiveRoom = {
   gameBanner: { label: string; instruction: string } | null;
 };
 
+// Sketch the Scene question, as the CLIENT sees it.
+// Backend strips `answer` before it lands in any client-bound response —
+// the reveal text comes via RoomState.revealedAnswer at reveal time.
+// `isIntro` skips the reveal phase entirely (intro video has no answer).
 export type SketchTheSceneQuestion = {
-  questionId: string;
-  videoUrl: string; // S3 URL to drawing video
-  answer: string; // what's being drawn
-  artistName: string; // fake name displayed as "Now drawing: X"
-  hint?: string;
+  questionId?: string;
+  videoUrl: string;
+  videoDurationMs?: number;
+  artistName: string;
+  isIntro?: boolean;
+  difficulty?: 'easy' | 'medium' | 'hard';
   improvise?: boolean;
+  // answer is INTENTIONALLY absent from this type — backend strips it.
+  // If you ever see `answer` here, the backend leak fix has regressed.
 };
+
+export type SketchPhase = 'playing' | 'revealing' | null;
+export type IrisMode =
+  | 'intro'
+  | 'game'
+  | 'justVibing'
+  | 'encore'
+  | 'windingDown'
+  | 'signOff'
+  | 'reveal';
 
 export type RoomState = {
   activeGameType: string | null;
   currentRound: number;
   currentQuestion: any | SketchTheSceneQuestion | null;
-  irisMode: 'intro' | 'game' | 'justVibing' | 'encore' | 'windingDown' | 'signOff';
+  irisMode: IrisMode;
   startedAt: string | null;
   introComplete?: boolean;
   gameBanner?: { label: string; instruction: string } | null;
+
+  // sketchTheScene-specific (state machine fields)
+  sketchPhase?: SketchPhase;
+  revealedAnswer?: string | null;
+  revealAt?: string | null;
 };
 
 export type RoomJoinResponse = {
