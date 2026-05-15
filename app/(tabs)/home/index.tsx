@@ -218,25 +218,26 @@ export default function HomeScreen() {
     return () => { mounted = false; };
   }, []);
 
-  // When the video ends naturally, either close or show the trial-day-6 overlay
+  // When the video ends naturally, either close or show the trial-day-6 overlay.
+  // Uses `playToEnd` (fires only on natural completion) instead of `playingChange`
+  // (which also fires on buffer pauses and would prematurely close mid-playback).
   useEffect(() => {
-    const sub = player.addListener('playingChange', ({ isPlaying }: { isPlaying: boolean }) => {
-      if (!isPlaying && overlayOpenRef.current) {
-        if (isTrialDay6Ref.current) {
-          setShowTrialOverlay(true);
-          // Mark shown so it doesn't appear again today
-          SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
-            if (!cached) return;
-            try {
-              const { timeZone } = JSON.parse(cached);
-              const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone ?? 'UTC' });
-              SecureStore.setItemAsync('bc_last_day6_video_shown', today).catch(() => {});
-            } catch {}
-          });
-        } else {
-          setOverlayOpen(false);
-          setWatched(true);
-        }
+    const sub = player.addListener('playToEnd', () => {
+      if (!overlayOpenRef.current) return;
+      if (isTrialDay6Ref.current) {
+        setShowTrialOverlay(true);
+        // Mark shown so it doesn't appear again today
+        SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
+          if (!cached) return;
+          try {
+            const { timeZone } = JSON.parse(cached);
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone ?? 'UTC' });
+            SecureStore.setItemAsync('bc_last_day6_video_shown', today).catch(() => {});
+          } catch {}
+        });
+      } else {
+        setOverlayOpen(false);
+        setWatched(true);
       }
     });
     return () => sub.remove();
