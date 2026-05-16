@@ -7,6 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -41,6 +43,10 @@ export default function DoorScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
   const finishingRef = useRef(false);
+
+  const [codeFieldVisible, setCodeFieldVisible] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
 
   useEffect(() => {
     track('paywall_shown', { type: 'soft', source: 'door' });
@@ -137,9 +143,66 @@ export default function DoorScreen() {
     setTimeout(() => setErrorMsg(null), 3500);
   };
 
+  const handleApplyCode = () => {
+    const normalized = codeInput.trim().toUpperCase();
+    if (!normalized) return;
+    setCodeInput(normalized);
+    setAppliedCode(normalized);
+  };
+
+  const handleCodeChange = (next: string) => {
+    setCodeInput(next.toUpperCase());
+  };
+
+  const handleRemoveCode = () => {
+    setAppliedCode(null);
+    setCodeInput('');
+  };
+
   const handlePurchase = async () => {
     if (purchasing || restoring) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (appliedCode) {
+      setPurchasing(true);
+      try {
+        const idToken = await SecureStore.getItemAsync('bc_id_token');
+        const res = await fetch('https://api.betweencovers.app/subscription/grant-promo', {
+          method: 'POST',
+          headers: {
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            promoCode: appliedCode,
+            platform: getResolvedPlatform(),
+          }),
+        });
+
+        if (res.ok) {
+          Alert.alert('🎉 Code applied!', 'Enjoy your 30-day trial.');
+          router.replace('/home' as any);
+          return;
+        }
+
+        if (res.status >= 400 && res.status < 500) {
+          const body = await res.json().catch(() => null);
+          const message =
+            (body && (body.error || body.message)) || 'This code could not be applied.';
+          Alert.alert('Code not applied', String(message));
+          setPurchasing(false);
+          return;
+        }
+
+        Alert.alert('Something went wrong', 'Please try again or contact support.');
+        setPurchasing(false);
+      } catch {
+        Alert.alert('Something went wrong', 'Please try again or contact support.');
+        setPurchasing(false);
+      }
+      return;
+    }
+
     setPurchasing(true);
     const sku = selectedPlan === 'annual' ? ANNUAL_PRODUCT_ID : MONTHLY_PRODUCT_ID;
     try {
@@ -272,6 +335,58 @@ export default function DoorScreen() {
             <Text style={styles.primaryBtnText}>Start your free 7-day trial</Text>
           )}
         </TouchableOpacity>
+
+        {!codeFieldVisible ? (
+          <TouchableOpacity
+            onPress={() => setCodeFieldVisible(true)}
+            activeOpacity={0.7}
+            style={styles.codeLinkBtn}
+          >
+            <Text style={styles.codeLinkText}>Have a code? Enter it here →</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.codeBlock}>
+            <View style={styles.codeRow}>
+              <TextInput
+                value={codeInput}
+                onChangeText={handleCodeChange}
+                placeholder="Enter promo code"
+                placeholderTextColor="rgba(196,168,130,0.5)"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!appliedCode}
+                style={[styles.codeInput, appliedCode && styles.codeInputApplied]}
+              />
+              {appliedCode ? (
+                <TouchableOpacity
+                  onPress={handleRemoveCode}
+                  activeOpacity={0.7}
+                  style={styles.codeRemoveBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.codeRemoveText}>×</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleApplyCode}
+                  disabled={codeInput.trim() === ''}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.codeApplyBtn,
+                    codeInput.trim() === '' && styles.btnDisabled,
+                  ]}
+                >
+                  <Text style={styles.codeApplyText}>Apply</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {appliedCode ? (
+              <Text style={styles.codeAppliedMsg}>
+                ✓ Code applied — your 30-day trial starts when you subscribe
+              </Text>
+            ) : null}
+          </View>
+        )}
 
         <Text style={styles.microcopy}>Instant access. Cancel anytime.</Text>
 
@@ -450,5 +565,70 @@ const styles = StyleSheet.create({
   notNowText: {
     fontSize: 13,
     color: 'rgba(196,168,130,0.5)',
+  },
+  codeLinkBtn: {
+    paddingVertical: 4,
+  },
+  codeLinkText: {
+    fontSize: 13,
+    color: '#C4A882',
+    textDecorationLine: 'underline',
+  },
+  codeBlock: {
+    width: '100%',
+    gap: 6,
+  },
+  codeRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  codeInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12,
+    color: '#FDFAF6',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  codeInputApplied: {
+    borderColor: 'rgba(74,222,128,0.55)',
+    backgroundColor: 'rgba(74,222,128,0.08)',
+  },
+  codeApplyBtn: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  codeApplyText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FDFAF6',
+  },
+  codeRemoveBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  codeRemoveText: {
+    fontSize: 22,
+    lineHeight: 24,
+    color: '#C4A882',
+    fontWeight: '600',
+  },
+  codeAppliedMsg: {
+    fontSize: 12,
+    color: '#4ADE80',
+    paddingHorizontal: 4,
   },
 });
