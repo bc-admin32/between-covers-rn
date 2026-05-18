@@ -9,7 +9,7 @@ import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 32;
+const REVEAL_AT_S = 27;
 
 const SNACKS = [
   { value: 'POPCORN', label: '🍿 Popcorn' },

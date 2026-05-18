@@ -9,7 +9,7 @@ import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 20;
+const REVEAL_AT_S = 16;
 
 const DRINKS = [
   { value: 'TEA', label: '🍵 Tea' },

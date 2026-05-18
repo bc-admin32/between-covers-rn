@@ -9,7 +9,7 @@ import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 
-const REVEAL_AT_S = 31;
+const REVEAL_AT_S = 28;
 
 const GENRES = [
   { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
@@ -41,7 +41,6 @@ export default function GenreScreen() {
   const { currentTime } = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: 0, bufferedPosition: 0 });
 
   useEffect(() => {
-    console.log('[genre-timing]', { currentTime, REVEAL_AT_S, willReveal: currentTime >= REVEAL_AT_S });
     if (currentTime >= REVEAL_AT_S) {
       setShowOptions(true);
     }
