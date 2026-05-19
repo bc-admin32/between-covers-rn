@@ -211,6 +211,15 @@ export default function RoomScreen({
     }
   });
 
+  // Auto-play when a new videoUrl arrives. useVideoPlayer's setup callback
+  // only runs once at mount — by then videoUrl is still null (state hasn't
+  // polled yet), so the setup-time play() never fires for the real URL.
+  // This effect catches both first-arrival and per-question URL changes.
+  useEffect(() => {
+    if (!player || !videoUrl) return;
+    try { player.play(); } catch {}
+  }, [player, videoUrl]);
+
   // Pause the video player when reveal is on screen. The video has already
   // finished playing per the backend state machine, but on slow networks it
   // can still be buffering/looping when reveal fires. Belt-and-suspenders.
