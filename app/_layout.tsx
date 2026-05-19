@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
@@ -85,6 +86,19 @@ function RootLayout() {
     });
 
     return () => subscription.remove();
+  }, []);
+
+  // Clear app icon badge whenever the app returns to foreground. Belt-and-suspenders
+  // for users whose server-side silent badge-clear push didn't deliver (force-quit,
+  // notification never opened, etc.).
+  useEffect(() => {
+    Notifications.setBadgeCountAsync(0).catch(() => {});
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        Notifications.setBadgeCountAsync(0).catch(() => {});
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Notification taps → route into the lounge.

@@ -7,6 +7,7 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as Notifications from 'expo-notifications';
 import { apiGet, apiPost } from '../../lib/api';
 import { spacing, colors } from '../../lib/theme';
 import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse } from '../../lib/types';
@@ -87,6 +88,7 @@ export default function RoomScreen({
     init();
     return () => {
       cancelled = true;
+      Notifications.setBadgeCountAsync(0).catch(() => {});
     };
   }, [eventId, roomId]);
 

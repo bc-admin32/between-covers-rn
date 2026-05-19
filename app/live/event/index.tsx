@@ -7,6 +7,7 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 import QuickRatingModal from '../../../components/QuickRatingModal';
@@ -95,6 +96,9 @@ export default function LiveEventScreen() {
       }
     };
     load();
+    return () => {
+      Notifications.setBadgeCountAsync(0).catch(() => {});
+    };
   }, [eventId]);
 
   useEffect(() => {
