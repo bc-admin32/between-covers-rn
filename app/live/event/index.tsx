@@ -118,7 +118,7 @@ export default function LiveEventScreen() {
         if (data.Type === 'MESSAGE') {
           setMessages((prev) => [...prev, {
             id: data.Id ?? Date.now().toString(),
-            sender: data.Sender?.UserId ?? 'Reader',
+            sender: data.Sender?.Attributes?.displayName ?? data.Sender?.UserId ?? 'Reader',
             message: data.Content,
             type: 'USER',
             timestamp: new Date(data.SendTime ?? Date.now()),
