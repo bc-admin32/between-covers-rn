@@ -211,13 +211,19 @@ export default function RoomScreen({
     }
   });
 
-  // Auto-play when a new videoUrl arrives. useVideoPlayer's setup callback
-  // only runs once at mount — by then videoUrl is still null (state hasn't
-  // polled yet), so the setup-time play() never fires for the real URL.
-  // This effect catches both first-arrival and per-question URL changes.
+  // Auto-play whenever videoUrl changes. useVideoPlayer's setup callback only
+  // runs once at mount — by then videoUrl is still null (state hasn't polled
+  // yet), so the setup-time play() never fires. This effect handles every
+  // transition: intro → drawing 1 → drawing 2 → … . Explicit pause + seek to
+  // zero clears any leftover playback state from the previous question so we
+  // don't carry frame-stutter or stale currentTime across the source swap.
   useEffect(() => {
     if (!player || !videoUrl) return;
-    try { player.play(); } catch {}
+    try {
+      player.pause();
+      player.currentTime = 0;
+      player.play();
+    } catch {}
   }, [player, videoUrl]);
 
   // Pause the video player when reveal is on screen. The video has already
