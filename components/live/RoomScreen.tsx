@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, FlatList,
   StyleSheet, ActivityIndicator, Image, TextInput,
   KeyboardAvoidingView, Platform, Modal, AppState,
+  type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,9 +61,10 @@ export default function RoomScreen({
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<ChatMessage>>(null);
 
   // Initial mount: fetch profile + join room
   useEffect(() => {
@@ -133,12 +135,25 @@ export default function RoomScreen({
     return () => ws.close();
   }, [chatToken]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages — only if the user is already at the
+  // visual bottom. Inverted FlatList: visual bottom = offset 0.
+  // If the user has scrolled up to read history, leave them where they are.
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    if (isAtBottom && listRef.current) {
+      listRef.current.scrollToOffset({ offset: 0, animated: true });
     }
-  }, [messages]);
+  }, [messages.length, isAtBottom]);
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = e.nativeEvent.contentOffset.y;
+    setIsAtBottom(offset < 50);
+  };
+
+  // Inverted FlatList renders data[0] at the visual bottom. Messages
+  // arrive oldest→newest in state; reverse for render so newest sits
+  // at the bottom and history scrolls up. Memoized so reference is
+  // stable across non-message renders.
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   // ── Polling for event/room state ──
   // Cadence adapts: 3s during active sketchTheScene game (catches reveal
@@ -365,18 +380,23 @@ export default function RoomScreen({
             style={styles.kavWrapper}
             keyboardVerticalOffset={0}
           >
-            <ScrollView
-              ref={scrollRef}
+            <FlatList
+              ref={listRef}
+              data={reversedMessages}
+              inverted
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <ChatMessageRow msg={item} />}
               style={styles.chatArea}
               contentContainerStyle={styles.chatContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-            >
-              {messages.map((msg) => (
-                <ChatMessageRow key={msg.id} msg={msg} />
-              ))}
-              <View style={{ height: spacing.md }} />
-            </ScrollView>
+              removeClippedSubviews
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              initialNumToRender={20}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            />
 
             <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
               <TextInput
@@ -565,7 +585,14 @@ const styles = StyleSheet.create({
   gameBannerInstruction: { fontSize: 12, color: 'rgba(196,160,240,0.8)', lineHeight: 18 },
   kavWrapper: { flex: 1 },
   chatArea: { flex: 1 },
-  chatContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  // Inverted FlatList flips contentContainer paddings visually:
+  // paddingTop → visual bottom (gap above composer, matches old spacer),
+  // paddingBottom → visual top (gap above first message in scroll history).
+  chatContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
