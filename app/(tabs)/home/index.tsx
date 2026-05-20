@@ -12,9 +12,8 @@ import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { FeedbackModal } from '../../../components/FeedbackModal';
-import LobbyModal from '../../../components/live/LobbyModal';
+import LiveEventBanner from '../../../components/live/LiveEventBanner';
 import * as LocalAuthentication from 'expo-local-authentication';
-import type { LiveRoom } from '../../../lib/types';
 
 function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
   const today = new Date().toLocaleDateString('en-CA', { timeZone });
@@ -24,15 +23,6 @@ function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
 
 const CACHE_KEY = 'bc_home_cache';
 const DEFAULT_BG = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/loc_default.jpg';
-
-type LiveEvent = {
-  eventId: string;
-  title: string;
-  eventType: 'AUTHOR_EVENT' | 'DANCE_PARTY' | 'IRIS_LIVE';
-  status: string;
-  scheduledAt?: string;
-  rooms?: LiveRoom[];
-};
 
 type HomeData = {
   nextRoute?: string;
@@ -102,33 +92,6 @@ function IrisPulseAvatar({ uri, onPress }: { uri: string; onPress: () => void })
   );
 }
 
-function PulseDot() {
-  const scale   = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0.8)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(scale,   { toValue: 1.9, duration: 800, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
-          Animated.timing(scale,   { toValue: 1,   duration: 800, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
-        ]),
-        Animated.sequence([
-          Animated.timing(opacity, { toValue: 0,   duration: 800, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.8, duration: 800, useNativeDriver: true }),
-        ]),
-      ])
-    ).start();
-  }, []);
-
-  return (
-    <View style={styles.livePulseContainer}>
-      <Animated.View style={[styles.livePulseRing, { transform: [{ scale }], opacity }]} />
-      <View style={styles.livePulseDot} />
-    </View>
-  );
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -145,9 +108,6 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => {
     setFocusCount((c) => c + 1);
   }, []));
-  const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
-  const [lobbyOpen, setLobbyOpen] = useState(false);
-  const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [watched, setWatched] = useState(false);
   const [showTrialOverlay, setShowTrialOverlay] = useState(false);
@@ -269,24 +229,6 @@ export default function HomeScreen() {
     load();
   }, [retryCount, focusCount]);
 
-  useEffect(() => {
-    apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
-      .then((res) => {
-        const eligible = res.events.find((e) => {
-          if (e.status === 'ACTIVE') return true;
-          // Multi-room IRIS_LIVE: show banner from 5 min before scheduled start.
-          // Dead branch until backend brief lands rooms[] on /live/active responses.
-          if (e.status === 'SCHEDULED' && e.eventType === 'IRIS_LIVE' && e.rooms?.length && e.scheduledAt) {
-            const minsUntil = (new Date(e.scheduledAt).getTime() - Date.now()) / 60_000;
-            return minsUntil <= 5 && minsUntil >= -0.5;
-          }
-          return false;
-        });
-        setActiveEvent(eligible ?? null);
-      })
-      .catch(() => {});
-  }, []);
-
   if (!data && loadError) {
     return (
       <View style={styles.loading}>
@@ -337,18 +279,6 @@ export default function HomeScreen() {
     setWatched(true);
   };
 
-  const handleLiveBanner = () => {
-    if (!activeEvent) return;
-    // Multi-room IRIS_LIVE → lobby modal; everything else → existing single-room route.
-    // The rooms[] check no-ops until the backend brief returns rooms on /live responses.
-    if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms && activeEvent.rooms.length > 0) {
-      setLobbyEventId(activeEvent.eventId);
-      setLobbyOpen(true);
-      return;
-    }
-    router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
-  };
-
   const dismissBiometricPrompt = async () => {
     await SecureStore.setItemAsync('bc_biometric_prompt_dismissed', 'true');
     await SecureStore.deleteItemAsync('bc_biometric_prompt_pending');
@@ -396,16 +326,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-      {lobbyEventId && (
-        <LobbyModal
-          eventId={lobbyEventId}
-          visible={lobbyOpen}
-          onClose={() => {
-            setLobbyOpen(false);
-            setLobbyEventId(null);
-          }}
-        />
-      )}
       <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
 
         {/* GREETING */}
@@ -415,18 +335,7 @@ export default function HomeScreen() {
         <View style={styles.center}>
 
           {/* LIVE EVENT BANNER */}
-          {activeEvent && (
-            <TouchableOpacity style={styles.liveBanner} onPress={handleLiveBanner}>
-              <PulseDot />
-              <View style={styles.liveBannerText}>
-                <Text style={styles.liveLabel}>Live Now</Text>
-                <Text style={styles.liveTitle} numberOfLines={1}>{activeEvent.title}</Text>
-              </View>
-              <View style={styles.joinButton}>
-                <Text style={styles.joinText}>Join →</Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          <LiveEventBanner />
 
           {/* IRIS - VIDEO MODE */}
           {iris.mode === 'video' && iris.videoUrl && (
@@ -528,58 +437,6 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: spacing.md,
   },
-  liveBanner: {
-    marginHorizontal: spacing.md,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1A1A2E',
-    borderWidth: 1,
-    borderColor: 'rgba(184,50,85,0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 14,
-    gap: spacing.sm,
-    width: '90%',
-  },
-  livePulseContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(184,50,85,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  livePulseRing: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(184,50,85,0.45)',
-  },
-  livePulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#B83255',
-  },
-  liveBannerText: { flex: 1 },
-  liveLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#B83255',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: 2,
-  },
-  liveTitle: { fontSize: 15, color: '#FDFAF6', fontStyle: 'italic' },
-  joinButton: {
-    backgroundColor: '#B83255',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  joinText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   irisContainer: { alignItems: 'center' },
   irisButton: { alignItems: 'center', gap: spacing.sm },
   irisPulseContainer: { alignItems: 'center', justifyContent: 'center', width: 96, height: 96 },
