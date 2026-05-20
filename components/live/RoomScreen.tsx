@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList,
+  View, Text, TouchableOpacity, FlatList, Pressable,
   StyleSheet, ActivityIndicator, Image, TextInput,
   KeyboardAvoidingView, Platform, Modal, AppState,
   type NativeScrollEvent, type NativeSyntheticEvent,
@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Notifications from 'expo-notifications';
 import { apiGet, apiPost } from '../../lib/api';
-import { spacing, colors } from '../../lib/theme';
+import { radius, spacing, colors } from '../../lib/theme';
 import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse } from '../../lib/types';
 
 // RoomScreen — second modal layer, sits on top of LobbyModal.
@@ -62,9 +62,11 @@ export default function RoomScreen({
   const [sending, setSending] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const prevMessageCountRef = useRef(0);
 
   // Initial mount: fetch profile + join room
   useEffect(() => {
@@ -135,6 +137,23 @@ export default function RoomScreen({
     return () => ws.close();
   }, [chatToken]);
 
+  // Track new arrivals while the user is scrolled away from the bottom.
+  // Must run BEFORE the auto-scroll effect below so the increment lands
+  // before any state churn from the scroll-on-new-message path.
+  useEffect(() => {
+    const delta = messages.length - prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+    if (delta > 0 && !isAtBottom) {
+      setUnreadCount((prev) => prev + delta);
+    }
+  }, [messages.length, isAtBottom]);
+
+  // Once the user is back at the bottom (auto-scroll or manual), clear the
+  // unread badge so the pill disappears.
+  useEffect(() => {
+    if (isAtBottom) setUnreadCount(0);
+  }, [isAtBottom]);
+
   // Auto-scroll on new messages — only if the user is already at the
   // visual bottom. Inverted FlatList: visual bottom = offset 0.
   // If the user has scrolled up to read history, leave them where they are.
@@ -148,6 +167,16 @@ export default function RoomScreen({
     const offset = e.nativeEvent.contentOffset.y;
     setIsAtBottom(offset < 50);
   };
+
+  const handleJumpToLatest = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    // Clear immediately for instant feedback; the isAtBottom reset effect
+    // will also fire once the scroll animation settles.
+    setUnreadCount(0);
+  }, []);
+
+  const displayCount = unreadCount > 99 ? '99+' : String(unreadCount);
+  const unreadLabel = unreadCount === 1 ? 'message' : 'messages';
 
   // Inverted FlatList renders data[0] at the visual bottom. Messages
   // arrive oldest→newest in state; reverse for render so newest sits
@@ -380,23 +409,37 @@ export default function RoomScreen({
             style={styles.kavWrapper}
             keyboardVerticalOffset={0}
           >
-            <FlatList
-              ref={listRef}
-              data={reversedMessages}
-              inverted
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <ChatMessageRow msg={item} />}
-              style={styles.chatArea}
-              contentContainerStyle={styles.chatContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              removeClippedSubviews
-              maxToRenderPerBatch={10}
-              windowSize={10}
-              initialNumToRender={20}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-            />
+            <View style={styles.chatRegion}>
+              <FlatList
+                ref={listRef}
+                data={reversedMessages}
+                inverted
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <ChatMessageRow msg={item} />}
+                style={styles.chatArea}
+                contentContainerStyle={styles.chatContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                removeClippedSubviews
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                initialNumToRender={20}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+              />
+              {unreadCount > 0 && (
+                <Pressable
+                  onPress={handleJumpToLatest}
+                  style={styles.unreadPill}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${displayCount} new ${unreadLabel}. Tap to scroll to latest.`}
+                >
+                  <Text style={styles.unreadPillText}>
+                    ↓ {displayCount} new {unreadLabel}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
 
             <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
               <TextInput
@@ -584,6 +627,7 @@ const styles = StyleSheet.create({
   gameBannerLabel: { fontSize: 13, color: '#C4A0F0', fontWeight: '700', marginBottom: 4 },
   gameBannerInstruction: { fontSize: 12, color: 'rgba(196,160,240,0.8)', lineHeight: 18 },
   kavWrapper: { flex: 1 },
+  chatRegion: { flex: 1, position: 'relative' },
   chatArea: { flex: 1 },
   // Inverted FlatList flips contentContainer paddings visually:
   // paddingTop → visual bottom (gap above composer, matches old spacer),
@@ -623,6 +667,25 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { backgroundColor: 'rgba(255,255,255,0.08)' },
   sendButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  unreadPill: {
+    position: 'absolute',
+    bottom: spacing.sm + 4,
+    alignSelf: 'center',
+    backgroundColor: '#B83255',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  unreadPillText: {
+    color: '#FDFAF6',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 const chatStyles = StyleSheet.create({
