@@ -262,10 +262,11 @@ export default function RoomScreen({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={handleBackToLobby}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.container, { paddingTop: insets.top }]}
-      >
+      {/* Fixed top elements stay outside the KeyboardAvoidingView so the */}
+      {/* header, video, pinned bar, and game banner never move when the */}
+      {/* keyboard opens — only the chat list compresses and the composer */}
+      {/* rides up above the keyboard. */}
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackToLobby} style={styles.backButton}>
@@ -359,41 +360,46 @@ export default function RoomScreen({
         )}
 
         {chatToken && (
-          <ScrollView
-            ref={scrollRef}
-            style={styles.chatArea}
-            contentContainerStyle={styles.chatContent}
-            showsVerticalScrollIndicator={false}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.kavWrapper}
+            keyboardVerticalOffset={0}
           >
-            {messages.map((msg) => (
-              <ChatMessageRow key={msg.id} msg={msg} />
-            ))}
-            <View style={{ height: spacing.md }} />
-          </ScrollView>
-        )}
-
-        {chatToken && (
-          <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              onSubmitEditing={handleSend}
-              placeholder={isPreEvent ? 'Say hi while we wait…' : 'Say something…'}
-              placeholderTextColor="rgba(253,250,246,0.4)"
-              style={styles.input}
-              maxLength={500}
-              returnKeyType="send"
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim() || sending}
+            <ScrollView
+              ref={scrollRef}
+              style={styles.chatArea}
+              contentContainerStyle={styles.chatContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.sendButtonText}>→</Text>
-            </TouchableOpacity>
-          </View>
+              {messages.map((msg) => (
+                <ChatMessageRow key={msg.id} msg={msg} />
+              ))}
+              <View style={{ height: spacing.md }} />
+            </ScrollView>
+
+            <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                onSubmitEditing={handleSend}
+                placeholder={isPreEvent ? 'Say hi while we wait…' : 'Say something…'}
+                placeholderTextColor="rgba(253,250,246,0.4)"
+                style={styles.input}
+                maxLength={500}
+                returnKeyType="send"
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
+                onPress={handleSend}
+                disabled={!input.trim() || sending}
+              >
+                <Text style={styles.sendButtonText}>→</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -557,6 +563,7 @@ const styles = StyleSheet.create({
   },
   gameBannerLabel: { fontSize: 13, color: '#C4A0F0', fontWeight: '700', marginBottom: 4 },
   gameBannerInstruction: { fontSize: 12, color: 'rgba(196,160,240,0.8)', lineHeight: 18 },
+  kavWrapper: { flex: 1 },
   chatArea: { flex: 1 },
   chatContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   composer: {
