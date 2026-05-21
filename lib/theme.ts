@@ -5,7 +5,7 @@ export const colors = {
   border: '#2a2a2a',
   primary: '#c084fc',      // purple
   primaryDark: '#9333ea',
-  accent: '#f472b6',       // pink
+  accent: '#B83255',       // pink
   accentDark: '#ec4899',
   text: '#ffffff',
   textSecondary: '#a1a1aa',
