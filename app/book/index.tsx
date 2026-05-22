@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import VerdictRating, { Verdict } from '../../components/rating/VerdictRating';
+import TagBookModal from '../../components/tag/TagBookModal';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -51,6 +52,11 @@ type BookDetailResponse = {
   libraryItem: {
     status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
     rating: Verdict | null;
+    userSpiceLevel: string | null;
+    userTriggers: string[];
+    userTropes: string[];
+    userTaggedAt: string | null;
+    finishedAt: string | null;
   } | null;
   ratingSummary: RatingSummary | null;
   userCommunityRating: string | null;
@@ -90,6 +96,7 @@ export default function BookDetailsScreen() {
   const [userCommunityRating, setUserCommunityRating] = useState<Verdict | null>(null);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
   const [savingRating, setSavingRating] = useState(false);
+  const [tagModalVisible, setTagModalVisible] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -125,17 +132,37 @@ export default function BookDetailsScreen() {
         status,
       });
       setSavedStatus(status);
-      setData((prev) => prev ? { ...prev, libraryItem: { status, rating: null } } : prev);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              libraryItem: {
+                status,
+                rating: null,
+                userSpiceLevel: null,
+                userTriggers: [],
+                userTropes: [],
+                userTaggedAt: null,
+                finishedAt: status === 'FINISHED' ? new Date().toISOString() : null,
+              },
+            }
+          : prev,
+      );
+      if (status === 'FINISHED') setTagModalVisible(true);
     } catch {}
     setAdding(false);
   }
 
   async function updateStatus(status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED') {
+    const wasFinished = data?.libraryItem?.status === 'FINISHED';
     try {
       await apiPatch(`/library/${workId}`, { status });
       setData((prev) =>
         prev && prev.libraryItem ? { ...prev, libraryItem: { ...prev.libraryItem, status } } : prev
       );
+      if (status === 'FINISHED' && !wasFinished) {
+        setTagModalVisible(true);
+      }
     } catch {}
   }
 
@@ -378,6 +405,24 @@ export default function BookDetailsScreen() {
 
           <View style={styles.divider} />
 
+          {/* TAG THIS BOOK */}
+          {libraryItem && (
+            <>
+              <View style={styles.tagSection}>
+                <TouchableOpacity
+                  style={styles.tagButton}
+                  onPress={() => setTagModalVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.tagButtonText}>
+                    {libraryItem.userTaggedAt ? 'Edit tags' : 'Tag this book'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.divider} />
+            </>
+          )}
+
           {/* PURCHASE */}
           {retailerCTAs.length > 0 && (
             <View style={styles.purchaseSection}>
@@ -404,6 +449,34 @@ export default function BookDetailsScreen() {
           <View style={{ height: spacing.xl }} />
         </View>
       </ScrollView>
+
+      {libraryItem && (
+        <TagBookModal
+          visible={tagModalVisible}
+          onClose={() => setTagModalVisible(false)}
+          workId={work.workId}
+          bookTitle={work.title}
+          initialValues={{
+            rating: libraryItem.rating as any,
+            userSpiceLevel: libraryItem.userSpiceLevel as any,
+            userTriggers: (libraryItem.userTriggers ?? []) as any,
+            userTropes: (libraryItem.userTropes ?? []) as any,
+          }}
+          onSaved={(changes) => {
+            setData((prev) => {
+              if (!prev || !prev.libraryItem) return prev;
+              return {
+                ...prev,
+                libraryItem: {
+                  ...prev.libraryItem,
+                  ...changes,
+                  userTaggedAt: new Date().toISOString(),
+                },
+              };
+            });
+          }}
+        />
+      )}
 
       {/* IRIS FAB */}
       <TouchableOpacity
@@ -480,6 +553,16 @@ const styles = StyleSheet.create({
   verdictButton: { height: 48, borderRadius: radius.md, backgroundColor: 'rgba(15,42,72,0.05)', alignItems: 'center', justifyContent: 'center' },
   verdictButtonActive: { backgroundColor: 'rgba(184,50,85,0.15)', borderWidth: 1.5, borderColor: '#B83255' },
   verdictEmoji: { fontSize: 22 },
+  tagSection: { marginBottom: spacing.md, alignItems: 'stretch' },
+  tagButton: {
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#B83255',
+    backgroundColor: 'rgba(184,50,85,0.06)',
+    alignItems: 'center',
+  },
+  tagButtonText: { fontSize: 12, fontWeight: '700', color: '#B83255', letterSpacing: 0.5 },
   purchaseSection: { marginBottom: spacing.md },
   retailerButtons: { flexDirection: 'row', gap: 12 },
   retailerButton: { flex: 1, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: '#0F2A48', alignItems: 'center' },

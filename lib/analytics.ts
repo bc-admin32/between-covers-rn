@@ -19,7 +19,9 @@ type EventName =
   | 'iris_chat_sent'
   | 'cozy_section_viewed'
   | 'book_added_to_library'
-  | 'retailer_cta_tapped';
+  | 'retailer_cta_tapped'
+  | 'book_tag_committed'
+  | 'tag_modal_closed';
 
 type AnalyticsEvent = {
   eventId: string;

@@ -37,9 +37,9 @@ export type RetailerCTAState =
     };
 
 const LABELS: Record<RetailerKey, { normal: string; fallback: string }> = {
-  amazonKindle: { normal: 'Buy on Amazon',     fallback: 'Find on Amazon' },
-  audible:      { normal: 'Listen on Audible', fallback: 'Find on Audible' },
-  bookshop:     { normal: 'Buy on Bookshop',   fallback: 'Buy on Bookshop' },
+  amazonKindle: { normal: 'Amazon',   fallback: 'Amazon'   },
+  audible:      { normal: 'Audible',  fallback: 'Audible'  },
+  bookshop:     { normal: 'Bookshop', fallback: 'Bookshop' },
 };
 
 export const RETAILERS: RetailerKey[] = ['amazonKindle', 'audible', 'bookshop'];
