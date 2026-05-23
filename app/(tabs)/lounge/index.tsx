@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, Modal, Pressable,
+  StyleSheet, ActivityIndicator, Image, Modal, Pressable, Linking,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,10 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
-import { parseLocalDate } from '../../../lib/dateUtils';
+import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
+
+const BC_LOGO = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/backgrounds/logo.png';
+const SUPPORT_EMAIL = 'support@betweencovers.app';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
@@ -25,6 +28,12 @@ type LoungeData = {
   active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
   loungeTermsAcceptedAt?: string | null;
+  // Populated when the current user has been temporarily restricted from
+  // Lounge participation by an admin. The backend /lounge/resolve handler
+  // must surface these from the user's DDB row for the restricted view to
+  // render — without them, restricted users see the normal empty state.
+  loungeSuspended?: boolean;
+  loungeSuspendedUntil?: string | null;
 };
 
 // Module-level in-memory cache — no size limit, survives tab switches.
@@ -145,6 +154,33 @@ export default function LoungeScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (data?.loungeSuspended) {
+    const returnDate = data.loungeSuspendedUntil ? formatFullDate(data.loungeSuspendedUntil) : '';
+    return (
+      <View style={[styles.container, styles.restrictedContainer, { paddingTop: insets.top }]}>
+        <Image source={{ uri: BC_LOGO }} style={styles.restrictedLogo} resizeMode="contain" />
+        <Text style={styles.restrictedHeadline}>Pause on the Lounge for now. 🤍</Text>
+        <Text style={styles.restrictedReturn}>
+          {returnDate ? `Your access will return on ${returnDate}.` : 'Your access will return shortly.'}
+        </Text>
+        <Text style={styles.restrictedBody}>
+          You'll still have access to the rest of Between Covers — including your library, Iris, and personalized recommendations.
+        </Text>
+        <View style={styles.restrictedDivider} />
+        <Text style={styles.restrictedSupport}>
+          Questions? Email{' '}
+          <Text
+            style={styles.restrictedSupportLink}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            suppressHighlighting
+          >
+            {SUPPORT_EMAIL}
+          </Text>
+        </Text>
       </View>
     );
   }
@@ -532,4 +568,43 @@ const styles = StyleSheet.create({
   },
   eulaAcceptBtnDisabled: { backgroundColor: '#DDD5C4' },
   eulaAcceptBtnText: { fontSize: 15, color: '#fff', fontFamily: 'Nunito_700Bold' },
+  restrictedContainer: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
+  restrictedLogo: { width: 140, height: 67, marginBottom: spacing.lg, opacity: 0.85 },
+  restrictedHeadline: {
+    fontSize: 26,
+    fontFamily: 'Cormorant_700Bold_Italic',
+    color: '#0F2A48',
+    textAlign: 'center',
+    lineHeight: 32,
+    marginBottom: spacing.lg,
+  },
+  restrictedReturn: {
+    fontSize: 16,
+    color: '#9c8f7e',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: spacing.lg,
+  },
+  restrictedBody: {
+    fontSize: 14,
+    color: '#B0A597',
+    textAlign: 'center',
+    lineHeight: 21,
+    paddingHorizontal: spacing.md,
+  },
+  restrictedDivider: {
+    height: 1,
+    width: 60,
+    backgroundColor: 'rgba(15,42,72,0.12)',
+    marginVertical: spacing.xl,
+  },
+  restrictedSupport: {
+    fontSize: 13,
+    color: '#9c8f7e',
+    textAlign: 'center',
+  },
+  restrictedSupportLink: {
+    color: '#0F2A48',
+    textDecorationLine: 'underline',
+  },
 });
