@@ -9,9 +9,13 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Notifications from 'expo-notifications';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, ApiError } from '../../lib/api';
 import { radius, spacing, colors } from '../../lib/theme';
 import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse } from '../../lib/types';
+import ReportMessageSheet, { type ReportTarget } from './ReportMessageSheet';
+import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from './LiveEventRestrictionScreen';
+import LiveEventTermsModal from './LiveEventTermsModal';
+import EjectionBanner, { type EjectionEvent } from './EjectionBanner';
 
 // RoomScreen — second modal layer, sits on top of LobbyModal.
 // Joins a single room: chat over IVS WebSocket, optional Sketch the Scene
@@ -30,6 +34,10 @@ const POLL_SKETCH_MS = 3_000;
 type ChatMessage = {
   id: string;
   sender: string;
+  // IVS Sender.UserId for the originating user. Iris/SYSTEM messages have
+  // no userId. Used to populate ReportTarget and to skip the long-press
+  // affordance on the current user's own messages.
+  userId?: string;
   message: string;
   type: 'USER' | 'IRIS_CHIME' | 'IRIS_CLOSING' | 'SYSTEM';
   timestamp: Date;
@@ -63,6 +71,12 @@ export default function RoomScreen({
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [toast, setToast] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
+  const [restriction, setRestriction] = useState<{ reason: LiveEventRestrictionReason; liftsAt: string | null } | null>(null);
+  const [termsGateVisible, setTermsGateVisible] = useState(false);
+  const [ejection, setEjection] = useState<EjectionEvent | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -73,20 +87,42 @@ export default function RoomScreen({
     let cancelled = false;
     async function init() {
       try {
-        const profileRes = await apiGet<{ displayName: string; photoUrl: string | null }>('/profile');
+        const profileRes = await apiGet<{
+          userId?: string;
+          displayName: string;
+          photoUrl: string | null;
+        }>('/profile');
         const joinRes = await apiPost<RoomJoinResponse>(
           `/live/${eventId}/rooms/${roomId}/join`,
           { displayName: profileRes.displayName, photoUrl: profileRes.photoUrl }
         );
         if (cancelled) return;
+        if (profileRes.userId) setMyUserId(profileRes.userId);
         setChatToken(joinRes.token);
         setAttendanceSk(joinRes.attendanceSk);
         setIsPreEvent(joinRes.isPreEvent);
       } catch (err) {
-        if (!cancelled) {
-          setJoinError("Couldn't join the room. Try again?");
-          console.warn('Room join failed:', err);
+        if (cancelled) return;
+        // Restriction branch — handle reason codes from /join. The four codes
+        // come back as 403 with body.reason; TERMS_ACCEPTANCE_REQUIRED redirects
+        // to the terms modal, the other three render the dedicated screen.
+        if (err instanceof ApiError && err.status === 403 && err.body?.reason) {
+          const reason = err.body.reason as string;
+          if (reason === 'TERMS_ACCEPTANCE_REQUIRED') {
+            setTermsGateVisible(true);
+            return;
+          }
+          if (
+            reason === 'LIVE_EVENTS_BANNED'
+            || reason === 'LIVE_EVENTS_SUSPENDED'
+            || reason === 'LOUNGE_SUSPENDED'
+          ) {
+            setRestriction({ reason, liftsAt: err.body?.liftsAt ?? null });
+            return;
+          }
         }
+        setJoinError("Couldn't join the room. Try again?");
+        console.warn('Room join failed:', err);
       }
     }
     init();
@@ -109,6 +145,7 @@ export default function RoomScreen({
         if (data.Type === 'MESSAGE') {
           setMessages((prev) => [...prev, {
             id: data.Id ?? Date.now().toString(),
+            userId: data.Sender?.UserId,
             sender: data.Sender?.Attributes?.displayName ?? data.Sender?.UserId ?? 'Reader',
             message: data.Content,
             type: 'USER',
@@ -129,6 +166,21 @@ export default function RoomScreen({
               type: data.EventName === 'iris:closing' ? 'IRIS_CLOSING' : 'IRIS_CHIME',
               timestamp: new Date(),
             }]);
+          }
+          if (data.EventName === 'bc:ejection') {
+            const attrs = data.Attributes ?? {};
+            const style = attrs.presentationStyle === 'interrupt' ? 'interrupt' : 'banner';
+            setEjection({
+              message: attrs.message ?? '',
+              presentationStyle: style,
+              timestamp: attrs.timestamp,
+              eventId: attrs.eventId,
+              roomId: attrs.roomId,
+              // Unique key forces EjectionBanner's effect to re-run / restart
+              // the 6s timer even when a back-to-back ejection has identical
+              // message text.
+              localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
+            });
           }
         }
       } catch {}
@@ -153,6 +205,15 @@ export default function RoomScreen({
   useEffect(() => {
     if (isAtBottom) setUnreadCount(0);
   }, [isAtBottom]);
+
+  // Auto-dismiss toast — success copy fades quickly, error sticks slightly
+  // longer so it doesn't disappear before the user reads it.
+  useEffect(() => {
+    if (!toast) return;
+    const ms = toast.kind === 'success' ? 2200 : 3500;
+    const id = setTimeout(() => setToast(null), ms);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   // Auto-scroll on new messages — only if the user is already at the
   // visual bottom. Inverted FlatList: visual bottom = offset 0.
@@ -304,6 +365,22 @@ export default function RoomScreen({
     onBackToLobby();
   }
 
+  // Restriction short-circuit: when the join 403'd with a reason code, the
+  // whole room UI is replaced by the dedicated restriction screen until the
+  // user backs out. We render it inside the same outer Modal so the parent's
+  // onBackToLobby contract stays intact.
+  if (restriction) {
+    return (
+      <Modal visible transparent animationType="slide" onRequestClose={handleBackToLobby}>
+        <LiveEventRestrictionScreen
+          reason={restriction.reason}
+          liftsAt={restriction.liftsAt}
+          onBack={handleBackToLobby}
+        />
+      </Modal>
+    );
+  }
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={handleBackToLobby}>
       {/* Fixed top elements stay outside the KeyboardAvoidingView so the */}
@@ -415,7 +492,27 @@ export default function RoomScreen({
                 data={reversedMessages}
                 inverted
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <ChatMessageRow msg={item} />}
+                renderItem={({ item }) => (
+                  <ChatMessageRow
+                    msg={item}
+                    isSelf={!!myUserId && item.userId === myUserId}
+                    onLongPress={() => {
+                      // Block long-press on Iris/SYSTEM messages and on the
+                      // current user's own messages — neither makes sense to
+                      // report.
+                      if (item.type !== 'USER') return;
+                      if (!myUserId || !item.userId || item.userId === myUserId) return;
+                      setReportTarget({
+                        eventId,
+                        roomId,
+                        reportedUserId: item.userId,
+                        messageId: item.id,
+                        reportedMessageContent: item.message,
+                        reportedDisplayName: item.sender,
+                      });
+                    }}
+                  />
+                )}
                 style={styles.chatArea}
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
@@ -462,12 +559,53 @@ export default function RoomScreen({
             </View>
           </KeyboardAvoidingView>
         )}
+
+        {/* bc:ejection — absolute-positioned overlay/banner, lives above */}
+        {/* chat so it covers the message list (interrupt) or rides the top */}
+        {/* of the room view (banner). Component manages its own 6s fade. */}
+        <EjectionBanner ejection={ejection} onDismiss={() => setEjection(null)} />
+
+        {toast && (
+          <View style={[styles.toast, toast.kind === 'error' && styles.toastError]} pointerEvents="none">
+            <Text style={styles.toastText}>{toast.text}</Text>
+          </View>
+        )}
       </View>
+
+      <ReportMessageSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onToast={(text, kind) => setToast({ text, kind })}
+      />
+
+      {/* Backend-driven gate: if /join returned 403 TERMS_ACCEPTANCE_REQUIRED, */}
+      {/* the user hits this modal here. On accept, retry the join by */}
+      {/* bouncing back to the lobby — RoomScreen unmounts cleanly. */}
+      <LiveEventTermsModal
+        visible={termsGateVisible}
+        onAccept={() => {
+          setTermsGateVisible(false);
+          handleBackToLobby();
+        }}
+        onCancel={() => {
+          setTermsGateVisible(false);
+          handleBackToLobby();
+        }}
+      />
     </Modal>
   );
 }
 
-function ChatMessageRow({ msg }: { msg: ChatMessage }) {
+function ChatMessageRow({
+  msg,
+  isSelf,
+  onLongPress,
+}: {
+  msg: ChatMessage;
+  isSelf: boolean;
+  onLongPress: () => void;
+}) {
   const isIris = msg.type === 'IRIS_CHIME' || msg.type === 'IRIS_CLOSING';
   if (isIris) {
     return (
@@ -484,6 +622,10 @@ function ChatMessageRow({ msg }: { msg: ChatMessage }) {
       </View>
     );
   }
+  // Long-press affordance only renders for other users' messages — self gets
+  // the same bubble but no Pressable wrapper. delayLongPress matches RN's
+  // default for predictable feel across platforms.
+  const reportable = msg.type === 'USER' && !isSelf;
   return (
     <View style={chatStyles.userRow}>
       {msg.photoUrl ? (
@@ -495,9 +637,19 @@ function ChatMessageRow({ msg }: { msg: ChatMessage }) {
       )}
       <View style={chatStyles.userContent}>
         <Text style={chatStyles.userName}>{msg.sender}</Text>
-        <View style={chatStyles.userBubble}>
+        <Pressable
+          onLongPress={reportable ? onLongPress : undefined}
+          delayLongPress={400}
+          disabled={!reportable}
+          style={({ pressed }) => [
+            chatStyles.userBubble,
+            pressed && reportable && chatStyles.userBubblePressed,
+          ]}
+          accessibilityRole={reportable ? 'button' : undefined}
+          accessibilityHint={reportable ? 'Long-press to report this message' : undefined}
+        >
           <Text style={chatStyles.userText}>{msg.message}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -686,6 +838,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  toast: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,42,72,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,163,188,0.4)',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    zIndex: 60,
+  },
+  toastError: {
+    backgroundColor: 'rgba(184,50,85,0.95)',
+    borderColor: 'rgba(245,163,188,0.6)',
+  },
+  toastText: {
+    color: '#FDFAF6',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 const chatStyles = StyleSheet.create({
@@ -743,6 +916,9 @@ const chatStyles = StyleSheet.create({
     borderRadius: 14,
     borderTopLeftRadius: 4,
     padding: spacing.sm,
+  },
+  userBubblePressed: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   userText: { fontSize: 13, color: 'rgba(253,250,246,0.85)' },
 });

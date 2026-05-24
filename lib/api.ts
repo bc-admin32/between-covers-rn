@@ -24,6 +24,21 @@ async function getToken(): Promise<string | null> {
   return token;
 }
 
+// Thrown for any non-2xx response. Callers that need to branch on the
+// status or response body (e.g. live-event restriction screens that read
+// body.reason on a 403) should catch ApiError and inspect those fields
+// rather than parsing the message string.
+export class ApiError extends Error {
+  status: number;
+  body: any;
+  constructor(status: number, body: any, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken();
 
@@ -42,9 +57,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   if (res.status === 204) return undefined as T;
 
   if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    const detail = err?.message ?? err?.error ?? (err ? JSON.stringify(err) : null);
-    throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    const body = await res.json().catch(() => null);
+    const detail = body?.message ?? body?.error ?? (body ? JSON.stringify(body) : null);
+    throw new ApiError(res.status, body, `HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
   }
 
   const text = await res.text();

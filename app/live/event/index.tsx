@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView, Pressable,
   StyleSheet, ActivityIndicator, Image, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -8,10 +8,18 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost, ApiError } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 import QuickRatingModal from '../../../components/QuickRatingModal';
 import type { LiveRoom } from '../../../lib/types';
+import ReportMessageSheet, { type ReportTarget } from '../../../components/live/ReportMessageSheet';
+import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from '../../../components/live/LiveEventRestrictionScreen';
+import LiveEventTermsModal, { shouldShowLiveEventTermsGate } from '../../../components/live/LiveEventTermsModal';
+import EjectionBanner, { type EjectionEvent } from '../../../components/live/EjectionBanner';
+
+// Single-room legacy flow has no rooms[], so report writes target a
+// synthetic "main" room — the backend treats it as the event's own chat.
+const SINGLE_ROOM_ID = 'main';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
@@ -46,6 +54,9 @@ type LiveEvent = {
 
 type ChatMessage = {
   id: string;
+  // IVS Sender.UserId — required to identify the reported user when the
+  // current user long-presses someone else's message.
+  userId?: string;
   sender: string;
   message: string;
   type: 'USER' | 'IRIS_CHIME' | 'IRIS_CLOSING' | 'SYSTEM';
@@ -65,9 +76,20 @@ export default function LiveEventScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [profile, setProfile] = useState<{ displayName: string; photoUrl: string | null } | null>(null);
+  const [profile, setProfile] = useState<{
+    userId?: string;
+    displayName: string;
+    photoUrl: string | null;
+    liveEventTermsAcceptedAt?: string | null;
+    liveEventTermsVersion?: string | null;
+  } | null>(null);
   const [gameBannerExpanded, setGameBannerExpanded] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [toast, setToast] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
+  const [restriction, setRestriction] = useState<{ reason: LiveEventRestrictionReason; liftsAt: string | null } | null>(null);
+  const [termsGateVisible, setTermsGateVisible] = useState(false);
+  const [ejection, setEjection] = useState<EjectionEvent | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -101,6 +123,23 @@ export default function LiveEventScreen() {
     };
   }, [eventId]);
 
+  // Deep-link safety: if the user landed here without going through the home
+  // banner (the entry point that normally gates terms), enforce the same
+  // acceptance check here once the profile loads.
+  useEffect(() => {
+    if (!profile) return;
+    if (shouldShowLiveEventTermsGate(profile)) setTermsGateVisible(true);
+  }, [profile]);
+
+  // Auto-dismiss toast — success copy fades quickly, error sticks slightly
+  // longer so it doesn't disappear before the user reads it.
+  useEffect(() => {
+    if (!toast) return;
+    const ms = toast.kind === 'success' ? 2200 : 3500;
+    const id = setTimeout(() => setToast(null), ms);
+    return () => clearTimeout(id);
+  }, [toast]);
+
   useEffect(() => {
     if (!event || event.status !== 'ACTIVE' || event.liveType !== 'gameNight') return;
     const interval = setInterval(async () => {
@@ -122,6 +161,7 @@ export default function LiveEventScreen() {
         if (data.Type === 'MESSAGE') {
           setMessages((prev) => [...prev, {
             id: data.Id ?? Date.now().toString(),
+            userId: data.Sender?.UserId,
             sender: data.Sender?.Attributes?.displayName ?? data.Sender?.UserId ?? 'Reader',
             message: data.Content,
             type: 'USER',
@@ -137,6 +177,18 @@ export default function LiveEventScreen() {
             type: data.EventName === 'iris:closing' ? 'IRIS_CLOSING' : 'IRIS_CHIME',
             timestamp: new Date(),
           }]);
+        }
+        if (data.Type === 'EVENT' && data.EventName === 'bc:ejection') {
+          const attrs = data.Attributes ?? {};
+          const style = attrs.presentationStyle === 'interrupt' ? 'interrupt' : 'banner';
+          setEjection({
+            message: attrs.message ?? '',
+            presentationStyle: style,
+            timestamp: attrs.timestamp,
+            eventId: attrs.eventId,
+            roomId: attrs.roomId,
+            localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
+          });
         }
       } catch {}
     };
@@ -169,7 +221,25 @@ export default function LiveEventScreen() {
     try {
       const res = await apiPost<{ token: string }>(`/live/${eventId}/chat-token`, { displayName: profile?.displayName, photoUrl: profile?.photoUrl });
       setChatToken(res.token);
-    } catch {}
+    } catch (err) {
+      // Same restriction-code branching as /join in the multi-room flow.
+      // The four reason codes are documented contract; anything else falls
+      // through silently to match the original swallow behaviour.
+      if (err instanceof ApiError && err.status === 403 && err.body?.reason) {
+        const reason = err.body.reason as string;
+        if (reason === 'TERMS_ACCEPTANCE_REQUIRED') {
+          setTermsGateVisible(true);
+          return;
+        }
+        if (
+          reason === 'LIVE_EVENTS_BANNED'
+          || reason === 'LIVE_EVENTS_SUSPENDED'
+          || reason === 'LOUNGE_SUSPENDED'
+        ) {
+          setRestriction({ reason, liftsAt: err.body?.liftsAt ?? null });
+        }
+      }
+    }
   };
 
   const handleSend = async () => {
@@ -200,6 +270,18 @@ export default function LiveEventScreen() {
           <Text style={styles.backLinkText}>Go back</Text>
         </TouchableOpacity>
       </View>
+    );
+  }
+
+  // 403 reason from chat-token replaces the whole screen with the dedicated
+  // restriction view — the user can still back out via router.back().
+  if (restriction) {
+    return (
+      <LiveEventRestrictionScreen
+        reason={restriction.reason}
+        liftsAt={restriction.liftsAt}
+        onBack={() => router.back()}
+      />
     );
   }
 
@@ -319,6 +401,12 @@ export default function LiveEventScreen() {
                   </View>
                 );
               }
+              // Long-press affordance only fires for other users' messages —
+              // self gets the same bubble but no long-press handler.
+              const reportable = msg.type === 'USER'
+                && !!profile?.userId
+                && !!msg.userId
+                && msg.userId !== profile.userId;
               return (
                 <View key={msg.id} style={styles.userChatRow}>
                   {msg.photoUrl ? (
@@ -330,9 +418,30 @@ export default function LiveEventScreen() {
                   )}
                   <View style={styles.userChatContent}>
                     <Text style={styles.userChatName}>{msg.sender}</Text>
-                    <View style={styles.userChatBubble}>
+                    <Pressable
+                      onLongPress={
+                        reportable
+                          ? () => setReportTarget({
+                              eventId: eventId!,
+                              roomId: SINGLE_ROOM_ID,
+                              reportedUserId: msg.userId!,
+                              messageId: msg.id,
+                              reportedMessageContent: msg.message,
+                              reportedDisplayName: msg.sender,
+                            })
+                          : undefined
+                      }
+                      delayLongPress={400}
+                      disabled={!reportable}
+                      style={({ pressed }) => [
+                        styles.userChatBubble,
+                        pressed && reportable && styles.userChatBubblePressed,
+                      ]}
+                      accessibilityRole={reportable ? 'button' : undefined}
+                      accessibilityHint={reportable ? 'Long-press to report this message' : undefined}
+                    >
                       <Text style={styles.userChatText}>{msg.message}</Text>
-                    </View>
+                    </Pressable>
                   </View>
                 </View>
               );
@@ -371,6 +480,44 @@ export default function LiveEventScreen() {
           onSkip={() => setShowRatingModal(false)}
         />
       )}
+
+      {/* bc:ejection overlay — owned by this screen so the timer resets */}
+      {/* when a new ejection lands while one is still visible. */}
+      <EjectionBanner ejection={ejection} onDismiss={() => setEjection(null)} />
+
+      {toast && (
+        <View style={[styles.toast, toast.kind === 'error' && styles.toastError]} pointerEvents="none">
+          <Text style={styles.toastText}>{toast.text}</Text>
+        </View>
+      )}
+
+      <ReportMessageSheet
+        visible={!!reportTarget}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onToast={(text, kind) => setToast({ text, kind })}
+      />
+
+      {/* Backend-driven and deep-link gate. On cancel we bounce out so the */}
+      {/* user can't sit on a chat they haven't agreed to participate in. */}
+      <LiveEventTermsModal
+        visible={termsGateVisible}
+        onAccept={() => {
+          setTermsGateVisible(false);
+          // Refresh profile so the next gate check sees the new acceptance.
+          apiGet<{
+            userId?: string;
+            displayName: string;
+            photoUrl: string | null;
+            liveEventTermsAcceptedAt?: string | null;
+            liveEventTermsVersion?: string | null;
+          }>('/profile').then(setProfile).catch(() => {});
+        }}
+        onCancel={() => {
+          setTermsGateVisible(false);
+          router.back();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -429,7 +576,25 @@ const styles = StyleSheet.create({
   userChatContent: { flex: 1 },
   userChatName: { fontSize: 10, fontWeight: '600', color: 'rgba(196,168,130,0.8)', marginBottom: 4 },
   userChatBubble: { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14, borderTopLeftRadius: 4, padding: spacing.sm },
+  userChatBubblePressed: { backgroundColor: 'rgba(255,255,255,0.14)' },
   userChatText: { fontSize: 13, color: 'rgba(253,250,246,0.85)' },
+  toast: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,42,72,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,163,188,0.4)',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    zIndex: 60,
+  },
+  toastError: {
+    backgroundColor: 'rgba(184,50,85,0.95)',
+    borderColor: 'rgba(245,163,188,0.6)',
+  },
+  toastText: { color: '#FDFAF6', fontSize: 13, fontWeight: '600' },
   chatComposer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
   chatInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: 13, color: 'rgba(253,250,246,0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   sendButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#B83255', alignItems: 'center', justifyContent: 'center' },

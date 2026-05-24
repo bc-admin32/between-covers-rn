@@ -7,7 +7,14 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { spacing } from '../../lib/theme';
 import LobbyModal from './LobbyModal';
+import LiveEventTermsModal, { shouldShowLiveEventTermsGate } from './LiveEventTermsModal';
 import type { LiveRoom } from '../../lib/types';
+
+// Captures what the user was trying to enter when the terms gate intercepted
+// them, so onAccept can resume the intended action without re-prompting.
+type PendingEntry =
+  | { kind: 'lobby'; eventId: string }
+  | { kind: 'single'; eventId: string };
 
 type LiveEvent = {
   eventId: string;
@@ -62,11 +69,18 @@ function PulseDot() {
   );
 }
 
+type ProfileShape = {
+  liveEventTermsAcceptedAt?: string | null;
+  liveEventTermsVersion?: string | null;
+};
+
 export default function LiveEventBanner() {
   const router = useRouter();
   const [activeEvent, setActiveEvent] = useState<LiveEvent | null>(null);
   const [lobbyOpen, setLobbyOpen] = useState(false);
   const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
+  const [termsGateVisible, setTermsGateVisible] = useState(false);
+  const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
 
   const refetch = useCallback(() => {
     apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
@@ -116,16 +130,36 @@ export default function LiveEventBanner() {
     };
   }, [refetch]);
 
-  const handlePress = () => {
-    if (!activeEvent) return;
-    // Multi-room IRIS_LIVE → lobby modal; everything else → existing single-room route.
-    // The rooms[] check no-ops until the backend brief returns rooms on /live responses.
-    if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms && activeEvent.rooms.length > 0) {
-      setLobbyEventId(activeEvent.eventId);
+  const proceedToEntry = useCallback((entry: PendingEntry) => {
+    if (entry.kind === 'lobby') {
+      setLobbyEventId(entry.eventId);
       setLobbyOpen(true);
-      return;
+    } else {
+      router.push(`/live/event?eventId=${entry.eventId}` as any);
     }
-    router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
+  }, [router]);
+
+  const handlePress = async () => {
+    if (!activeEvent) return;
+    const entry: PendingEntry = activeEvent.eventType === 'IRIS_LIVE'
+      && activeEvent.rooms && activeEvent.rooms.length > 0
+      ? { kind: 'lobby', eventId: activeEvent.eventId }
+      : { kind: 'single', eventId: activeEvent.eventId };
+
+    // Pre-check terms before opening either flow. Profile fetch failure
+    // shouldn't block entry — the underlying /chat-token or /join 403 with
+    // TERMS_ACCEPTANCE_REQUIRED is the source-of-truth fallback.
+    try {
+      const profile = await apiGet<ProfileShape>('/profile');
+      if (shouldShowLiveEventTermsGate(profile)) {
+        setPendingEntry(entry);
+        setTermsGateVisible(true);
+        return;
+      }
+    } catch {
+      // fall through and let backend gate enforce
+    }
+    proceedToEntry(entry);
   };
 
   return (
@@ -152,6 +186,20 @@ export default function LiveEventBanner() {
           }}
         />
       )}
+
+      <LiveEventTermsModal
+        visible={termsGateVisible}
+        onAccept={() => {
+          setTermsGateVisible(false);
+          const entry = pendingEntry;
+          setPendingEntry(null);
+          if (entry) proceedToEntry(entry);
+        }}
+        onCancel={() => {
+          setTermsGateVisible(false);
+          setPendingEntry(null);
+        }}
+      />
     </>
   );
 }
