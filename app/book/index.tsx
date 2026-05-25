@@ -6,6 +6,7 @@ import {
 import { CaretLeft } from 'phosphor-react-native';
 import VerdictRating, { Verdict } from '../../components/rating/VerdictRating';
 import TagBookModal from '../../components/tag/TagBookModal';
+import AffiliateDisclosure from '../../components/AffiliateDisclosure';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -445,6 +446,8 @@ export default function BookDetailsScreen() {
               </View>
             </View>
           )}
+
+          {retailerCTAs.length > 0 && <AffiliateDisclosure />}
 
           <View style={{ height: spacing.xl }} />
         </View>

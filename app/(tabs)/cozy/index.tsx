@@ -12,6 +12,7 @@ import { apiGet } from '../../../lib/api';
 import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../lib/dateUtils';
+import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 
 const CACHE_KEY = 'bc_cozy_cache';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
@@ -515,6 +516,8 @@ export default function CozyScreen() {
             </ScrollView>
           </View>
         )}
+
+        <AffiliateDisclosure />
 
         <View style={{ height: 100 }} />
       </ScrollView>

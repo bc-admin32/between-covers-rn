@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
+import AffiliateDisclosure from '../../../../components/AffiliateDisclosure';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -269,6 +270,8 @@ export default function CozyItemsScreen() {
             <Text style={styles.submitCardCta}>Share it →</Text>
           </TouchableOpacity>
         )}
+
+        <AffiliateDisclosure />
 
         <View style={{ height: 100 }} />
       </ScrollView>
