@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { apiPost } from '../../lib/api';
 import { spacing } from '../../lib/theme';
 
@@ -31,8 +32,16 @@ type Props = {
 };
 
 export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Props) {
+  const router = useRouter();
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function openCommunityGuidelines() {
+    // Routes through the shared legal-document handler so the doc URL stays
+    // centralized (mirrors the Lounge guidelines modal). Modal stays mounted
+    // beneath the pushed route and remains visible on back-navigation.
+    router.push('/legal/document?doc=community-guidelines' as any);
+  }
 
   async function handleAccept() {
     setAccepting(true);
@@ -54,22 +63,26 @@ export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Pro
           <View style={styles.handle} />
 
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>Before You Step Inside ✦</Text>
-            <Text style={styles.subtitle}>
-              Live events are intimate, real-time spaces. A few ground rules to keep them feeling that way:
+            <Text style={styles.title}>Before You Walk In</Text>
+
+            <Text style={styles.paragraph}>Live events aren't the Lounge.</Text>
+
+            <Text style={styles.paragraph}>
+              Slurs, threats, harassment, and the other hard stops outlined in our{' '}
+              <Text style={styles.link} onPress={openCommunityGuidelines} suppressHighlighting>
+                Community Guidelines
+              </Text>
+              {' '}will get you removed from this live and restricted from all future live events — no warnings, no second chances.
             </Text>
 
-            <View style={styles.bullets}>
-              <Bullet>Be kind. No harassment, slurs, or personal attacks — anyone can long-press a message to report it.</Bullet>
-              <Bullet>Keep it appropriate. Sexual content, threats, and spam will get you removed from the room.</Bullet>
-              <Bullet>Don't break the moment. Iris is hosting — let her drive, and use chat to react and connect.</Bullet>
-              <Bullet>Repeat violations may pause or end your live event access. Severe ones may end it permanently.</Bullet>
-            </View>
-
-            <Text style={styles.legalese}>
-              By tapping Accept, you agree to participate respectfully and acknowledge that Between Covers may
-              remove messages, temporarily restrict your access, or permanently revoke it for violations.
+            <Text style={styles.paragraph}>
+              Sustained negativity toward other members or Iris may also lead to restrictions over time.
+              Members can flag behavior they believe the team should review.
             </Text>
+
+            <Text style={styles.paragraph}>Everything else on Between Covers stays yours.</Text>
+
+            <Text style={styles.paragraph}>Chaos is welcome. Cruelty isn't.</Text>
 
             {error && <Text style={styles.error}>{error}</Text>}
           </ScrollView>
@@ -96,15 +109,6 @@ export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Pro
   );
 }
 
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.bulletRow}>
-      <Text style={styles.bulletDot}>✦</Text>
-      <Text style={styles.bulletText}>{children}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: {
@@ -125,22 +129,16 @@ const styles = StyleSheet.create({
     color: '#0F2A48',
     marginBottom: spacing.sm,
   },
-  subtitle: {
+  paragraph: {
     fontSize: 14,
-    color: '#6A5550',
+    color: '#3A2C28',
     lineHeight: 21,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
-  bullets: { gap: spacing.md, marginBottom: spacing.lg },
-  bulletRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  bulletDot: { fontSize: 12, color: '#B83255', marginTop: 2 },
-  bulletText: { flex: 1, fontSize: 13, color: '#3A2C28', lineHeight: 20 },
-  legalese: {
-    fontSize: 12,
-    color: '#9c8f7e',
-    fontStyle: 'italic',
-    lineHeight: 18,
-    marginTop: spacing.sm,
+  link: {
+    color: '#B83255',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   error: {
     marginTop: spacing.md,
