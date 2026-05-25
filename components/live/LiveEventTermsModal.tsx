@@ -12,7 +12,7 @@ import { spacing } from '../../lib/theme';
 // against that env var to decide whether to return TERMS_ACCEPTANCE_REQUIRED,
 // and bcAcceptLiveEvent writes that env var into the user's row on accept.
 // Compared as a string (not semver-parsed) so any mismatch invalidates.
-export const CURRENT_LIVE_EVENT_TERMS_VERSION = '1.0.0';
+export const CURRENT_LIVE_EVENT_TERMS_VERSION = '2026-05';
 
 // Profile shape this modal cares about. Callers pass profile.liveEventTermsAcceptedAt
 // (and optionally liveEventTermsVersion) into shouldShowLiveEventTermsGate.
