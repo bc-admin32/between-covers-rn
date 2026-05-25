@@ -16,6 +16,7 @@ import ReportMessageSheet, { type ReportTarget } from './ReportMessageSheet';
 import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from './LiveEventRestrictionScreen';
 import LiveEventTermsModal from './LiveEventTermsModal';
 import EjectionBanner, { type EjectionEvent } from './EjectionBanner';
+import WarningBanner, { type WarningEvent } from './WarningBanner';
 
 // RoomScreen — second modal layer, sits on top of LobbyModal.
 // Joins a single room: chat over IVS WebSocket, optional Sketch the Scene
@@ -77,10 +78,14 @@ export default function RoomScreen({
   const [restriction, setRestriction] = useState<{ reason: LiveEventRestrictionReason; liftsAt: string | null } | null>(null);
   const [termsGateVisible, setTermsGateVisible] = useState(false);
   const [ejection, setEjection] = useState<EjectionEvent | null>(null);
+  const [warning, setWarning] = useState<WarningEvent | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const prevMessageCountRef = useRef(0);
+  // Read inside ws.onmessage so the closure sees the current userId even
+  // when /profile resolves after the WebSocket is established.
+  const myUserIdRef = useRef<string | null>(null);
 
   // Initial mount: fetch profile + join room
   useEffect(() => {
@@ -97,7 +102,10 @@ export default function RoomScreen({
           { displayName: profileRes.displayName, photoUrl: profileRes.photoUrl }
         );
         if (cancelled) return;
-        if (profileRes.userId) setMyUserId(profileRes.userId);
+        if (profileRes.userId) {
+          setMyUserId(profileRes.userId);
+          myUserIdRef.current = profileRes.userId;
+        }
         setChatToken(joinRes.token);
         setAttendanceSk(joinRes.attendanceSk);
         setIsPreEvent(joinRes.isPreEvent);
@@ -179,6 +187,19 @@ export default function RoomScreen({
               // Unique key forces EjectionBanner's effect to re-run / restart
               // the 6s timer even when a back-to-back ejection has identical
               // message text.
+              localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
+            });
+          }
+          if (data.EventName === 'bc:warning') {
+            // Broadcast to every participant — only the targeted user should
+            // see the banner; everyone else returns silently with no log.
+            const attrs = data.Attributes ?? {};
+            if (!myUserIdRef.current || attrs.userId !== myUserIdRef.current) return;
+            console.log('[liveEvent] bc:warning received for current user, count:', attrs.warningCount);
+            setWarning({
+              message: attrs.message ?? '',
+              warningCount: attrs.warningCount,
+              timestamp: attrs.timestamp,
               localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
             });
           }
@@ -564,6 +585,10 @@ export default function RoomScreen({
         {/* chat so it covers the message list (interrupt) or rides the top */}
         {/* of the room view (banner). Component manages its own 6s fade. */}
         <EjectionBanner ejection={ejection} onDismiss={() => setEjection(null)} />
+
+        {/* bc:warning — only mounted when the event was for the current */}
+        {/* user (filter happens in the ws handler upstream). */}
+        <WarningBanner warning={warning} onDismiss={() => setWarning(null)} />
 
         {toast && (
           <View style={[styles.toast, toast.kind === 'error' && styles.toastError]} pointerEvents="none">

@@ -16,6 +16,7 @@ import ReportMessageSheet, { type ReportTarget } from '../../../components/live/
 import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from '../../../components/live/LiveEventRestrictionScreen';
 import LiveEventTermsModal, { shouldShowLiveEventTermsGate } from '../../../components/live/LiveEventTermsModal';
 import EjectionBanner, { type EjectionEvent } from '../../../components/live/EjectionBanner';
+import WarningBanner, { type WarningEvent } from '../../../components/live/WarningBanner';
 
 // Single-room legacy flow has no rooms[], so report writes target a
 // synthetic "main" room — the backend treats it as the event's own chat.
@@ -90,8 +91,12 @@ export default function LiveEventScreen() {
   const [restriction, setRestriction] = useState<{ reason: LiveEventRestrictionReason; liftsAt: string | null } | null>(null);
   const [termsGateVisible, setTermsGateVisible] = useState(false);
   const [ejection, setEjection] = useState<EjectionEvent | null>(null);
+  const [warning, setWarning] = useState<WarningEvent | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // Read inside ws.onmessage so the closure sees the current userId even
+  // when profile loads/updates after the WebSocket is established.
+  const myUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!eventId) { setLoading(false); return; }
@@ -99,7 +104,13 @@ export default function LiveEventScreen() {
       try {
         const [eventRes, profileRes] = await Promise.all([
           apiGet<{ event: LiveEvent }>(`/live/${eventId}`),
-          apiGet<{ displayName: string; photoUrl: string | null }>('/profile'),
+          apiGet<{
+            userId?: string;
+            displayName: string;
+            photoUrl: string | null;
+            liveEventTermsAcceptedAt?: string | null;
+            liveEventTermsVersion?: string | null;
+          }>('/profile'),
         ]);
 
         // Defensive: multi-room IRIS_LIVE events should only enter via the home banner → LobbyModal.
@@ -130,6 +141,10 @@ export default function LiveEventScreen() {
     if (!profile) return;
     if (shouldShowLiveEventTermsGate(profile)) setTermsGateVisible(true);
   }, [profile]);
+
+  useEffect(() => {
+    if (profile?.userId) myUserIdRef.current = profile.userId;
+  }, [profile?.userId]);
 
   // Auto-dismiss toast — success copy fades quickly, error sticks slightly
   // longer so it doesn't disappear before the user reads it.
@@ -187,6 +202,19 @@ export default function LiveEventScreen() {
             timestamp: attrs.timestamp,
             eventId: attrs.eventId,
             roomId: attrs.roomId,
+            localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
+          });
+        }
+        if (data.Type === 'EVENT' && data.EventName === 'bc:warning') {
+          // Broadcast to every participant — only the targeted user should
+          // see the banner; everyone else returns silently with no log.
+          const attrs = data.Attributes ?? {};
+          if (!myUserIdRef.current || attrs.userId !== myUserIdRef.current) return;
+          console.log('[liveEvent] bc:warning received for current user, count:', attrs.warningCount);
+          setWarning({
+            message: attrs.message ?? '',
+            warningCount: attrs.warningCount,
+            timestamp: attrs.timestamp,
             localKey: `${attrs.timestamp ?? ''}-${Date.now()}-${Math.random()}`,
           });
         }
@@ -484,6 +512,10 @@ export default function LiveEventScreen() {
       {/* bc:ejection overlay — owned by this screen so the timer resets */}
       {/* when a new ejection lands while one is still visible. */}
       <EjectionBanner ejection={ejection} onDismiss={() => setEjection(null)} />
+
+      {/* bc:warning banner — only mounted when the event was for the */}
+      {/* current user (filter happens in the ws handler upstream). */}
+      <WarningBanner warning={warning} onDismiss={() => setWarning(null)} />
 
       {toast && (
         <View style={[styles.toast, toast.kind === 'error' && styles.toastError]} pointerEvents="none">
