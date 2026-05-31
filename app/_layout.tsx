@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useRouter, useRootNavigationState } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,6 +21,33 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayout() {
   const router = useRouter();
+
+  // Root navigator readiness. useRootNavigationState() returns undefined until
+  // the <Stack> below mounts; deep-link / notification handlers can fire (cold
+  // start via OAuth redirect or notification tap) before that, so navigating
+  // immediately throws "Attempted to navigate before mounting the Root Layout
+  // component." We stash the target and flush it once the navigator is ready.
+  const navigationState = useRootNavigationState();
+  const navReadyRef = useRef(false);
+  const pendingNavRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    navReadyRef.current = !!navigationState?.key;
+    if (navReadyRef.current && pendingNavRef.current) {
+      const target = pendingNavRef.current;
+      pendingNavRef.current = null;
+      router.push(target as any);
+    }
+  }, [navigationState?.key]);
+
+  // Navigate now if the navigator is mounted, otherwise defer until it is.
+  const navigateWhenReady = (path: string) => {
+    if (navReadyRef.current) {
+      router.push(path as any);
+    } else {
+      pendingNavRef.current = path;
+    }
+  };
 
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
@@ -71,7 +98,7 @@ function RootLayout() {
           const code = new URL(url).searchParams.get('code');
           console.log('CODE:', code);
           if (code) {
-            router.push(`/(auth)/redirect?code=${code}` as any);
+            navigateWhenReady(`/(auth)/redirect?code=${code}`);
           }
         } catch (e) {
           console.log('URL parse error:', e);
@@ -107,7 +134,7 @@ function RootLayout() {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       if (data?.type === 'iris_live' || data?.screen === 'lounge') {
-        router.push('/(tabs)/lounge' as any);
+        navigateWhenReady('/(tabs)/lounge');
       }
     });
     return () => sub.remove();
