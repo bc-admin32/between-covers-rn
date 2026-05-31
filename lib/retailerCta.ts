@@ -54,11 +54,36 @@ export const RETAILER_PROFILE_ID: Record<RetailerKey, string> = {
 };
 
 export function getRetailerCTA(
-  fields: RetailerCTAFields,
+  fields: RetailerCTAFields & { title?: string | null; primaryAuthor?: string | null },
   retailer: RetailerKey,
 ): RetailerCTAState {
   const url = fields[`${retailer}Url`];
   const status = fields[`${retailer}ValidationStatus`] ?? null;
+
+  // Bookshop: stored product URLs key to a different edition's ISBN than ours,
+  // so direct ISBN links mismatch. Route to a title+author search, which
+  // resolves to the book regardless of edition. (/beta-search confirmed live.)
+  if (retailer === 'bookshop') {
+    const rawTitle = (fields.title ?? '')
+      .split('|')[0]
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\bA Novel\b/gi, '')
+      .trim();
+    const terms = [rawTitle, fields.primaryAuthor ?? '']
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .toLowerCase();
+    if (!terms) return { visible: false };
+    return {
+      visible: true,
+      url: `https://bookshop.org/beta-search?keywords=${encodeURIComponent(terms)}`,
+      label: LABELS.bookshop.normal,
+      isFallback: true,
+      validationStatus: status,
+    };
+  }
 
   if (!url) return { visible: false };
   if (status === 'no_match' || status === 'manual_broken') {
