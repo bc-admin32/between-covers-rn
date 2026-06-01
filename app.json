@@ -29,7 +29,8 @@
         "NSPhotoLibraryAddUsageDescription": "Between Covers saves your photo to your library.",
         "NSFaceIDUsageDescription": "Between Covers uses Face ID to keep your account secure.",
         "LSApplicationQueriesSchemes": ["spotify"],
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "UIRequiredDeviceCapabilities": ["arm64"]
       }
 
     },
