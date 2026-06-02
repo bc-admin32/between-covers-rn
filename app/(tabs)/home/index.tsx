@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
   ActivityIndicator, ImageBackground, Animated, Easing, Linking, Modal,
+  AccessibilityInfo,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -36,16 +37,22 @@ type HomeData = {
   };
 };
 
+// Rendered only while Iris's daily message is unread (the `!watched` branch on
+// the home screen), so this component's mount lifetime *is* the unread state —
+// the looping attention animation starts on mount and stops when it unmounts
+// (i.e. once the user opens the message). No separate flag or API call needed.
 function IrisPulseAvatar({ uri, onPress }: { uri: string; onPress: () => void }) {
   const ringScale   = useRef(new Animated.Value(1)).current;
   const ringOpacity = useRef(new Animated.Value(0.35)).current;
   const ring2Scale  = useRef(new Animated.Value(1)).current;
   const ring2Opacity= useRef(new Animated.Value(0.2)).current;
-  const shakeX      = useRef(new Animated.Value(0)).current;
+  const wiggle      = useRef(new Animated.Value(0)).current; // -1..1 → rotate + slide
+  const glow        = useRef(new Animated.Value(0)).current; // 0..1  → halo opacity + scale
+  const [reduceMotion, setReduceMotion] = useState(false);
 
+  // Ambient pulse rings — always breathing, gives the avatar a soft live halo.
   useEffect(() => {
-    // Soft pulse rings
-    Animated.loop(
+    const rings = Animated.loop(
       Animated.parallel([
         Animated.sequence([
           Animated.timing(ringScale,   { toValue: 1.25, duration: 1200, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
@@ -64,26 +71,61 @@ function IrisPulseAvatar({ uri, onPress }: { uri: string; onPress: () => void })
           Animated.timing(ring2Opacity, { toValue: 0.2, duration: 1200, useNativeDriver: true }),
         ]),
       ])
-    ).start();
-
-    // Gentle shake every ~5s
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shakeX, { toValue: 1.5,  duration: 90, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -1.5, duration: 90, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: 1,    duration: 90, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: -1,   duration: 90, useNativeDriver: true }),
-        Animated.timing(shakeX, { toValue: 0,    duration: 90, useNativeDriver: true }),
-        Animated.delay(5000),
-      ])
-    ).start();
+    );
+    rings.start();
+    return () => rings.stop();
   }, []);
 
+  // Honor the OS "reduce motion" setting — fall back to glow-only (no wiggle).
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((v) => { if (mounted) setReduceMotion(v); })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => setReduceMotion(v));
+    return () => { mounted = false; sub.remove(); };
+  }, []);
+
+  // Attention burst: a quick wiggle + a couple of glow pulses over ~1.3s, then
+  // a brief rest (~2.4s), on repeat. Eye-catching without being frantic.
+  useEffect(() => {
+    const glowPulses = Animated.sequence([
+      Animated.timing(glow, { toValue: 1,    duration: 320, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+      Animated.timing(glow, { toValue: 0.25, duration: 300, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+      Animated.timing(glow, { toValue: 1,    duration: 320, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+      Animated.timing(glow, { toValue: 0,    duration: 360, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+    ]);
+
+    const wiggleBurst = Animated.sequence([
+      Animated.timing(wiggle, { toValue: 1,    duration: 80, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: -1,   duration: 90, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: 0.7,  duration: 90, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: -0.7, duration: 90, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: 0.4,  duration: 90, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: 0,    duration: 90, useNativeDriver: true }),
+    ]);
+
+    const burst = reduceMotion ? glowPulses : Animated.parallel([wiggleBurst, glowPulses]);
+    const loop = Animated.loop(Animated.sequence([burst, Animated.delay(2400)]));
+    loop.start();
+    return () => {
+      loop.stop();
+      wiggle.setValue(0);
+      glow.setValue(0);
+    };
+  }, [reduceMotion]);
+
+  const rotate      = wiggle.interpolate({ inputRange: [-1, 1], outputRange: ['-10deg', '10deg'] });
+  const translateX  = wiggle.interpolate({ inputRange: [-1, 1], outputRange: [-5, 5] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
+  const glowScale   = glow.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.35] });
+
   return (
-    <TouchableOpacity onPress={onPress} style={styles.irisPulseContainer}>
+    <TouchableOpacity onPress={onPress} style={styles.irisPulseContainer} activeOpacity={0.85}>
+      <Animated.View pointerEvents="none" style={[styles.irisGlow, { opacity: glowOpacity, transform: [{ scale: glowScale }] }]} />
       <Animated.View style={[styles.irisPulseRing, { transform: [{ scale: ringScale }], opacity: ringOpacity }]} />
       <Animated.View style={[styles.irisPulseRing2, { transform: [{ scale: ring2Scale }], opacity: ring2Opacity }]} />
-      <Animated.View style={{ transform: [{ translateX: shakeX }] }}>
+      <Animated.View style={{ transform: [{ rotate }, { translateX }] }}>
         <View style={styles.irisAvatarWrapper}>
           <Image source={{ uri }} style={styles.irisAvatar} />
         </View>
@@ -440,6 +482,20 @@ const styles = StyleSheet.create({
   irisContainer: { alignItems: 'center' },
   irisButton: { alignItems: 'center', gap: spacing.sm },
   irisPulseContainer: { alignItems: 'center', justifyContent: 'center', width: 96, height: 96 },
+  irisGlow: {
+    position: 'absolute',
+    top: -12,
+    left: -12,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(184,50,85,0.5)',
+    shadowColor: '#B83255',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 22,
+    elevation: 12,
+  },
   irisPulseRing: {
     position: 'absolute',
     width: 96,
