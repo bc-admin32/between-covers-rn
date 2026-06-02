@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform, Image,
+  StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable,
 } from 'react-native';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft, Copy, Check } from 'phosphor-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPost } from '../../../lib/api';
@@ -62,7 +63,18 @@ export default function IrisChatScreen() {
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopy = useCallback(async (id: string, text: string) => {
+    await Clipboard.setStringAsync(text);
+    setCopiedId(id);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopiedId(null), 1500);
+  }, []);
+
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
@@ -158,8 +170,30 @@ export default function IrisChatScreen() {
         {messages.map((msg) => (
           msg.role === 'iris' ? (
             <View key={msg.id} style={styles.irisMsgRow}>
-              <View style={styles.irisBubble}>
-                <Text style={styles.irisBubbleText}>{msg.text}</Text>
+              <View style={styles.irisBubbleCol}>
+                <Pressable
+                  style={styles.irisBubble}
+                  onLongPress={() => handleCopy(msg.id, msg.text)}
+                  delayLongPress={300}
+                >
+                  <Text style={styles.irisBubbleText}>{msg.text}</Text>
+                </Pressable>
+                <TouchableOpacity
+                  style={styles.copyAffordance}
+                  onPress={() => handleCopy(msg.id, msg.text)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Iris's message"
+                >
+                  {copiedId === msg.id ? (
+                    <Check size={13} color="#9B6B9B" weight="bold" />
+                  ) : (
+                    <Copy size={13} color="#B09A7E" weight="regular" />
+                  )}
+                  <Text style={[styles.copyAffordanceText, copiedId === msg.id && styles.copyAffordanceTextDone]}>
+                    {copiedId === msg.id ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
             </View>
@@ -228,8 +262,12 @@ const styles = StyleSheet.create({
   dateLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
   dateLabel: { fontSize: 11, color: '#B09A7E', letterSpacing: 0.4 },
   irisMsgRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-end', gap: spacing.sm, marginBottom: spacing.sm },
-  irisBubble: { maxWidth: '78%', backgroundColor: '#fff', borderRadius: 18, borderBottomRightRadius: 4, padding: spacing.md, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  irisBubbleCol: { maxWidth: '78%', alignItems: 'flex-end', gap: 4 },
+  irisBubble: { backgroundColor: '#fff', borderRadius: 18, borderBottomRightRadius: 4, padding: spacing.md, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
   irisBubbleText: { fontSize: 15, color: '#1a1a1a', lineHeight: 22, fontWeight: '300' },
+  copyAffordance: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 4, paddingVertical: 2 },
+  copyAffordanceText: { fontSize: 11, color: '#B09A7E', fontWeight: '500' },
+  copyAffordanceTextDone: { color: '#9B6B9B' },
   irisAvatar: { width: 28, height: 28, borderRadius: 14, marginBottom: spacing.xs },
   userMsgRow: { flexDirection: 'row', justifyContent: 'flex-start', marginBottom: spacing.sm },
   userBubble: { maxWidth: '78%', backgroundColor: '#6A5969', borderRadius: 18, borderBottomLeftRadius: 4, padding: spacing.md },

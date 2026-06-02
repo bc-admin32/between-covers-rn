@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, Modal, Pressable, Linking,
@@ -6,6 +6,8 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
+import { Copy, Check } from 'phosphor-react-native';
 import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
@@ -77,6 +79,17 @@ export default function LoungeScreen() {
   const [pollResult, setPollResult] = useState<{ options: PollOption[]; totalVotes: number; selectedOptionId: string } | null>(null);
   const [eulaModal, setEulaModal] = useState(false);
   const [eulaAccepting, setEulaAccepting] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopy = useCallback(async (key: string, text: string) => {
+    await Clipboard.setStringAsync(text);
+    setCopiedKey(key);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopiedKey(null), 1500);
+  }, []);
+
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -321,6 +334,20 @@ export default function LoungeScreen() {
                 <Text style={styles.irisLabel}>Iris Has Thoughts</Text>
                 <Text style={styles.irisTitle}>{iris.title}</Text>
               </View>
+              <TouchableOpacity
+                style={styles.copyChip}
+                onPress={() => handleCopy('iris', `${iris.title}\n\n${iris.body}`)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Copy this week's topic and prompt"
+              >
+                {copiedKey === 'iris' ? (
+                  <Check size={14} color="#9B6B9B" weight="bold" />
+                ) : (
+                  <Copy size={14} color="#9B6B9B" weight="regular" />
+                )}
+                <Text style={styles.copyChipText}>{copiedKey === 'iris' ? 'Copied' : 'Copy'}</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.cardDescription}>{iris.body}</Text>
             <View style={styles.irisCardFooter}>
@@ -417,7 +444,23 @@ export default function LoungeScreen() {
           <>
             <Divider />
             <View style={[styles.card, styles.monthlyCard]}>
-              <Text style={styles.monthlyLabel}>{formatMonth(active.startDate)} Prompt</Text>
+              <View style={styles.monthlyLabelRow}>
+                <Text style={styles.monthlyLabel}>{formatMonth(active.startDate)} Prompt</Text>
+                <TouchableOpacity
+                  style={styles.copyChipDark}
+                  onPress={() => handleCopy('monthly', `${monthly.title}\n\n${monthly.body}`)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy the monthly prompt"
+                >
+                  {copiedKey === 'monthly' ? (
+                    <Check size={14} color="#C4A882" weight="bold" />
+                  ) : (
+                    <Copy size={14} color="#C4A882" weight="regular" />
+                  )}
+                  <Text style={styles.copyChipTextLight}>{copiedKey === 'monthly' ? 'Copied' : 'Copy'}</Text>
+                </TouchableOpacity>
+              </View>
               {monthly.isHot && (
                 <View style={styles.monthlyHotBadge}>
                   <Text style={styles.monthlyHotBadgeText}>🔥 Hot</Text>
@@ -533,7 +576,12 @@ const styles = StyleSheet.create({
   pollBarFill: { height: 8 },
   pollVoteCount: { textAlign: 'center', fontSize: 11, color: '#B09A7E', marginTop: spacing.md },
   monthlyCard: { backgroundColor: '#1A1A2E', borderColor: '#C4A882' },
+  monthlyLabelRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   monthlyLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Nunito_700Bold', color: '#C4A882', marginBottom: spacing.sm },
+  copyChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(155,107,155,0.10)' },
+  copyChipText: { fontSize: 11, color: '#9B6B9B', fontFamily: 'Nunito_700Bold' },
+  copyChipDark: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(196,168,130,0.18)' },
+  copyChipTextLight: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_700Bold' },
   monthlyHotBadge: { backgroundColor: 'rgba(184,50,85,0.25)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: spacing.sm },
   monthlyHotBadgeText: { fontSize: 10, fontWeight: '700', color: '#F5A3BC' },
   monthlyTitle: { fontSize: 28, color: '#FDFAF6', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 34, marginBottom: spacing.sm },
