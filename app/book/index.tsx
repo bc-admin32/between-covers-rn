@@ -320,9 +320,9 @@ export default function BookDetailsScreen() {
 
           {/* TITLE */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>{work.title}</Text>
+            <Text style={styles.title} selectable>{work.title}</Text>
             {work.series && <Text style={styles.series}>{work.series}</Text>}
-            <Text style={styles.author}>{work.primaryAuthor}</Text>
+            <Text style={styles.author} selectable>{work.primaryAuthor}</Text>
           </View>
 
           {/* LIBRARY STATUS */}
