@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image, Modal, Pressable, Linking,
@@ -6,8 +6,6 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import * as Clipboard from 'expo-clipboard';
-import { Copy, Check } from 'phosphor-react-native';
 import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
@@ -20,8 +18,8 @@ const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris
 const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
 type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 type Section =
-  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
-  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
+  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
+  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
   | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null; replyCount?: number }
   | { type: 'POLL'; sk: string; pollId: string; question: string; options: PollOption[]; totalVotes: number; hasVoted: boolean; selectedOptionId: string | null; isHot: boolean }
   | { type: 'MONTHLY_PROMPT'; promptId: string; title: string; body: string; submissionsOpen: boolean; closesAt: string | null; submissionCount: number; userHasSubmitted: boolean; userSubmission: string | null; isHot: boolean; anonymous?: boolean };
@@ -79,17 +77,6 @@ export default function LoungeScreen() {
   const [pollResult, setPollResult] = useState<{ options: PollOption[]; totalVotes: number; selectedOptionId: string } | null>(null);
   const [eulaModal, setEulaModal] = useState(false);
   const [eulaAccepting, setEulaAccepting] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleCopy = useCallback(async (key: string, text: string) => {
-    await Clipboard.setStringAsync(text);
-    setCopiedKey(key);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopiedKey(null), 1500);
-  }, []);
-
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -280,12 +267,14 @@ export default function LoungeScreen() {
         {/* PRIMARY THREAD */}
         {primary && (
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>This Week's Rant</Text>
-              {primary.isHot && <View style={styles.hotBadge}><Text style={styles.hotBadgeText}>🔥 Hot</Text></View>}
-            </View>
-            <Text style={styles.cardTitle}>{primary.title}</Text>
-            <Text style={styles.cardDescription}>{primary.description}</Text>
+            {(!!primary.sectionHeaderLabel || primary.isHot) && (
+              <View style={styles.cardHeader}>
+                {!!primary.sectionHeaderLabel && <Text style={styles.cardLabel}>{primary.sectionHeaderLabel}</Text>}
+                {primary.isHot && <View style={styles.hotBadge}><Text style={styles.hotBadgeText}>🔥 Hot</Text></View>}
+              </View>
+            )}
+            <Text style={styles.cardTitle} selectable>{primary.title}</Text>
+            <Text style={styles.cardDescription} selectable>{primary.description}</Text>
             <View style={styles.cardFooter}>
               <Text style={styles.cardFooterNote}>
                 {typeof primary.replyCount === 'number' && primary.replyCount > 0
@@ -305,12 +294,14 @@ export default function LoungeScreen() {
         {/* SECONDARY THREAD */}
         {secondary && (
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>What We're Reading</Text>
-              {secondary.isHot && <View style={styles.hotBadge}><Text style={styles.hotBadgeText}>🔥 Hot</Text></View>}
-            </View>
-            <Text style={styles.cardTitle}>{secondary.title}</Text>
-            <Text style={styles.cardDescription}>{secondary.description}</Text>
+            {(!!secondary.sectionHeaderLabel || secondary.isHot) && (
+              <View style={styles.cardHeader}>
+                {!!secondary.sectionHeaderLabel && <Text style={styles.cardLabel}>{secondary.sectionHeaderLabel}</Text>}
+                {secondary.isHot && <View style={styles.hotBadge}><Text style={styles.hotBadgeText}>🔥 Hot</Text></View>}
+              </View>
+            )}
+            <Text style={styles.cardTitle} selectable>{secondary.title}</Text>
+            <Text style={styles.cardDescription} selectable>{secondary.description}</Text>
             <TouchableOpacity
               style={styles.outlineButton}
               onPress={() => router.push(`/lounge/thread?id=${encodeURIComponent(secondary.threadId)}` as any)}
@@ -332,24 +323,10 @@ export default function LoungeScreen() {
               <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
               <View style={styles.irisHeaderText}>
                 <Text style={styles.irisLabel}>Iris Has Thoughts</Text>
-                <Text style={styles.irisTitle}>{iris.title}</Text>
+                <Text style={styles.irisTitle} selectable>{iris.title}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.copyChip}
-                onPress={() => handleCopy('iris', `${iris.title}\n\n${iris.body}`)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Copy this week's topic and prompt"
-              >
-                {copiedKey === 'iris' ? (
-                  <Check size={14} color="#9B6B9B" weight="bold" />
-                ) : (
-                  <Copy size={14} color="#9B6B9B" weight="regular" />
-                )}
-                <Text style={styles.copyChipText}>{copiedKey === 'iris' ? 'Copied' : 'Copy'}</Text>
-              </TouchableOpacity>
             </View>
-            <Text style={styles.cardDescription}>{iris.body}</Text>
+            <Text style={styles.cardDescription} selectable>{iris.body}</Text>
             <View style={styles.irisCardFooter}>
               <View style={styles.irisReplyRow}>
                 <Image source={{ uri: IRIS_TEACUP }} style={styles.irisReplyIcon} resizeMode="contain" />
@@ -378,7 +355,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardLabel}>Weekly Poll</Text>
               {poll.isHot && <View style={styles.hotBadge}><Text style={styles.hotBadgeText}>🔥 Hot</Text></View>}
             </View>
-            <Text style={styles.cardTitle}>{poll.question}</Text>
+            <Text style={styles.cardTitle} selectable>{poll.question}</Text>
             <View style={styles.pollOptions}>
               {pollOptions.map((option) => {
                 const isSelected = votedOptionId === option.id;
@@ -444,30 +421,14 @@ export default function LoungeScreen() {
           <>
             <Divider />
             <View style={[styles.card, styles.monthlyCard]}>
-              <View style={styles.monthlyLabelRow}>
-                <Text style={styles.monthlyLabel}>{formatMonth(active.startDate)} Prompt</Text>
-                <TouchableOpacity
-                  style={styles.copyChipDark}
-                  onPress={() => handleCopy('monthly', `${monthly.title}\n\n${monthly.body}`)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy the monthly prompt"
-                >
-                  {copiedKey === 'monthly' ? (
-                    <Check size={14} color="#C4A882" weight="bold" />
-                  ) : (
-                    <Copy size={14} color="#C4A882" weight="regular" />
-                  )}
-                  <Text style={styles.copyChipTextLight}>{copiedKey === 'monthly' ? 'Copied' : 'Copy'}</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.monthlyLabel}>{formatMonth(active.startDate)} Prompt</Text>
               {monthly.isHot && (
                 <View style={styles.monthlyHotBadge}>
                   <Text style={styles.monthlyHotBadgeText}>🔥 Hot</Text>
                 </View>
               )}
-              <Text style={styles.monthlyTitle}>{monthly.title}</Text>
-              <Text style={styles.monthlyBody}>{monthly.body}</Text>
+              <Text style={styles.monthlyTitle} selectable>{monthly.title}</Text>
+              <Text style={styles.monthlyBody} selectable>{monthly.body}</Text>
               <Text style={styles.monthlyCount}>{monthly.submissionCount} confessions so far ✦</Text>
               <View style={styles.monthlyDivider} />
 
@@ -576,12 +537,7 @@ const styles = StyleSheet.create({
   pollBarFill: { height: 8 },
   pollVoteCount: { textAlign: 'center', fontSize: 11, color: '#B09A7E', marginTop: spacing.md },
   monthlyCard: { backgroundColor: '#1A1A2E', borderColor: '#C4A882' },
-  monthlyLabelRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   monthlyLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', fontFamily: 'Nunito_700Bold', color: '#C4A882', marginBottom: spacing.sm },
-  copyChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(155,107,155,0.10)' },
-  copyChipText: { fontSize: 11, color: '#9B6B9B', fontFamily: 'Nunito_700Bold' },
-  copyChipDark: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(196,168,130,0.18)' },
-  copyChipTextLight: { fontSize: 11, color: '#C4A882', fontFamily: 'Nunito_700Bold' },
   monthlyHotBadge: { backgroundColor: 'rgba(184,50,85,0.25)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: spacing.sm },
   monthlyHotBadgeText: { fontSize: 10, fontWeight: '700', color: '#F5A3BC' },
   monthlyTitle: { fontSize: 28, color: '#FDFAF6', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 34, marginBottom: spacing.sm },
