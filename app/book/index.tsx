@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
 import VerdictRating, { Verdict } from '../../components/rating/VerdictRating';
+import RatingInfoButton from '../../components/rating/RatingInfoButton';
 import TagBookModal from '../../components/tag/TagBookModal';
 import AffiliateDisclosure from '../../components/AffiliateDisclosure';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -397,7 +398,10 @@ export default function BookDetailsScreen() {
               )}
             </View>
 
-            <Text style={styles.sectionLabel}>{userCommunityRating ? 'Your Verdict' : "What's the Verdict?"}</Text>
+            <View style={styles.verdictHeadingRow}>
+              <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>{userCommunityRating ? 'Your Verdict' : "What's the Verdict?"}</Text>
+              <RatingInfoButton />
+            </View>
             <VerdictRating
               value={userCommunityRating}
               onChange={savingRating ? undefined : handleVerdictChange}
@@ -544,6 +548,7 @@ const styles = StyleSheet.create({
   removeButton: { alignItems: 'center', marginTop: 4 },
   removeText: { fontSize: 11, color: 'rgba(184,50,85,0.7)', textDecorationLine: 'underline' },
   sectionLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: spacing.sm },
+  verdictHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginVertical: spacing.lg },
   synopsis: { fontSize: 17, color: '#0F2A48', lineHeight: 30, marginBottom: spacing.md },
   ratingSection: { marginBottom: spacing.md },

@@ -11,6 +11,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { getPlatform } from '../../../../lib/platforms';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
+import RatingInfoButton from '../../../../components/rating/RatingInfoButton';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -269,7 +270,10 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
             {item.movieId && (
               <View style={styles.userVerdictSection}>
-                <Text style={styles.sheetSectionLabel}>{userRating ? 'Your Verdict' : "What's Your Verdict?"}</Text>
+                <View style={styles.verdictHeadingRow}>
+                  <Text style={[styles.sheetSectionLabel, { marginBottom: 0 }]}>{userRating ? 'Your Verdict' : "What's Your Verdict?"}</Text>
+                  <RatingInfoButton />
+                </View>
                 <VerdictRating
                   value={userRating as Verdict | null}
                   onChange={savingRating ? undefined : (v) => v && handleVerdictSelect(v)}
@@ -463,6 +467,7 @@ const styles = StyleSheet.create({
   vibeTagText: { fontSize: 10, fontWeight: '700', color: '#B83255' },
   sheetSection: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
   sheetSectionLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 10 },
+  verdictHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: 10 },
   sheetSynopsis: { fontSize: 16, fontStyle: 'italic', color: '#0F2A48', lineHeight: 26 },
   irisNoteCard: { flexDirection: 'row', gap: 10, marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.md, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#D7E2E9' },
   irisNoteAvatar: { width: 32, height: 32, borderRadius: 16 },
