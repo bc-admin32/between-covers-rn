@@ -95,10 +95,18 @@ function RootLayout() {
       captureFromUrl(url);
       if (url.includes('redirect')) {
         try {
-          const code = new URL(url).searchParams.get('code');
+          const parsed = new URL(url);
+          const code = parsed.searchParams.get('code');
+          // `state` carries the sign-in provider (set in login.tsx's authorize
+          // URL); forward it so redirect.tsx can resolve method deterministically
+          // even when this Linking path wins the redirect race.
+          const state = parsed.searchParams.get('state');
           console.log('CODE:', code);
           if (code) {
-            navigateWhenReady(`/(auth)/redirect?code=${code}`);
+            const query = state
+              ? `?code=${code}&state=${encodeURIComponent(state)}`
+              : `?code=${code}`;
+            navigateWhenReady(`/(auth)/redirect${query}`);
           }
         } catch (e) {
           console.log('URL parse error:', e);

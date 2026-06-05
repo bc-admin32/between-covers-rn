@@ -14,6 +14,20 @@ const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
 const REDIRECT_URI = 'com.betweencovers.app://redirect';
 const API_BASE = 'https://api.betweencovers.app';
 
+const JWT_RE = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
+
+// FIX A: a single-use OAuth `code` reaches this screen from TWO independent
+// paths — login.tsx's WebBrowser.openAuthSessionAsync success handler AND
+// _layout.tsx's Linking 'url' deep-link listener (the custom-scheme redirect is
+// delivered to both, especially on Android). Each path router.push-es a fresh
+// redirect screen, so a per-instance useRef latch can't dedupe them. This
+// module-level set survives across instances/remounts and guarantees the code
+// is exchanged at most once. A second exchange reuses the spent code, Cognito
+// returns invalid_grant, and the handler below flashes
+// REDIRECT_TOKEN_EXCHANGE_FAILED even though the first exchange already logged
+// the user in.
+const exchangedCodes = new Set<string>();
+
 export default function RedirectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -21,14 +35,53 @@ export default function RedirectScreen() {
   const [status, setStatus] = useState('Signing you in…');
 
   useEffect(() => {
+    // FIX B: a sibling redirect instance may have already completed the
+    // exchange and stored a valid session. Before showing any auth-failure
+    // screen, look for stored tokens and, if a valid session exists, resolve
+    // the account and route the user in — treat it as success. The winning
+    // exchange can still be in flight, so poll briefly for its tokens.
+    const resolveFromSession = async (): Promise<boolean> => {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const idToken = (await SecureStore.getItemAsync('bc_id_token'))?.trim();
+        if (idToken && JWT_RE.test(idToken)) {
+          try {
+            const res = await fetch(`${API_BASE}/auth/resolve`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+              const result = await res.json();
+              if (result?.nextRoute?.startsWith('/')) {
+                router.replace(normalizeRoute(result.nextRoute) as any);
+                return true;
+              }
+            }
+          } catch {}
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return false;
+    };
+
     const run = async () => {
       try {
         const code = params.code as string;
-        
+
         if (!code) {
           setErrorCode('REDIRECT_NO_CODE');
           return;
         }
+
+        // FIX A: exchange each single-use code at most once across all redirect
+        // instances. If another instance already claimed this code, don't
+        // re-spend it (Cognito would reject the reuse with invalid_grant) — wait
+        // for that exchange's session and route in instead.
+        if (exchangedCodes.has(code)) {
+          if (await resolveFromSession()) return;
+          setErrorCode('REDIRECT_TOKEN_EXCHANGE_FAILED');
+          return;
+        }
+        exchangedCodes.add(code);
 
         setStatus('Exchanging token…');
 
@@ -44,6 +97,9 @@ export default function RedirectScreen() {
         });
 
         if (!tokenRes.ok) {
+          // FIX B: never show the error if a valid session already exists
+          // (e.g. a sibling instance won the exchange race) — route in instead.
+          if (await resolveFromSession()) return;
           setErrorCode('REDIRECT_TOKEN_EXCHANGE_FAILED');
           return;
         }
@@ -116,7 +172,14 @@ export default function RedirectScreen() {
           // Fire signup_completed only when this OAuth flow lands a new user
           // in onboarding — returning logins skip the event.
           if (typeof result.nextRoute === 'string' && result.nextRoute.includes('(onboarding)')) {
-            const method = (params.method as string | undefined) ?? 'unknown';
+            // Provider rides on OAuth `state`, which round-trips on the redirect
+            // URL regardless of whether WebBrowser or Linking delivered it, so
+            // method is deterministic on both paths. params.method kept as a
+            // legacy fallback.
+            const method =
+              (params.state as string | undefined) ??
+              (params.method as string | undefined) ??
+              'unknown';
             const attr = await getAttribution();
             const payload = {
               method,
@@ -130,6 +193,9 @@ export default function RedirectScreen() {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');
         }
       } catch (err: any) {
+        // FIX B: a transient error (e.g. the second, racing exchange throwing)
+        // shouldn't surface if the user already has a valid session.
+        if (await resolveFromSession()) return;
         setErrorCode(`REDIRECT_UNEXPECTED_ERROR: ${err?.message}`);
       }
     };

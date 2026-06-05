@@ -14,13 +14,19 @@ const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
 const REDIRECT_URI = 'com.betweencovers.app://redirect';
 const API_BASE = 'https://api.betweencovers.app';
 
-function buildCognitoUrl(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple') {
+function buildCognitoUrl(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple', method: string) {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: 'code',
     scope: 'openid email',
     redirect_uri: REDIRECT_URI,
     identity_provider: provider,
+    // Carry the provider through OAuth `state` so it round-trips back on the
+    // redirect URL. This makes the provider resolvable in redirect.tsx no matter
+    // whether the WebBrowser or the Linking deep-link path delivers the redirect
+    // — otherwise the Linking path (common on Android / cold start) loses it and
+    // signup_completed logs method: 'unknown'. (No CSRF state in use to preserve.)
+    state: method,
   });
   return `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
 }
@@ -87,12 +93,12 @@ export default function LoginScreen() {
       : provider === 'SignInWithApple' ? 'apple'
       : 'amazon';
     track('signup_started', { method });
-    const url = buildCognitoUrl(provider);
+    const url = buildCognitoUrl(provider, method);
     const result = await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
     if (result.type === 'success') {
       try {
         const code = new URL(result.url).searchParams.get('code');
-        if (code) router.push(`/(auth)/redirect?code=${code}&method=${method}` as any);
+        if (code) router.push(`/(auth)/redirect?code=${code}&state=${method}` as any);
       } catch {}
     }
   }
