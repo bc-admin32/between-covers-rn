@@ -322,7 +322,7 @@ export default function BookDetailsScreen() {
           {/* TITLE */}
           <View style={styles.titleSection}>
             <Text style={styles.title} selectable>{work.title}</Text>
-            {work.series && <Text style={styles.series}>{work.series}</Text>}
+            {work.series && <Text style={styles.series} selectable>{work.series}</Text>}
             <Text style={styles.author} selectable>{work.primaryAuthor}</Text>
           </View>
 
