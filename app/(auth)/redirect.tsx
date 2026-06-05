@@ -28,6 +28,15 @@ const JWT_RE = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
 // the user in.
 const exchangedCodes = new Set<string>();
 
+// Nav latch (same single-threaded check-then-set reasoning as exchangedCodes):
+// both the winning instance's success router.replace AND the losing instance's
+// resolveFromSession router.replace target the resolved in-app route, so without
+// a guard the home screen mounts twice. Set synchronously immediately before
+// each in-app navigation so only the first instance enters; the other bails.
+// Does NOT cover the error-screen "Try Again" or index.tsx fail-closed login
+// routes — those are separate flows and stay free.
+let navigatedIntoApp = false;
+
 export default function RedirectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -52,7 +61,11 @@ export default function RedirectScreen() {
             if (res.ok) {
               const result = await res.json();
               if (result?.nextRoute?.startsWith('/')) {
-                router.replace(normalizeRoute(result.nextRoute) as any);
+                // Nav latch: enter the app at most once across instances.
+                if (!navigatedIntoApp) {
+                  navigatedIntoApp = true;
+                  router.replace(normalizeRoute(result.nextRoute) as any);
+                }
                 return true;
               }
             }
@@ -188,7 +201,11 @@ export default function RedirectScreen() {
             track('signup_completed', payload);
             if (attr) await clearAttribution();
           }
-          router.replace(normalizeRoute(result.nextRoute) as any);
+          // Nav latch: enter the app at most once across instances.
+          if (!navigatedIntoApp) {
+            navigatedIntoApp = true;
+            router.replace(normalizeRoute(result.nextRoute) as any);
+          }
         } else {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');
         }
