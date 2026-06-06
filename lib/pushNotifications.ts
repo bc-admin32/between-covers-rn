@@ -51,6 +51,15 @@ export async function registerForPushNotifications(): Promise<void> {
       return;
     }
 
+    // DEFERRED — Fire OS / ADM branch goes here.
+    // On Amazon devices detectPlatform() returns 'amazon', but the call below
+    // uses FCM, which is unavailable on Fire OS (no Google Play Services) → it
+    // throws and is swallowed by the catch, so Fire never registers. When the
+    // ADM native module lands (credential bundled via plugins/withAdmApiKey.js),
+    // branch here: if detectPlatform() === 'amazon', obtain the ADM registration
+    // token from that module instead of getDevicePushTokenAsync(), then POST to
+    // /push/register with platform: 'amazon' exactly as below. Deferred until a
+    // Fire HD device is available to test against.
     const tokenResult = await Notifications.getDevicePushTokenAsync();
     const token = tokenResult.data;
 
