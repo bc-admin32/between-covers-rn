@@ -37,6 +37,7 @@
     "android": {
       "package": "com.betweencovers.app",
       "versionCode": 10,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#e5b2bf"
