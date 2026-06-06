@@ -275,6 +275,7 @@ export default function DoorScreen() {
         </TouchableOpacity>
 
         <Text style={styles.microcopy}>Instant access. Cancel anytime.</Text>
+        <Text style={styles.microcopy}>We'll remind you the day before your free trial ends.</Text>
 
         <TouchableOpacity
           onPress={handleRestore}

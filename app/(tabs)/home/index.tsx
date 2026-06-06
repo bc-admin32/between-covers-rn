@@ -16,11 +16,9 @@ import { FeedbackModal } from '../../../components/FeedbackModal';
 import LiveEventBanner from '../../../components/live/LiveEventBanner';
 import * as LocalAuthentication from 'expo-local-authentication';
 
-function getDaysSinceTrial(startDateStr: string, timeZone: string): number {
-  const today = new Date().toLocaleDateString('en-CA', { timeZone });
-  const start = new Date(startDateStr).toLocaleDateString('en-CA', { timeZone });
-  return Math.round((new Date(today).getTime() - new Date(start).getTime()) / 86400000);
-}
+// Device-local date key — client-side "already shown today" guard only.
+function todayKey(): string { return new Date().toLocaleDateString('en-CA'); }
+function markDay6Shown() { SecureStore.setItemAsync('bc_last_day6_video_shown', todayKey()).catch(() => {}); }
 
 const CACHE_KEY = 'bc_home_cache';
 const DEFAULT_BG = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/loc_default.jpg';
@@ -35,6 +33,7 @@ type HomeData = {
     staticImageUrl?: string;
     context: { isIntro: boolean; timeBucket: string | null; holiday: string | null };
   };
+  irisDay6?: { videoUrl: string; daysSinceTrialStart?: number };
 };
 
 // Rendered only while Iris's daily message is unread (the `!watched` branch on
@@ -161,7 +160,7 @@ export default function HomeScreen() {
   const overlayOpenRef = useRef(false);
   const isTrialDay6Ref = useRef(false);
   const player = useVideoPlayer(
-    data?.irisDaily?.videoUrl ?? '',
+    (isTrialDay6 && data?.irisDay6?.videoUrl ? data.irisDay6.videoUrl : data?.irisDaily?.videoUrl) ?? '',
     (p) => { p.loop = false; }
   );
 
@@ -169,26 +168,17 @@ export default function HomeScreen() {
   useEffect(() => { overlayOpenRef.current = overlayOpen; }, [overlayOpen]);
   useEffect(() => { isTrialDay6Ref.current = isTrialDay6; }, [isTrialDay6]);
 
-  // Check once on mount whether this user is on trial day 6 and hasn't seen the overlay today
+  // Day-6 reminder is driven off the backend irisDay6 object (always present on
+  // home load on trial day 6) — not bc_profile_cache (only written by the
+  // Profile tab; absent for users who never opened it). Same-day guard kept.
   useEffect(() => {
-    SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
-      if (!cached) return;
-      try {
-        const profile = JSON.parse(cached);
-        if (
-          profile.subscriptionStatus === 'trial' &&
-          profile.subscriptionStartDate &&
-          profile.timeZone &&
-          getDaysSinceTrial(profile.subscriptionStartDate, profile.timeZone) === 6
-        ) {
-          const today = new Date().toLocaleDateString('en-CA', { timeZone: profile.timeZone });
-          SecureStore.getItemAsync('bc_last_day6_video_shown').then((lastShown) => {
-            if (lastShown !== today) setIsTrialDay6(true);
-          });
-        }
-      } catch {}
+    if (!data?.irisDay6?.videoUrl) { setIsTrialDay6(false); return; }
+    let cancelled = false;
+    SecureStore.getItemAsync('bc_last_day6_video_shown').then((lastShown) => {
+      if (!cancelled) setIsTrialDay6(lastShown !== todayKey());
     });
-  }, []);
+    return () => { cancelled = true; };
+  }, [data?.irisDay6?.videoUrl]);
 
   // One-time biometric opt-in prompt — fires when redirect.tsx flagged it pending
   useEffect(() => {
@@ -228,15 +218,7 @@ export default function HomeScreen() {
       if (!overlayOpenRef.current) return;
       if (isTrialDay6Ref.current) {
         setShowTrialOverlay(true);
-        // Mark shown so it doesn't appear again today
-        SecureStore.getItemAsync('bc_profile_cache').then((cached) => {
-          if (!cached) return;
-          try {
-            const { timeZone } = JSON.parse(cached);
-            const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone ?? 'UTC' });
-            SecureStore.setItemAsync('bc_last_day6_video_shown', today).catch(() => {});
-          } catch {}
-        });
+        markDay6Shown();
       } else {
         setOverlayOpen(false);
         setWatched(true);
@@ -294,6 +276,8 @@ export default function HomeScreen() {
   }
 
   const iris = data.irisDaily;
+  const day6Active = isTrialDay6 && !!data.irisDay6?.videoUrl;
+  const showVideoMode = day6Active || (iris.mode === 'video' && !!iris.videoUrl);
 
   const markViewed = () => {
     if (markedRef.current) return;
@@ -311,6 +295,8 @@ export default function HomeScreen() {
 
   const closeVideo = () => {
     player.pause();
+    // On day-6, skipping still surfaces the trial overlay (no watch-to-end required).
+    if (isTrialDay6Ref.current) { setShowTrialOverlay(true); markDay6Shown(); return; }
     setOverlayOpen(false);
     setWatched(true);
   };
@@ -319,6 +305,7 @@ export default function HomeScreen() {
     setShowTrialOverlay(false);
     setOverlayOpen(false);
     setWatched(true);
+    setIsTrialDay6(false);
   };
 
   const dismissBiometricPrompt = async () => {
@@ -380,7 +367,7 @@ export default function HomeScreen() {
           <LiveEventBanner />
 
           {/* IRIS - VIDEO MODE */}
-          {iris.mode === 'video' && iris.videoUrl && (
+          {showVideoMode && (
             <View style={styles.irisContainer}>
               {overlayOpen ? (
                 <View style={styles.videoContainer}>
@@ -436,7 +423,7 @@ export default function HomeScreen() {
           )}
 
           {/* IRIS - STATIC MODE */}
-          {iris.mode === 'static' && (
+          {iris.mode === 'static' && !day6Active && (
             <TouchableOpacity
               style={styles.irisButton}
               onPress={() => router.push('/iris/chat' as any)}
