@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
   ActivityIndicator, ImageBackground, Animated, Easing, Linking, Modal,
-  AccessibilityInfo,
+  AccessibilityInfo, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -308,6 +308,16 @@ export default function HomeScreen() {
     setIsTrialDay6(false);
   };
 
+  // Deep-link to the platform's subscription-management screen. The old handler
+  // used an iOS-only `itms-apps://` scheme, so on Android openURL rejected and
+  // the swallowed .catch made the button do nothing.
+  const handleManageTrial = () => {
+    const url = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/account/subscriptions'
+      : 'https://play.google.com/store/account/subscriptions?package=com.betweencovers.app';
+    Linking.openURL(url).catch(() => {});
+  };
+
   const dismissBiometricPrompt = async () => {
     await SecureStore.setItemAsync('bc_biometric_prompt_dismissed', 'true');
     await SecureStore.deleteItemAsync('bc_biometric_prompt_pending');
@@ -386,7 +396,7 @@ export default function HomeScreen() {
                     <View style={styles.trialOverlay}>
                       <TouchableOpacity
                         style={styles.trialBtn}
-                        onPress={() => Linking.openURL('itms-apps://apps.apple.com/account/subscriptions').catch(() => {})}
+                        onPress={handleManageTrial}
                       >
                         <Text style={styles.trialBtnText}>Manage trial</Text>
                       </TouchableOpacity>
