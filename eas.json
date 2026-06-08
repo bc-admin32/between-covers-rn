@@ -50,6 +50,16 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./play-submit-key.json",
+        "track": "internal",
+        "releaseStatus": "completed"
+      },
+      "ios": {
+        "ascAppId": "6757622557",
+        "appleTeamId": "2R4496MTCJ"
+      }
+    }
   }
 }
