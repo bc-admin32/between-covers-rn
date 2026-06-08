@@ -7,6 +7,7 @@ import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
@@ -39,6 +40,30 @@ function RootLayout() {
       router.push(target as any);
     }
   }, [navigationState?.key]);
+
+  // OTA apply-on-launch. By default expo-updates fetches in the background and
+  // applies on the NEXT cold start (fallbackToCacheTimeout: 0). Here we check on
+  // mount and, only if an update is actually available, fetch it and reload so
+  // it applies on THIS launch instead. Release builds only — guarded by !__DEV__
+  // (Expo Go / dev-client skip it) and Updates.isEnabled. Best-effort: any error
+  // is swallowed and the app starts normally; reloadAsync fires only after a
+  // successful fetch, so there's no reload loop and no blocking spinner.
+  useEffect(() => {
+    if (__DEV__ || !Updates.isEnabled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const u = await Updates.checkForUpdateAsync();
+        if (cancelled || !u.isAvailable) return;
+        await Updates.fetchUpdateAsync();
+        if (cancelled) return;
+        await Updates.reloadAsync();
+      } catch {
+        // Never let an update check crash or block startup.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Navigate now if the navigator is mounted, otherwise defer until it is.
   const navigateWhenReady = (path: string) => {
