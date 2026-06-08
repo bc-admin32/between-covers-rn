@@ -12,13 +12,16 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases, getResolvedPlatform } from '../../lib/iap-shim';
+import {
+  MONTHLY_PRODUCT_ID,
+  ANNUAL_PRODUCT_ID,
+  ALL_PRODUCT_IDS,
+  writeSubscription,
+  safeFinishTransaction,
+} from '../../lib/subscription';
 import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
 import { track } from '../../lib/analytics';
-
-const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
-const ANNUAL_PRODUCT_ID  = 'com.betweencovers.app.membership.annual';
-const ALL_PRODUCT_IDS    = [MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID];
 
 const TERMS_URL   = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/terms-of-use.html';
 const PRIVACY_URL = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/privacy-policy.html';
@@ -66,7 +69,21 @@ export default function DoorScreen() {
 
     const confirm = async () => {
       try {
-        await finishTransaction({ purchase: currentPurchase, isConsumable: false });
+        // 1. Verify + record with the backend FIRST (awaited). On Android the
+        //    backend verifies the purchaseToken against Google and acknowledges
+        //    the purchase server-side.
+        const written = await writeSubscription(currentPurchase);
+        if (!written) {
+          // Leave the purchase PENDING (do NOT finishTransaction) so the launch
+          // reconcile retries it next time; surface a retry to the user.
+          showError("Couldn't confirm your purchase. Please try again.");
+          setPurchasing(false);
+          return;
+        }
+
+        // 2. Only after a successful write, finish the transaction — tolerating
+        //    "already acknowledged" (the backend acked it server-side).
+        await safeFinishTransaction(finishTransaction, currentPurchase);
 
         track('subscription_started', {
           platform: getResolvedPlatform(),
@@ -74,25 +91,7 @@ export default function DoorScreen() {
           trial: true,
         });
 
-        const idToken = await SecureStore.getItemAsync('bc_id_token');
-        if (idToken) {
-          await fetch('https://api.betweencovers.app/subscription/write', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              productId: currentPurchase.productId,
-              transactionId: currentPurchase.transactionId,
-              platform: getResolvedPlatform(),
-              originalPurchaseDate: currentPurchase.transactionDate
-                ? new Date(currentPurchase.transactionDate).toISOString()
-                : new Date().toISOString(),
-            }),
-          }).catch(err => console.warn('Subscription write failed:', err));
-        }
-
+        // 3. Route via the backend entitlement check, as today.
         try {
           const token = await SecureStore.getItemAsync('bc_id_token');
           if (token) {
@@ -166,6 +165,9 @@ export default function DoorScreen() {
       const purchases = await doRestorePurchases();
       const active = purchases.find((p) => ALL_PRODUCT_IDS.includes(p.productId));
       if (active) {
+        // Write the device-verified purchase back to the backend before
+        // re-resolving, so a stale/missing record can self-heal.
+        await writeSubscription(active);
         try {
           const idToken = await SecureStore.getItemAsync('bc_id_token');
           if (idToken) {

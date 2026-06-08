@@ -29,9 +29,10 @@
  *      `requestSubscription({ sku })` per the Amazon path documented in
  *      react-native-iap v12 (RequestPurchaseAmazon = sku-only).
  *
- * The exported surface (`useIAP`, `restorePurchases`, `withIAPContext`,
- * `getResolvedPlatform`) is stable across all three paths so callers
- * (`door.tsx`, `hard-paywall.tsx`) don't need branching logic of their own.
+ * The exported surface (`useIAP`, `restorePurchases`, `ensureConnection`,
+ * `withIAPContext`, `getResolvedPlatform`) is stable across all three paths so
+ * callers (`door.tsx`, `hard-paywall.tsx`, `subscription.ts`) don't need
+ * branching logic of their own.
  */
 
 import Constants from 'expo-constants';
@@ -70,6 +71,10 @@ export type ShimPurchase = {
   productId: string;
   transactionId: string;
   transactionDate?: number;
+  // Android (Google Play / Amazon) purchase token. Required by the backend to
+  // verify the purchase against Google (subscriptionWrite v4). Present on
+  // Android purchases from react-native-iap 12.16.4 as `purchase.purchaseToken`.
+  purchaseToken?: string;
 };
 
 type FetchProductsOpts = { skus: string[]; type: string };
@@ -97,6 +102,7 @@ export type IAPHookReturn = {
 
 export type UseIAP = () => IAPHookReturn;
 export type RestorePurchases = () => Promise<ShimPurchase[]>;
+export type EnsureConnection = () => Promise<void>;
 export type WithIAPContext = <P extends object>(
   Component: React.ComponentType<P>,
 ) => React.ComponentType<P>;
@@ -129,10 +135,13 @@ const restorePurchasesStub: RestorePurchases = async () => {
   return [];
 };
 
+const ensureConnectionStub: EnsureConnection = async () => {};
+
 const passthroughHOC: WithIAPContext = (Component) => Component;
 
 let resolvedUseIAP: UseIAP = useIAPStub;
 let resolvedRestorePurchases: RestorePurchases = restorePurchasesStub;
+let resolvedEnsureConnection: EnsureConnection = ensureConnectionStub;
 let resolvedWithIAPContext: WithIAPContext = passthroughHOC;
 
 // ── Real react-native-iap path (iOS / Android / Amazon) ──────────────────
@@ -264,13 +273,28 @@ if (!isExpoGo) {
       const purchases = await rniap.getAvailablePurchases();
       return (purchases ?? []).map((p: any) => ({
         productId: p.productId,
-        transactionId: p.transactionId ?? p.purchaseToken ?? '',
+        transactionId: p.transactionId ?? '',
         transactionDate: p.transactionDate,
+        // Preserve the Android purchase token so callers can verify it
+        // server-side (backend verification + restore/launch write-back).
+        purchaseToken: p.purchaseToken,
       }));
+    };
+
+    const realEnsureConnection: EnsureConnection = async () => {
+      // Idempotent: react-native-iap returns the existing connection if already
+      // initialized. Tolerant — best-effort so callers (launch reconcile) never
+      // throw on a connection hiccup.
+      try {
+        await rniap.initConnection();
+      } catch {
+        // ignore — caller treats a missing connection as "no purchases found"
+      }
     };
 
     resolvedUseIAP = useRealIAP;
     resolvedRestorePurchases = realRestorePurchases;
+    resolvedEnsureConnection = realEnsureConnection;
   } catch (err) {
     console.warn('[iap-shim] Failed to load react-native-iap, falling back to stub:', err);
   }
@@ -278,4 +302,5 @@ if (!isExpoGo) {
 
 export const useIAP: UseIAP = resolvedUseIAP;
 export const restorePurchases: RestorePurchases = resolvedRestorePurchases;
+export const ensureConnection: EnsureConnection = resolvedEnsureConnection;
 export const withIAPContext: WithIAPContext = resolvedWithIAPContext;

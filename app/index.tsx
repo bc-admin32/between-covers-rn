@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
+import { isPaywallRoute, reconcileAndroidPurchases } from '../lib/subscription';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -40,6 +41,19 @@ export default function SplashScreen() {
           setTimeout(resolve, Math.max(0, MIN_SPLASH_TIME - elapsed()))
         );
 
+      // POST /auth/resolve. Throws on a network error (so the caller's outer
+      // catch goes to login WITHOUT wiping tokens). Returns { ok, data } where
+      // ok:false means the server explicitly rejected the token.
+      const resolveOnce = async (idToken: string): Promise<{ ok: boolean; data: any | null }> => {
+        const res = await fetch(`${API_BASE}/auth/resolve`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return { ok: false, data: null };
+        const data = await res.json().catch(() => null);
+        return { ok: true, data };
+      };
+
       try {
         const raw = await SecureStore.getItemAsync('bc_id_token');
         const idToken = raw?.trim() ?? null;
@@ -73,25 +87,37 @@ export default function SplashScreen() {
             }
           }
 
-          const res = await fetch(`${API_BASE}/auth/resolve`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
+          // Backend-authoritative entitlement check (unchanged gate).
+          let resolved = await resolveOnce(idToken);
 
-          await waitForSplash();
-
-          if (res.ok) {
-            const result = await res.json();
-            if (result?.nextRoute?.startsWith('/')) {
-              router.replace(normalizeRoute(result.nextRoute) as any);
-              return;
+          // Launch reconcile: if the backend says NOT entitled (paywall route)
+          // but Google still holds an active Android subscription, push it to
+          // the backend and re-resolve. Android-only and silent (the helper
+          // no-ops off-Android / on any error). Skipped entirely when the first
+          // resolve already grants access — we never touch IAP for entitled users.
+          if (resolved.ok && isPaywallRoute(resolved.data?.nextRoute)) {
+            const reconciled = await reconcileAndroidPurchases();
+            if (reconciled) {
+              try {
+                const second = await resolveOnce(idToken);
+                if (second.ok) resolved = second;
+              } catch {
+                // keep the first result if the re-resolve errors
+              }
             }
           }
 
-          // Token rejected — force-hard wipe overrides the biometric-aware soft
-          // path because the stored token is invalid; soft would leave it in
-          // place and trigger the same /auth/resolve failure on every Face ID
-          // re-entry. Fall through to subscription check after the wipe.
+          await waitForSplash();
+
+          if (resolved.ok && resolved.data?.nextRoute?.startsWith('/')) {
+            router.replace(normalizeRoute(resolved.data.nextRoute) as any);
+            return;
+          }
+
+          // Token rejected by the server — force-hard wipe overrides the
+          // biometric-aware soft path because the stored token is invalid; soft
+          // would leave it in place and trigger the same /auth/resolve failure
+          // on every Face ID re-entry. Fall through to login after the wipe.
           await signOut({ force: true });
         } else {
           await waitForSplash();
