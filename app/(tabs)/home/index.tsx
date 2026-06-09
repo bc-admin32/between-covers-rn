@@ -314,7 +314,7 @@ export default function HomeScreen() {
   const handleManageTrial = () => {
     const url = Platform.OS === 'ios'
       ? 'https://apps.apple.com/account/subscriptions'
-      : 'https://play.google.com/store/account/subscriptions?package=com.betweencovers.app';
+      : 'https://play.google.com/store/account/subscriptions?sku=com.betweencovers.app.membership.monthly&package=com.betweencovers.app';
     Linking.openURL(url).catch(() => {});
   };
 
@@ -404,7 +404,7 @@ export default function HomeScreen() {
                         style={[styles.trialBtn, styles.trialBtnSecondary]}
                         onPress={() => setFeedbackOpen(true)}
                       >
-                        <Text style={[styles.trialBtnText, styles.trialBtnTextSecondary]}>Share feedback</Text>
+                        <Text style={[styles.trialBtnText, styles.trialBtnTextSecondary]} numberOfLines={1}>Share feedback</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.trialDismiss} onPress={dismissTrialOverlay}>
                         <Text style={styles.trialDismissText}>Dismiss</Text>
@@ -562,12 +562,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     padding: 14,
+    paddingTop: 24,
   },
   trialBtn: {
     width: '100%',
     paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 999,
     backgroundColor: '#B83255',
     alignItems: 'center',
@@ -576,6 +578,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+    paddingVertical: 12,
   },
   trialBtnText: {
     fontSize: 12,
@@ -586,7 +589,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
   },
   trialDismiss: {
-    marginTop: 2,
     paddingVertical: 4,
   },
   trialDismissText: {

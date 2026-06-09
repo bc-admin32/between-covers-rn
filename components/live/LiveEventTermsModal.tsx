@@ -9,8 +9,12 @@ import { spacing } from '../../lib/theme';
 // Bump when the terms text below is materially revised. Must match the
 // backend env var LIVE_EVENT_TERMS_VERSION exactly — the gate Lambdas
 // (liveEventChatToken, liveEventRoomJoin) compare profile.liveEventTermsVersion
-// against that env var to decide whether to return TERMS_ACCEPTANCE_REQUIRED,
-// and bcAcceptLiveEvent writes that env var into the user's row on accept.
+// against that env var to decide whether to return TERMS_ACCEPTANCE_REQUIRED.
+// On accept, handleAccept POSTs this version to /legal/accept/live-event
+// (handled by the liveEventAcceptTerms Lambda), which writes both
+// liveEventTermsAcceptedAt and liveEventTermsVersion to the user record; the
+// gate below (shouldShowLiveEventTermsGate) reads liveEventTermsVersion to
+// decide whether to re-show this modal.
 // Compared as a string (not semver-parsed) so any mismatch invalidates.
 export const CURRENT_LIVE_EVENT_TERMS_VERSION = '2026-05';
 
@@ -47,7 +51,7 @@ export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Pro
     setAccepting(true);
     setError(null);
     try {
-      await apiPost('/accept/live-event', { version: CURRENT_LIVE_EVENT_TERMS_VERSION });
+      await apiPost('/legal/accept/live-event', { context: 'live_event', appVersion: CURRENT_LIVE_EVENT_TERMS_VERSION });
       onAccept();
     } catch {
       setError("Couldn't save your acceptance. Try again?");
