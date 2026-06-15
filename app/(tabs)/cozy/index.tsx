@@ -564,12 +564,9 @@ export default function CozyScreen() {
         {offShelf?.enabled && offShelf.books.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Off Shelf"
+              title="Off The Shelf"
               onViewAll={() => router.push('/(tabs)/cozy/off-shelf' as any)}
             />
-            {!!offShelf.blurb && (
-              <Text style={styles.spotlightSubtitle}>{offShelf.blurb}</Text>
-            )}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
               {offShelf.books.map((book, i) => (
                 <BookCard key={book?.bookId ?? i} book={book} />
