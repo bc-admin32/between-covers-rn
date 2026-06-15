@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowRight } from 'phosphor-react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { MovieDetailSheet } from './media/index';
@@ -13,6 +14,7 @@ import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
+import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 
 const CACHE_KEY = 'bc_cozy_cache';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
@@ -62,8 +64,15 @@ type AuthorSpotlight = {
   featuredBooks: Array<{ workId: string; title: string; author: string; coverUrl: string }>;
 };
 
+type OffShelfData = {
+  enabled: boolean;
+  blurb: string;
+  books: BookCardData[];
+};
+
 type CozyData = {
   weekId: string;
+  monthLabel?: string;
   theme: { title: string; tagline: string };
   sections: {
     spotlight?: { book: BookItem | null; alignment: any };
@@ -253,6 +262,7 @@ export default function CozyScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<CozyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [offShelf, setOffShelf] = useState<OffShelfData | null>(null);
   const [activeRecipe, setActiveRecipe] = useState<VisualItem | null>(null);
   const [activeMovie, setActiveMovie] = useState<VisualItem | null>(null);
   const [movieSheetOpen, setMovieSheetOpen] = useState(false);
@@ -274,6 +284,19 @@ export default function CozyScreen() {
       }
     };
     load();
+  }, []);
+
+  // Off Shelf is a standalone endpoint (see plan). Kept in its own effect so it
+  // can be folded into /cozy/home later in one spot if the backend prefers a
+  // single payload. The server owns the on/off — we only render when enabled.
+  useEffect(() => {
+    const loadOffShelf = async () => {
+      try {
+        const response = await apiGet<OffShelfData>('/cozy/off-shelf');
+        setOffShelf(response ?? null);
+      } catch {}
+    };
+    loadOffShelf();
   }, []);
 
   // Fire one cozy_section_viewed per section that actually renders for this user.
@@ -378,6 +401,26 @@ export default function CozyScreen() {
             </View>
           </View>
         </View>
+
+        {/* NEW RELEASES BUTTON */}
+        <TouchableOpacity
+          style={styles.newReleasesButton}
+          activeOpacity={0.85}
+          onPress={() => router.push('/(tabs)/cozy/new-releases' as any)}
+        >
+          <View style={styles.newReleasesText}>
+            <Text style={styles.newReleasesEyebrow}>NEW RELEASES</Text>
+            <Text style={styles.newReleasesTitle}>
+              What's New{data?.monthLabel ? ` in ${data.monthLabel}` : ''}
+            </Text>
+            <Text style={styles.newReleasesSubtitle}>
+              Browse this month's arrivals by genre
+            </Text>
+          </View>
+          <View style={styles.newReleasesArrow}>
+            <ArrowRight size={18} color="#fff" weight="bold" />
+          </View>
+        </TouchableOpacity>
 
         {/* THEME */}
         {data?.theme?.title && (
@@ -517,6 +560,24 @@ export default function CozyScreen() {
           </View>
         )}
 
+        {/* OFF SHELF */}
+        {offShelf?.enabled && offShelf.books.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader
+              title="Off Shelf"
+              onViewAll={() => router.push('/(tabs)/cozy/off-shelf' as any)}
+            />
+            {!!offShelf.blurb && (
+              <Text style={styles.spotlightSubtitle}>{offShelf.blurb}</Text>
+            )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+              {offShelf.books.map((book, i) => (
+                <BookCard key={book?.bookId ?? i} book={book} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <AffiliateDisclosure />
 
         <View style={{ height: 100 }} />
@@ -539,6 +600,13 @@ const styles = StyleSheet.create({
   irisText: { flex: 1 },
   irisCardTitle: { fontSize: 17, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 4 },
   irisCardBody: { fontSize: 12, fontWeight: '300', color: '#6A5969', lineHeight: 18 },
+  // New Releases action button — navy filled, distinct from editorial cards
+  newReleasesButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: '#18293F', borderRadius: 18, padding: 16, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3 },
+  newReleasesText: { flex: 1 },
+  newReleasesEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: '#B11E45', marginBottom: 4 },
+  newReleasesTitle: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#fff', lineHeight: 26 },
+  newReleasesSubtitle: { fontSize: 12, fontWeight: '300', color: 'rgba(255,255,255,0.6)', marginTop: 4 },
+  newReleasesArrow: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B11E45', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   themeSection: { marginBottom: spacing.md },
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e8e0d4' },
