@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiPost } from '../../lib/api';
@@ -37,6 +38,10 @@ type Props = {
 
 export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Props) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  // Scale relative to a 375pt baseline, clamped 0.85x–1.15x so buttons/text
+  // never get too small or too large across phone sizes.
+  const scale = (size: number) => Math.round(size * Math.min(Math.max(width / 375, 0.85), 1.15));
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,18 +97,26 @@ export default function LiveEventTermsModal({ visible, onAccept, onCancel }: Pro
           </ScrollView>
 
           <View style={styles.actions}>
-            <TouchableOpacity onPress={onCancel} style={styles.cancelBtn} disabled={accepting}>
-              <Text style={styles.cancelBtnText}>Not Right Now</Text>
+            <TouchableOpacity
+              onPress={onCancel}
+              style={[styles.cancelBtn, { paddingVertical: scale(14), minHeight: scale(48), justifyContent: 'center' }]}
+              disabled={accepting}
+            >
+              <Text style={[styles.cancelBtnText, { fontSize: scale(14) }]} numberOfLines={1} adjustsFontSizeToFit>
+                Not Right Now
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleAccept}
-              style={[styles.acceptBtn, accepting && styles.acceptBtnDisabled]}
+              style={[styles.acceptBtn, { paddingVertical: scale(14), minHeight: scale(48), justifyContent: 'center' }, accepting && styles.acceptBtnDisabled]}
               disabled={accepting}
             >
               {accepting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.acceptBtnText}>Accept &amp; Continue</Text>
+                <Text style={[styles.acceptBtnText, { fontSize: scale(14) }]} numberOfLines={1} adjustsFontSizeToFit>
+                  Accept &amp; Continue
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -162,19 +175,17 @@ const styles = StyleSheet.create({
   cancelBtn: {
     flex: 1,
     borderRadius: 999,
-    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#DDD5C4',
   },
-  cancelBtnText: { fontSize: 14, color: '#6A5550', fontWeight: '600' },
+  cancelBtnText: { color: '#6A5550', fontWeight: '600' },
   acceptBtn: {
     flex: 2,
     backgroundColor: '#B83255',
     borderRadius: 999,
-    paddingVertical: 14,
     alignItems: 'center',
   },
   acceptBtnDisabled: { backgroundColor: '#D4B5BF' },
-  acceptBtnText: { fontSize: 14, color: '#fff', fontWeight: '700', letterSpacing: 0.3 },
+  acceptBtnText: { color: '#fff', fontWeight: '700', letterSpacing: 0.3 },
 });
