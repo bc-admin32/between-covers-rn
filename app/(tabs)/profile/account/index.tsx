@@ -247,7 +247,14 @@ export default function AccountSettingsScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <CaretLeft size={24} color="rgba(255,255,255,0.85)" weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.title}>Account & Settings</Text>
+            <Text
+              style={styles.title}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
+              Account & Settings
+            </Text>
           </View>
           <View style={styles.titleDivider} />
         </View>
@@ -448,8 +455,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: spacing.xl },
   header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 8 },
-  backButton: { padding: 2 },
-  title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 38 },
+  backButton: { padding: 2, flexShrink: 0 },
+  // flex:1 bounds the title to the remaining row width so it can shrink-to-fit
+  // instead of overflowing/clipping on Android. No fixed lineHeight: it isn't
+  // multiplied by the device fontScale, so a fixed value clips glyphs vertically
+  // when the system font is enlarged. adjustsFontSizeToFit keeps the rendered
+  // size within bounds on both axes.
+  title: { flex: 1, fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4' },
   titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 4 },
   curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
