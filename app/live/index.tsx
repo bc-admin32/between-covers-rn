@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../lib/api';
 import { spacing, radius, colors } from '../../lib/theme';
+import type { LiveRoom } from '../../lib/types';
+import LobbyModal from '../../components/live/LobbyModal';
 
 type LiveEvent = {
   eventId: string;
@@ -20,6 +22,7 @@ type LiveEvent = {
   status: 'SCHEDULED' | 'ACTIVE' | 'ENDED';
   rsvpCount: number;
   bookTitle?: string | null;
+  rooms?: LiveRoom[];
 };
 
 function eventTypeLabel(type: LiveEvent['eventType']) {
@@ -73,6 +76,8 @@ export default function LiveEventsScreen() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
+  const [lobbyOpen, setLobbyOpen] = useState(false);
 
   useEffect(() => {
     apiGet<{ events: LiveEvent[] }>('/live')
@@ -146,7 +151,14 @@ export default function LiveEventsScreen() {
                 <Text style={styles.activeRsvp}>{activeEvent.rsvpCount} joined ✦</Text>
                 <TouchableOpacity
                   style={styles.joinButton}
-                  onPress={() => router.push(`/live/event?eventId=${activeEvent.eventId}` as any)}
+                  onPress={() => {
+                    if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms?.length) {
+                      setLobbyEventId(activeEvent.eventId);
+                      setLobbyOpen(true);
+                    } else {
+                      router.push(`/live/event?eventId=${activeEvent.eventId}` as any);
+                    }
+                  }}
                 >
                   <Text style={styles.joinButtonText}>Join Now →</Text>
                 </TouchableOpacity>
@@ -208,6 +220,14 @@ export default function LiveEventsScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {lobbyEventId && (
+        <LobbyModal
+          eventId={lobbyEventId}
+          visible={lobbyOpen}
+          onClose={() => { setLobbyOpen(false); setLobbyEventId(null); }}
+        />
+      )}
     </View>
   );
 }
