@@ -39,6 +39,11 @@ type VisualItem = {
   watchUrl?: string;
   deepLink?: string;
   ratingSummary?: RatingSummary | null;
+  // Lifestyle/recipe fields used by the Cozy home consumer; optional so
+  // movie/watch items that never set them are unaffected.
+  affiliateLink?: string;
+  spotifyLink?: string;
+  promo?: { discountCode?: string; endDate?: string };
 };
 
 type RatingBreakdown = { count: number; pct: number };

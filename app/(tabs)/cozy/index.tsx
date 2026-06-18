@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight } from 'phosphor-react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { MovieDetailSheet } from './media/index';
+import { MovieDetailSheet, type VisualItem } from './media/index';
 import { apiGet } from '../../../lib/api';
 import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
@@ -27,22 +27,6 @@ type BookItem = {
   primaryAuthor: string;
   coverUrl: string;
   genres?: string[];
-};
-
-type PlatformLink = { platformId: string; deepLink: string };
-
-type VisualItem = {
-  sk: string;
-  imageUrl: string;
-  deepLink?: string;
-  affiliateLink?: string;
-  spotifyLink?: string;
-  platforms?: PlatformLink[];
-  title?: string;
-  category?: string;
-  description?: string;
-  promo?: { discountCode?: string; endDate?: string };
-  movieId?: string;
 };
 
 type AuthorSpotlight = {

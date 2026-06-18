@@ -22,6 +22,7 @@ import {
   type RetailerKey,
   type RetailerCTAFields,
 } from '../../lib/retailerCta';
+import { type RatingKey } from '../../lib/tagTaxonomy';
 
 const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: string }> = {
   trash:      { emoji: '🗑️', phrase: 'they say skip it',       color: '#E57373' },
@@ -30,9 +31,6 @@ const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: st
   obsessed:   { emoji: '😍', phrase: "they're obsessed",       color: '#F06292' },
   chefs_kiss: { emoji: '💋', phrase: "it's a Chef's Kiss",     color: '#B83255' },
 };
-
-const VERDICTS = ['trash', 'meh', 'cute', 'obsessed', 'chefs_kiss'] as const;
-type Verdict = typeof VERDICTS[number];
 
 type RatingSummary = {
   totalRatings: number;
@@ -53,7 +51,10 @@ type BookDetailResponse = {
   } & RetailerCTAFields;
   libraryItem: {
     status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
-    rating: Verdict | null;
+    // Personal library rating, in the uppercase tag-taxonomy domain
+    // (RatingKey). Distinct from the lowercase community Verdict used by
+    // userCommunityRating / VerdictRating. Read/written only by TagBookModal.
+    rating: RatingKey | null;
     userSpiceLevel: string | null;
     userTriggers: string[];
     userTropes: string[];
@@ -464,7 +465,7 @@ export default function BookDetailsScreen() {
           workId={work.workId}
           bookTitle={work.title}
           initialValues={{
-            rating: libraryItem.rating as any,
+            rating: libraryItem.rating,
             userSpiceLevel: libraryItem.userSpiceLevel as any,
             userTriggers: (libraryItem.userTriggers ?? []) as any,
             userTropes: (libraryItem.userTropes ?? []) as any,
