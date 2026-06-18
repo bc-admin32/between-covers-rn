@@ -63,6 +63,11 @@ export default function RoomScreen({
   const [chatToken, setChatToken] = useState<string | null>(null);
   const [attendanceSk, setAttendanceSk] = useState<string | null>(null);
   const [isPreEvent, setIsPreEvent] = useState(false);
+  // From the room-join response: the room's live-broadcast HLS (.m3u8) URL and
+  // whether the room streams video or is chat-only. Set once at join — the
+  // /live poll that refreshes liveRoom does not carry these fields.
+  const [ivsPlaybackUrl, setIvsPlaybackUrl] = useState<string | null>(null);
+  const [outputMode, setOutputMode] = useState<'video' | 'text' | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pinnedMessage, setPinnedMessage] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
@@ -109,6 +114,8 @@ export default function RoomScreen({
         setChatToken(joinRes.token);
         setAttendanceSk(joinRes.attendanceSk);
         setIsPreEvent(joinRes.isPreEvent);
+        setIvsPlaybackUrl(joinRes.room?.ivsPlaybackUrl ?? null);
+        setOutputMode(joinRes.room?.outputMode ?? 'text');
       } catch (err) {
         if (cancelled) return;
         // Restriction branch — handle reason codes from /join. The four codes
@@ -322,7 +329,14 @@ export default function RoomScreen({
     | { videoUrl?: string; artistName?: string; isIntro?: boolean }
     | null
     | undefined;
-  const videoUrl = isSketchTheScene ? currentQuestion?.videoUrl ?? null : null;
+  // Live broadcast: gate on avatar STREAM HEALTH, not outputMode. outputMode
+  // is a chime-routing flag the bot flips to "text" when /speak fails, which
+  // is independent of whether the avatar video is streaming. Optimistic —
+  // undefined/not-yet-polled health still shows the stream; only an explicit
+  // false hides it. Falls back to the per-question Sketch the Scene clip.
+  const avatarHealthy = roomState?.avatarHealthy;
+  const liveVideoUrl = ivsPlaybackUrl && avatarHealthy !== false ? ivsPlaybackUrl : null;
+  const videoUrl = liveVideoUrl ?? (isSketchTheScene ? currentQuestion?.videoUrl ?? null : null);
   const artistName = isSketchTheScene ? currentQuestion?.artistName ?? null : null;
 
   // Reveal phase state — surfaces revealedAnswer as overlay, pauses video
@@ -346,6 +360,7 @@ export default function RoomScreen({
   useEffect(() => {
     if (!player || !videoUrl) return;
     try {
+      player.loop = false;
       player.pause();
       player.currentTime = 0;
       player.play();
@@ -447,7 +462,7 @@ export default function RoomScreen({
           </View>
         )}
 
-        {chatToken && isSketchTheScene && (
+        {chatToken && (videoUrl || isSketchTheScene) && (
           <>
             {artistName && (
               <View style={styles.artistBar}>

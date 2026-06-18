@@ -53,6 +53,10 @@ export type RoomState = {
   sketchPhase?: SketchPhase;
   revealedAnswer?: string | null;
   revealAt?: string | null;
+
+  // Avatar live-stream health. Distinct from the bot's chime-routing
+  // outputMode flag — undefined until polled, treated as healthy (optimistic).
+  avatarHealthy?: boolean;
 };
 
 export type RoomJoinResponse = {
@@ -66,6 +70,10 @@ export type RoomJoinResponse = {
     name: string;
     gameType: string | null;
     description: string;
+    // Live broadcast: when outputMode is "video", ivsPlaybackUrl is the room's
+    // HLS (.m3u8) live-stream URL. "text" rooms are chat-only (no stream).
+    outputMode: 'video' | 'text';
+    ivsPlaybackUrl: string | null;
   };
 };
 
