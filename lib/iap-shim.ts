@@ -37,6 +37,7 @@
 
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
@@ -181,6 +182,40 @@ if (!isExpoGo) {
       const real = rniap.useIAP();
       const platform = getResolvedPlatform();
 
+      // ── Connection readiness gate ──────────────────────────────────────────
+      // react-native-iap's own useIAP() sets the context `connected` flag to
+      // true on hook MOUNT (see hooks/useIAP.ts), independent of whether
+      // initConnection() has resolved. On Amazon, initConnection() is what
+      // registers the native PurchasingListener (PurchasingService.registerListener);
+      // any purchasing call (getSubscriptions/getProducts/getAvailablePurchases/
+      // requestSubscription) issued before it resolves throws "You must register
+      // a PurchasingListener before invoking this operation for Amazon".
+      //
+      // So we DON'T trust real.connected as the ready signal. We own a `ready`
+      // flag that flips true only after initConnection() resolves. initConnection
+      // is idempotent (returns the existing connection if the root provider
+      // already initialized it), so calling it here is safe on every platform.
+      // Apple/Google init resolves promptly — same observable behavior, minus the
+      // Amazon race.
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [ready, setReady] = useState(false);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      useEffect(() => {
+        let cancelled = false;
+        rniap
+          .initConnection()
+          .then(() => {
+            if (!cancelled) setReady(true);
+          })
+          .catch(() => {
+            // Stay not-ready: paywalls keep their fallback prices and the 8s
+            // loading timeout takes over, exactly as on any init failure today.
+          });
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
       const shimSubs: ShimSubscription[] = (real.subscriptions ?? []).map(toShimSubscription);
 
       const fetchProducts = async (opts: FetchProductsOpts): Promise<ShimSubscription[]> => {
@@ -259,7 +294,11 @@ if (!isExpoGo) {
       };
 
       return {
-        connected: !!real.connected,
+        // Gate on our init-resolved flag, NOT real.connected (which useIAP sets
+        // true on mount before initConnection resolves). This is what keeps the
+        // paywalls from calling getSubscriptions before the Amazon listener is
+        // registered.
+        connected: ready,
         subscriptions: shimSubs,
         currentPurchase: (real.currentPurchase ?? null) as ShimPurchase | null,
         currentPurchaseError: (real.currentPurchaseError ?? null) as { code?: string } | null,
