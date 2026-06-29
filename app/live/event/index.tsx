@@ -400,7 +400,7 @@ export default function LiveEventScreen() {
         <View style={styles.joinChatContainer}>
           <Text style={styles.joinChatText}>Jump into the conversation</Text>
           <TouchableOpacity style={styles.joinChatButton} onPress={handleJoinChat}>
-            <Text style={styles.joinChatButtonText}>Join the Chat →</Text>
+            <Text style={styles.joinChatButtonText}>Join Live →</Text>
           </TouchableOpacity>
         </View>
       )}

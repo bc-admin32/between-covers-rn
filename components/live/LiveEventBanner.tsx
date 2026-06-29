@@ -172,7 +172,7 @@ export default function LiveEventBanner() {
             <Text style={styles.liveTitle} numberOfLines={1}>{activeEvent.title}</Text>
           </View>
           <View style={styles.joinButton}>
-            <Text style={styles.joinText}>Join →</Text>
+            <Text style={styles.joinText}>Join Live →</Text>
           </View>
         </TouchableOpacity>
       )}
