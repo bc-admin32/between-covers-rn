@@ -74,7 +74,7 @@
         }
       ],
       "expo-video",
-      "expo-image-picker",
+      ["expo-image-picker", { "cameraPermission": false }],
       [
         "expo-notifications",
         {
@@ -82,7 +82,8 @@
           "color": "#B83255"
         }
       ],
-      "./plugins/withAdmApiKey"
+      "./plugins/withAdmApiKey",
+      "./withNoCameraFeatures"
     ],
     "experiments": {
       "typedRoutes": true
