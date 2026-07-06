@@ -6,6 +6,8 @@ import {
   ensureConnection,
   type ShimPurchase,
 } from './iap-shim';
+// TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture.
+import { recordIapError } from './iapDebug';
 
 const API_BASE = 'https://api.betweencovers.app';
 
@@ -71,7 +73,10 @@ export async function writeSubscription(purchase: ShimPurchase): Promise<boolean
     const data = await res.json().catch(() => null);
     if (data && (data.success === false || data.verified === false)) return false;
     return true;
-  } catch {
+  } catch (e) {
+    // TEMPORARY DEBUG: record-only (this path intentionally swallows and returns
+    // false so the caller leaves the purchase PENDING; behavior unchanged).
+    recordIapError('writeSubscription', e);
     return false;
   }
 }
@@ -129,7 +134,10 @@ export async function reconcileAndroidPurchases(): Promise<boolean> {
     );
     if (!active) return false;
     return await writeSubscription(active);
-  } catch {
+  } catch (e) {
+    // TEMPORARY DEBUG: record-only (this path intentionally swallows and returns
+    // false so launch never blocks; re-throwing would change behavior).
+    recordIapError('reconcileAndroidPurchases', e);
     return false;
   }
 }
