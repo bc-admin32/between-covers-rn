@@ -62,6 +62,27 @@ export function getResolvedPlatform(): ResolvedPlatform {
   return cachedPlatform;
 }
 
+/**
+ * True only on the Google Play path (Android, non-Amazon).
+ *
+ * This is the store detector that ALL Play-only billing logic must gate on —
+ * NOT `Platform.OS`. Amazon Fire reports `Platform.OS === 'android'`, so a
+ * `Platform.OS === 'android'` gate would let Google-Play-only calls run on
+ * Amazon, where they throw / are unsupported. Play-only surface includes:
+ *   - `flushFailedPurchasesCachedAsPendingAndroid()` (Google Play Billing only;
+ *     the Amazon native module implements it as a no-op, and nothing in this app
+ *     calls it — but any future caller must still gate on this, not Platform.OS).
+ *   - `getAvailablePurchases()`-based launch reconciliation
+ *     (`reconcileAndroidPurchases` in lib/subscription.ts), which self-heals a
+ *     Google subscription against the backend and has no Amazon analogue.
+ *
+ * Delegates to `getResolvedPlatform()` so the Amazon-vs-Google decision lives in
+ * exactly one place (`Device.manufacturer === 'Amazon'`).
+ */
+export function isGooglePlay(): boolean {
+  return getResolvedPlatform() === 'android';
+}
+
 export type ShimSubscription = {
   id: string;
   displayPrice: string;

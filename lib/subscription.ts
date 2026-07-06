@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import {
   getResolvedPlatform,
+  isGooglePlay,
   restorePurchases,
   ensureConnection,
   type ShimPurchase,
@@ -106,11 +107,18 @@ export async function safeFinishTransaction(
 /**
  * Launch reconcile: if the backend says the user is not entitled but Google
  * still holds an active subscription, push that purchase to the backend so the
- * next /auth/resolve grants access. Android only; silent/best-effort. Returns
- * true only if a verified write was made (caller should then re-resolve).
+ * next /auth/resolve grants access. GOOGLE PLAY ONLY; silent/best-effort.
+ * Returns true only if a verified write was made (caller should then re-resolve).
+ *
+ * This is Play-only reconciliation (`getAvailablePurchases()` against Google
+ * Billing). It MUST be gated on the shim's store detector (`isGooglePlay()`),
+ * NOT `Platform.OS === 'android'`: Amazon Fire reports `Platform.OS === 'android'`,
+ * so a Platform.OS gate would run this Play path on Amazon — the same class of
+ * bug as the PurchasingListener error, one step later. `isGooglePlay()` returns
+ * false on Amazon (and iOS), so this is a hard no-op there.
  */
 export async function reconcileAndroidPurchases(): Promise<boolean> {
-  if (getResolvedPlatform() !== 'android') return false;
+  if (!isGooglePlay()) return false;
   try {
     // getAvailablePurchases needs an IAP connection; at cold start no paywall
     // screen has mounted useIAP() yet, so establish it ourselves (tolerant).
