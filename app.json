@@ -73,6 +73,7 @@
           "paymentProvider": "both"
         }
       ],
+      "./plugins/withRNIapAmazonActivityListener",
       "expo-video",
       ["expo-image-picker", { "cameraPermission": false }],
       [
