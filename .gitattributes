@@ -1,0 +1,4 @@
+# Ship the Amazon IAP auth key verbatim — no EOL conversion. The config plugin
+# copies this file byte-for-byte into the APK assets, so its bytes must be stable
+# across platforms/checkouts.
+assets/amazon/AppstoreAuthenticationKey.pem -text

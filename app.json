@@ -84,6 +84,7 @@
         }
       ],
       "./plugins/withAdmApiKey",
+      "./plugins/withAmazonIapAuthKey",
       "./withNoCameraFeatures"
     ],
     "experiments": {
