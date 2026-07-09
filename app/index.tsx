@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
-import { isPaywallRoute, reconcileAndroidPurchases } from '../lib/subscription';
+import { isPaywallRoute, reconcileAndroidPurchases, reconcileAmazonPurchases } from '../lib/subscription';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -96,7 +96,12 @@ export default function SplashScreen() {
           // no-ops off-Android / on any error). Skipped entirely when the first
           // resolve already grants access — we never touch IAP for entitled users.
           if (resolved.ok && isPaywallRoute(resolved.data?.nextRoute)) {
-            const reconciled = await reconcileAndroidPurchases();
+            // Google and Amazon each self-heal against their own store; both
+            // helpers hard no-op off their platform, so calling both is safe and
+            // only one can do work. Amazon recovers the case where a direct
+            // purchase rejected with E_UNKNOWN but actually completed.
+            const reconciled =
+              (await reconcileAndroidPurchases()) || (await reconcileAmazonPurchases());
             if (reconciled) {
               try {
                 const second = await resolveOnce(idToken);

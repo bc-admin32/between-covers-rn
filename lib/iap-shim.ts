@@ -100,7 +100,14 @@ export type ShimPurchase = {
   // Android (Google Play / Amazon) purchase token. Required by the backend to
   // verify the purchase against Google (subscriptionWrite v4). Present on
   // Android purchases from react-native-iap 12.16.4 as `purchase.purchaseToken`.
+  // On Amazon this carries the receiptId (the native maps receiptId →
+  // purchaseToken), which the backend needs for Amazon receipt verification.
   purchaseToken?: string;
+  // Amazon-only: the Amazon userId and full receipt JSON. Amazon's Receipt
+  // Verification Service is addressed by (userId, receiptId), so the backend
+  // needs the userId alongside the receiptId to verify. Undefined off-Amazon.
+  amazonUserId?: string;
+  transactionReceipt?: string;
 };
 
 type FetchProductsOpts = { skus: string[]; type: string };
@@ -360,11 +367,18 @@ if (!isExpoGo) {
       }
       return (purchases ?? []).map((p: any) => ({
         productId: p.productId,
-        transactionId: p.transactionId ?? '',
+        // Amazon receipts carry no transactionId; fall back to the receiptId
+        // (purchaseToken) so downstream never sees an empty id.
+        transactionId: p.transactionId ?? p.purchaseToken ?? '',
         transactionDate: p.transactionDate,
-        // Preserve the Android purchase token so callers can verify it
-        // server-side (backend verification + restore/launch write-back).
+        // Preserve the Android/Amazon purchase token (on Amazon this is the
+        // receiptId) so callers can verify it server-side (backend verification
+        // + restore/launch write-back).
         purchaseToken: p.purchaseToken,
+        // Amazon receipt verification also needs the userId + full receipt JSON.
+        // Undefined on Google/iOS — harmless passthrough.
+        amazonUserId: p.userIdAmazon ?? p.amazonUserId,
+        transactionReceipt: p.transactionReceipt,
       }));
     };
 

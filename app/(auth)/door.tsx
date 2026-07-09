@@ -18,6 +18,10 @@ import {
   ALL_PRODUCT_IDS,
   writeSubscription,
   safeFinishTransaction,
+  priceLabelFor,
+  reconcileAmazonPurchases,
+  resolveEntitlementRoute,
+  isPaywallRoute,
 } from '../../lib/subscription';
 import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
@@ -63,6 +67,26 @@ export default function DoorScreen() {
       .catch((e) => recordIapError('door.fetchProducts', e))
       .finally(() => setLoading(false));
   }, [connected]);
+
+  // Amazon entitlement recovery on paywall load. If a direct purchase rejected
+  // with E_UNKNOWN while the Amazon subscription actually completed, no write
+  // happened — so on load we query Amazon's existing purchases, verify the
+  // receipt with the backend, and route away if the user is now entitled.
+  // Amazon-only (helper no-ops off-Amazon); silent and best-effort.
+  useEffect(() => {
+    if (getResolvedPlatform() !== 'amazon') return;
+    let cancelled = false;
+    (async () => {
+      const recovered = await reconcileAmazonPurchases();
+      if (cancelled || !recovered) return;
+      const next = await resolveEntitlementRoute();
+      if (cancelled || !next || isPaywallRoute(next)) return;
+      router.replace(normalizeRoute(next) as any);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentPurchase) return;
@@ -208,8 +232,11 @@ export default function DoorScreen() {
 
   const annualProduct  = subscriptions.find((s) => s.id === ANNUAL_PRODUCT_ID);
   const monthlyProduct = subscriptions.find((s) => s.id === MONTHLY_PRODUCT_ID);
-  const annualPriceLabel  = annualProduct  ? `${annualProduct.displayPrice}/year`  : '$89.99/year';
-  const monthlyPriceLabel = monthlyProduct ? `${monthlyProduct.displayPrice}/month` : '$9.99/month';
+  // Use the store price when it's a real price; fall back to the canonical
+  // catalog price when the store returns none — Amazon normalizes these subs to
+  // "0.0", which would otherwise render as "0.0/year".
+  const annualPriceLabel  = priceLabelFor(ANNUAL_PRODUCT_ID, annualProduct?.displayPrice, '/year');
+  const monthlyPriceLabel = priceLabelFor(MONTHLY_PRODUCT_ID, monthlyProduct?.displayPrice, '/month');
 
   return (
     <ScrollView

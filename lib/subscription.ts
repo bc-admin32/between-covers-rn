@@ -18,6 +18,46 @@ export const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 export const ANNUAL_PRODUCT_ID = 'com.betweencovers.app.membership.annual';
 export const ALL_PRODUCT_IDS = [MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID];
 
+// ── Canonical catalog prices (display strings) ──────────────────────────────
+// Fallback headline prices, keyed by product id. Used when the store's own
+// price is unusable — on Amazon, getSubscriptions normalizes auto-renew
+// subscription SKUs to the literal string "0.0" because Amazon's native
+// Product.getPrice() returns null/empty for them (see toShimSubscription /
+// react-native-iap fillProductsWithAdditionalData). These MUST track the prices
+// configured in the store consoles.
+export const PRODUCT_DISPLAY_PRICE: Record<string, string> = {
+  [MONTHLY_PRODUCT_ID]: '$9.99',
+  [ANNUAL_PRODUCT_ID]: '$89.99',
+};
+
+/**
+ * Returns the trimmed store price when it's a real, non-zero price; otherwise
+ * null. Treats missing/empty and zero sentinels ("0.0", "0", "$0.00") as
+ * unusable — that's what the Amazon path yields when it has no real price.
+ */
+export function usableStorePrice(raw?: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed.replace(/[^\d.,]/g, '').replace(',', '.'));
+  if (!Number.isNaN(numeric) && numeric === 0) return null;
+  return trimmed;
+}
+
+/**
+ * Headline price label for a product: the store price when usable, else the
+ * canonical catalog price. `suffix` is appended (e.g. "/year"). Empty string
+ * only if the product id is unknown and the store price is unusable.
+ */
+export function priceLabelFor(
+  productId: string,
+  storePrice?: string | null,
+  suffix = '',
+): string {
+  const price = usableStorePrice(storePrice) ?? PRODUCT_DISPLAY_PRICE[productId] ?? '';
+  return price ? `${price}${suffix}` : '';
+}
+
 // Routes /auth/resolve returns when the user is NOT entitled (paywalled).
 export function isPaywallRoute(route: string | null | undefined): boolean {
   if (!route) return false;
@@ -43,7 +83,9 @@ export async function writeSubscription(purchase: ShimPurchase): Promise<boolean
   const platform = getResolvedPlatform();
   const body: Record<string, unknown> = {
     productId: purchase.productId,
-    transactionId: purchase.transactionId,
+    // Amazon receipts have no transactionId; fall back to the receiptId
+    // (carried as purchaseToken) so the backend always gets a non-empty id.
+    transactionId: purchase.transactionId || purchase.purchaseToken || '',
     platform,
   };
 
@@ -52,8 +94,29 @@ export async function writeSubscription(purchase: ShimPurchase): Promise<boolean
     // Without it there's nothing to verify, so don't claim success.
     if (!purchase.purchaseToken) return false;
     body.purchaseToken = purchase.purchaseToken;
+  } else if (platform === 'amazon') {
+    // Amazon verification needs the receiptId (mapped to purchaseToken by the
+    // shim) and the Amazon userId — together they address Amazon's Receipt
+    // Verification Service (verifyReceiptId/user/{userId}/receiptId/{receiptId}).
+    // Without the receiptId there's nothing to verify, so don't claim success.
+    //
+    // BACKEND DEPENDENCY: subscriptionWrite (AWS Lambda) must accept + verify
+    // these Amazon fields (receiptId / amazonUserId / transactionReceipt) and
+    // record the subscription. Until it does, this write will not grant
+    // entitlement even though the payload is now correct.
+    const receiptId = purchase.purchaseToken;
+    if (!receiptId) return false;
+    body.receiptId = receiptId;
+    body.purchaseToken = receiptId;
+    const amazonUserId = purchase.amazonUserId ?? (purchase as any).userIdAmazon;
+    if (amazonUserId) body.amazonUserId = amazonUserId;
+    const receipt = purchase.transactionReceipt ?? (purchase as any).transactionReceipt;
+    if (receipt) body.transactionReceipt = receipt;
+    body.originalPurchaseDate = purchase.transactionDate
+      ? new Date(purchase.transactionDate).toISOString()
+      : new Date().toISOString();
   } else {
-    // iOS / Amazon: preserve the existing payload shape (no purchaseToken).
+    // iOS: preserve the existing payload shape (no purchaseToken).
     body.originalPurchaseDate = purchase.transactionDate
       ? new Date(purchase.transactionDate).toISOString()
       : new Date().toISOString();
@@ -139,5 +202,60 @@ export async function reconcileAndroidPurchases(): Promise<boolean> {
     // false so launch never blocks; re-throwing would change behavior).
     recordIapError('reconcileAndroidPurchases', e);
     return false;
+  }
+}
+
+/**
+ * Amazon analogue of reconcileAndroidPurchases. Queries Amazon for existing
+ * purchases (getAvailablePurchases → PurchaseUpdatesResponse) and, if an active
+ * membership receipt is found, writes it to the backend for verification +
+ * recording. Returns true only if a verified write was made (caller should then
+ * re-resolve). AMAZON ONLY; hard no-op on Google/iOS (getResolvedPlatform gate).
+ *
+ * This is the recovery path for the case that actually happened: a direct
+ * requestPurchase rejected with E_UNKNOWN while the Amazon purchase truly
+ * completed, so `currentPurchase` never fired and nothing was written. Querying
+ * available purchases recovers the receipt regardless of the failed request.
+ *
+ * NOTE: entitlement is only granted once subscriptionWrite (AWS) verifies the
+ * Amazon receipt — see writeSubscription's amazon branch.
+ */
+export async function reconcileAmazonPurchases(): Promise<boolean> {
+  if (getResolvedPlatform() !== 'amazon') return false;
+  try {
+    await ensureConnection();
+    const purchases = await restorePurchases();
+    const active = purchases.find(
+      (p) => ALL_PRODUCT_IDS.includes(p.productId) && !!p.purchaseToken,
+    );
+    if (!active) return false;
+    return await writeSubscription(active);
+  } catch (e) {
+    // Record-only: best-effort recovery must never throw into the paywall.
+    recordIapError('reconcileAmazonPurchases', e);
+    return false;
+  }
+}
+
+/**
+ * Backend-authoritative entitlement check. POSTs /auth/resolve and returns the
+ * next route string when the user is entitled (a non-null, app-relative route);
+ * returns null on any failure or when no route is given. Never throws.
+ */
+export async function resolveEntitlementRoute(): Promise<string | null> {
+  const idToken = await SecureStore.getItemAsync('bc_id_token');
+  if (!idToken) return null;
+  try {
+    const res = await fetch(`${API_BASE}/auth/resolve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const next = data?.nextRoute;
+    return typeof next === 'string' && next.startsWith('/') ? next : null;
+  } catch (e) {
+    recordIapError('resolveEntitlementRoute', e);
+    return null;
   }
 }
