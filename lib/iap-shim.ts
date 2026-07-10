@@ -38,7 +38,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, NativeModules, Platform } from 'react-native';
 // TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture. Only
 // referenced inside functions (not at module load), so the iapDebug ↔ iap-shim
 // import cycle is safe.
@@ -356,16 +356,8 @@ if (!isExpoGo) {
       };
     };
 
-    const realRestorePurchases: RestorePurchases = async () => {
-      let purchases: any[];
-      try {
-        purchases = await rniap.getAvailablePurchases();
-      } catch (e) {
-        // TEMPORARY DEBUG: record then re-throw (behavior unchanged).
-        recordIapError('shim.getAvailablePurchases', e);
-        throw e;
-      }
-      return (purchases ?? []).map((p: any) => ({
+    const mapPurchases = (purchases: any[] | null | undefined): ShimPurchase[] =>
+      (purchases ?? []).map((p: any) => ({
         productId: p.productId,
         // Amazon receipts carry no transactionId; fall back to the receiptId
         // (purchaseToken) so downstream never sees an empty id.
@@ -380,6 +372,76 @@ if (!isExpoGo) {
         amazonUserId: p.userIdAmazon ?? p.amazonUserId,
         transactionReceipt: p.transactionReceipt,
       }));
+
+    // Amazon requires the current user to be resolved (getUserData) before it
+    // will return entitlements. getUser() round-trips through the registered
+    // PurchasingListener, so it both identifies the user AND proves the listener
+    // is live. Non-fatal — proceed to the query even if it can't resolve.
+    const resolveAmazonUser = async (): Promise<void> => {
+      const amazonModule: any = NativeModules.RNIapAmazonModule;
+      if (!amazonModule?.getUser) return;
+      try {
+        await amazonModule.getUser();
+      } catch (e) {
+        recordIapError('shim.amazonGetUser', e);
+      }
+    };
+
+    const realRestorePurchases: RestorePurchases = async () => {
+      const platform = getResolvedPlatform();
+
+      // Apple / Google: unchanged — surface errors to the caller.
+      if (platform !== 'amazon') {
+        let purchases: any[];
+        try {
+          purchases = await rniap.getAvailablePurchases();
+        } catch (e) {
+          // TEMPORARY DEBUG: record then re-throw (behavior unchanged).
+          recordIapError('shim.getAvailablePurchases', e);
+          throw e;
+        }
+        return mapPurchases(purchases);
+      }
+
+      // ── Amazon path ────────────────────────────────────────────────────────
+      // getAvailableItems maps to Amazon's getPurchaseUpdates(true). Amazon
+      // returns a FAILED PurchaseUpdatesResponse — surfaced as E_UNKNOWN — when
+      // it's invoked before the PurchasingListener has registered AND the current
+      // user is resolved. Our reconcile can run at cold launch (before any
+      // paywall mounted useIAP()/getSubscriptions, so getUser was never called),
+      // which is exactly that race. So: register the listener (initConnection,
+      // idempotent) + resolve the user first, then query; retry once on a
+      // transient E_UNKNOWN; and degrade to an empty result rather than throwing.
+      try {
+        await rniap.initConnection();
+      } catch (e) {
+        recordIapError('shim.getAvailablePurchases.init', e);
+      }
+      await resolveAmazonUser();
+
+      try {
+        return mapPurchases(await rniap.getAvailablePurchases());
+      } catch (e) {
+        const code = (e as any)?.code;
+        if (code !== 'E_UNKNOWN') {
+          // Non-transient (e.g. service unavailable). Record and treat as "no
+          // purchases" so the reconcile never throws before the backend call.
+          recordIapError('shim.getAvailablePurchases', e);
+          return [];
+        }
+        // Transient E_UNKNOWN: the user/listener likely hadn't settled. Give
+        // Amazon a moment, re-resolve the user, and retry once.
+        await new Promise((r) => setTimeout(r, 600));
+        await resolveAmazonUser();
+        try {
+          return mapPurchases(await rniap.getAvailablePurchases());
+        } catch (e2) {
+          // Still failing — degrade gracefully to empty. The next launch /
+          // paywall-load reconcile will try again.
+          recordIapError('shim.getAvailablePurchases.retry', e2);
+          return [];
+        }
+      }
     };
 
     const realEnsureConnection: EnsureConnection = async () => {

@@ -219,10 +219,20 @@ export async function reconcileAndroidPurchases(): Promise<boolean> {
  *
  * NOTE: entitlement is only granted once subscriptionWrite (AWS) verifies the
  * Amazon receipt — see writeSubscription's amazon branch.
+ *
+ * Amazon readiness (register the PurchasingListener + resolve the current user
+ * before querying entitlements) and the E_UNKNOWN retry are handled inside the
+ * shim's restorePurchases() — see lib/iap-shim.ts. Amazon's getAvailableItems
+ * otherwise rejects with E_UNKNOWN when called before that setup, which is what
+ * made this reconcile throw before ever reaching the backend. restorePurchases()
+ * now degrades to an empty result instead of throwing, so a no-purchase (or
+ * transiently-unavailable) query simply returns false here.
  */
 export async function reconcileAmazonPurchases(): Promise<boolean> {
   if (getResolvedPlatform() !== 'amazon') return false;
   try {
+    // ensureConnection is idempotent; the shim's restorePurchases() also
+    // guarantees listener+user readiness for the Amazon query.
     await ensureConnection();
     const purchases = await restorePurchases();
     const active = purchases.find(

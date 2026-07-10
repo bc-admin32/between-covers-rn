@@ -73,7 +73,12 @@ export default function DoorScreen() {
   // happened — so on load we query Amazon's existing purchases, verify the
   // receipt with the backend, and route away if the user is now entitled.
   // Amazon-only (helper no-ops off-Amazon); silent and best-effort.
+  //
+  // Gated on `connected` (the shim's init-resolved flag) so we don't query
+  // Amazon before the PurchasingListener is registered — Amazon's
+  // getAvailableItems throws E_UNKNOWN if invoked too early.
   useEffect(() => {
+    if (!connected) return;
     if (getResolvedPlatform() !== 'amazon') return;
     let cancelled = false;
     (async () => {
@@ -86,7 +91,7 @@ export default function DoorScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     if (!currentPurchase) return;
