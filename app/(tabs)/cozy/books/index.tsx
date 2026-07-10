@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -15,7 +16,12 @@ type BookItem = {
   workId: string;
   title: string;
   primaryAuthor: string;
-  coverUrl: string;
+  coverUrl: string | null;
+  spice?: number | null;
+  spiceLevel?: string | null;
+  tropes?: string[];
+  primarySubgenre?: string | null;
+  triggers?: string[];
 };
 
 export default function CozyBooksScreen() {
@@ -99,22 +105,22 @@ export default function CozyBooksScreen() {
           </View>
         ) : (
           <View style={styles.gridInner}>
-            {books.map((book, i) => (
-              <TouchableOpacity
-                key={book.workId ?? i}
-                style={styles.bookCard}
-                onPress={() => router.push(`/book?workId=${book.workId}` as any)}
-              >
-                <View style={styles.bookCover}>
-                  <Image source={{ uri: book.coverUrl }} style={styles.bookCoverImage} />
-                </View>
-                <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-                <Text style={styles.bookAuthor} numberOfLines={1}>by {book.primaryAuthor}</Text>
-                <View style={styles.detailsButton}>
-                  <Text style={styles.detailsButtonText}>Details</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {books.map((book, i) => {
+              const card: BookCardData = {
+                bookId: book.workId,
+                title: book.title,
+                author: book.primaryAuthor,
+                coverUrl: book.coverUrl,
+                spice: book.spice,
+                spiceLevel: book.spiceLevel,
+                tropes: book.tropes,
+                primarySubgenre: book.primarySubgenre,
+                triggers: book.triggers,
+              };
+              return (
+                <BookCard key={book.workId ?? i} book={card} style={styles.bookCard} />
+              );
+            })}
           </View>
         )}
         <View style={{ height: 100 }} />
@@ -141,13 +147,7 @@ const styles = StyleSheet.create({
   countText: { fontSize: 11, fontWeight: '700', color: '#A9C0D4', letterSpacing: 0.8, textTransform: 'uppercase' },
   grid: { paddingHorizontal: spacing.md },
   gridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  bookCard: { width: '45%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
-  bookCover: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#D7E2E9', overflow: 'hidden' },
-  bookCoverImage: { width: '100%', height: '100%' },
-  bookTitle: { paddingHorizontal: 12, paddingTop: 10, fontSize: 15, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 20 },
-  bookAuthor: { paddingHorizontal: 12, paddingTop: 3, fontSize: 11, fontWeight: '400', color: '#A9C0D4' },
-  detailsButton: { margin: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#0F2A48', alignItems: 'center' },
-  detailsButtonText: { fontSize: 11, fontWeight: '700', color: '#0F2A48', letterSpacing: 0.6, textTransform: 'uppercase' },
+  bookCard: { width: '45%' },
   emptyState: { alignItems: 'center', paddingTop: 64, gap: spacing.sm },
   emptyEmoji: { fontSize: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48' },
