@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, Image, StyleSheet, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
+import { prettifyEnum } from '../../lib/tagTaxonomy';
 
 export type BookCardData = {
   bookId: string;
@@ -13,19 +14,6 @@ export type BookCardData = {
   primarySubgenre?: string | null;
   triggers?: string[];
 };
-
-// Taxonomy values arrive as SCREAMING_SNAKE enum keys (FAKE_DATING,
-// GRUMPY_SUNSHINE). Prettify for display: lowercase, split on "_", title-case.
-// Good enough for v1 — a couple (GRUMPY_SUNSHINE → "Grumpy Sunshine") drop the
-// taxonomy's slash, fine.
-function prettifyEnum(key: string): string {
-  return key
-    .toLowerCase()
-    .split('_')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 export default function BookCard({
   book,

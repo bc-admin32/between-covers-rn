@@ -27,6 +27,18 @@ export type PrimarySubgenreKey =
 // `sub`) matches the onboarding genre step, which imports this as its source of
 // truth — keep it stable so both the onboarding picker and the catalog filter
 // stay in sync.
+// Prettify a SCREAMING_SNAKE enum key for display: FAKE_DATING → "Fake Dating",
+// SPICY_EROTIC_ROMANCE → "Spicy Erotic Romance". Shared so cards, section
+// headers, and filters all label taxonomy values the same way.
+export function prettifyEnum(key: string): string {
+  return key
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export const PRIMARY_SUBGENRES: Array<{ value: PrimarySubgenreKey; label: string; sub: string }> = [
   { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
   { value: 'ROMANTIC_SUSPENSE', label: '🕵️ Romantic Suspense', sub: 'bodyguards · detectives · mysteries · thrillers' },
