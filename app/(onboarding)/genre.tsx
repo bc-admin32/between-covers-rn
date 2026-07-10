@@ -8,18 +8,13 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { CaretDown } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
+import { PRIMARY_SUBGENRES } from '../../lib/tagTaxonomy';
 
 const REVEAL_AT_S = 28;
 
-const GENRES = [
-  { value: 'CONTEMPORARY_ROMANCE', label: '📘 Contemporary Romance', sub: 'real world · small town · billionaire · rom-com vibes' },
-  { value: 'ROMANTIC_SUSPENSE', label: '🕵️ Romantic Suspense', sub: 'bodyguards · detectives · mysteries · thrillers' },
-  { value: 'FANTASY_ROMANCE', label: '🧚 Fantasy Romance', sub: 'fae · kingdoms · quests · magic' },
-  { value: 'PARANORMAL_ROMANCE', label: '🧛‍♂️ Paranormal Romance', sub: 'vampires · shifters · witches' },
-  { value: 'HISTORICAL_ROMANCE', label: '👑 Historical Romance', sub: 'Regency · Victorian · medieval' },
-  { value: 'DARK_ROMANCE', label: '🖤 Dark Romance', sub: 'mafia · morally gray · intense' },
-  { value: 'SPICY_EROTIC_ROMANCE', label: '🔥 Spicy / Erotic Romance', sub: 'high heat · explicit romance' },
-];
+// Source of truth lives in lib/tagTaxonomy so the catalog filter reuses the
+// exact same 7 onboarding-locked subgenres.
+const GENRES = PRIMARY_SUBGENRES;
 
 export default function GenreScreen() {
   const router = useRouter();
