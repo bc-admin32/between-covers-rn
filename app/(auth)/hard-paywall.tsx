@@ -67,11 +67,12 @@ export default function HardPaywallScreen() {
       .finally(() => setLoading(false));
   }, [connected]);
 
-  // Amazon entitlement recovery on paywall load. If a direct purchase rejected
-  // with E_UNKNOWN while the Amazon subscription actually completed, no write
-  // happened — so on load we query Amazon's existing purchases, verify the
-  // receipt with the backend, and route away if the user is now entitled.
-  // Amazon-only (helper no-ops off-Amazon); silent and best-effort.
+  // Amazon entitlement recovery on paywall load. First best-effort query Amazon's
+  // existing purchases and write back any receipt found. Then, REGARDLESS of the
+  // store query outcome, consult the backend entitlement: the subscription is
+  // already persisted in DynamoDB from the original purchase, so the paywall must
+  // clear from backend state even when the live store query fails (E_UNKNOWN) or
+  // comes back empty. Amazon-only (helper no-ops off-Amazon); silent + best-effort.
   //
   // Gated on `connected` (the shim's init-resolved flag) so we don't query
   // Amazon before the PurchasingListener is registered — Amazon's
@@ -81,8 +82,11 @@ export default function HardPaywallScreen() {
     if (getResolvedPlatform() !== 'amazon') return;
     let cancelled = false;
     (async () => {
-      const recovered = await reconcileAmazonPurchases();
-      if (cancelled || !recovered) return;
+      // Best-effort store reconcile — never throws (the shim logs + degrades to
+      // an empty result internally, so an E_UNKNOWN here can't block the user).
+      await reconcileAmazonPurchases();
+      if (cancelled) return;
+      // Authoritative fallback: clear the paywall from backend entitlement state.
       const next = await resolveEntitlementRoute();
       if (cancelled || !next || isPaywallRoute(next)) return;
       router.replace(normalizeRoute(next) as any);
@@ -191,6 +195,7 @@ export default function HardPaywallScreen() {
     if (purchasing || restoring) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRestoring(true);
+    const isAmazon = getResolvedPlatform() === 'amazon';
     try {
       const purchases = await doRestorePurchases();
       const active = purchases.find((p) => ALL_PRODUCT_IDS.includes(p.productId));
@@ -217,10 +222,33 @@ export default function HardPaywallScreen() {
           console.warn('Post-restore resolve failed:', err);
         }
         router.replace('/(auth)/login');
-      } else {
-        showError('No active subscription found.');
+        return;
       }
-    } catch {
+
+      // No live purchase from the store. On Amazon the query can come back empty
+      // (or have failed with E_UNKNOWN, which the shim degrades to an empty
+      // result) even though the subscription is persisted in DynamoDB from the
+      // original purchase — fall back to backend entitlement before giving up.
+      if (isAmazon) {
+        const next = await resolveEntitlementRoute();
+        if (next && !isPaywallRoute(next)) {
+          router.replace(normalizeRoute(next) as any);
+          return;
+        }
+      }
+      showError('No active subscription found.');
+    } catch (err) {
+      // The store restore threw. Log via the IAP debug channel, then on Amazon
+      // fall back to backend entitlement so a failed live query can't block a
+      // user whose subscription is already recorded server-side.
+      recordIapError('hardPaywall.handleRestore', err);
+      if (isAmazon) {
+        const next = await resolveEntitlementRoute().catch(() => null);
+        if (next && !isPaywallRoute(next)) {
+          router.replace(normalizeRoute(next) as any);
+          return;
+        }
+      }
       showError('Restore failed. Please try again.');
     } finally {
       setRestoring(false);
