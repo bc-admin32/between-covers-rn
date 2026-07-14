@@ -6,8 +6,6 @@ import {
   ensureConnection,
   type ShimPurchase,
 } from './iap-shim';
-// TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture.
-import { recordIapError } from './iapDebug';
 
 const API_BASE = 'https://api.betweencovers.app';
 
@@ -136,10 +134,7 @@ export async function writeSubscription(purchase: ShimPurchase): Promise<boolean
     const data = await res.json().catch(() => null);
     if (data && (data.success === false || data.verified === false)) return false;
     return true;
-  } catch (e) {
-    // TEMPORARY DEBUG: record-only (this path intentionally swallows and returns
-    // false so the caller leaves the purchase PENDING; behavior unchanged).
-    recordIapError('writeSubscription', e);
+  } catch {
     return false;
   }
 }
@@ -197,10 +192,7 @@ export async function reconcileAndroidPurchases(): Promise<boolean> {
     );
     if (!active) return false;
     return await writeSubscription(active);
-  } catch (e) {
-    // TEMPORARY DEBUG: record-only (this path intentionally swallows and returns
-    // false so launch never blocks; re-throwing would change behavior).
-    recordIapError('reconcileAndroidPurchases', e);
+  } catch {
     return false;
   }
 }
@@ -240,9 +232,8 @@ export async function reconcileAmazonPurchases(): Promise<boolean> {
     );
     if (!active) return false;
     return await writeSubscription(active);
-  } catch (e) {
-    // Record-only: best-effort recovery must never throw into the paywall.
-    recordIapError('reconcileAmazonPurchases', e);
+  } catch {
+    // Best-effort recovery must never throw into the paywall.
     return false;
   }
 }
@@ -264,8 +255,7 @@ export async function resolveEntitlementRoute(): Promise<string | null> {
     const data = await res.json().catch(() => null);
     const next = data?.nextRoute;
     return typeof next === 'string' && next.startsWith('/') ? next : null;
-  } catch (e) {
-    recordIapError('resolveEntitlementRoute', e);
+  } catch {
     return null;
   }
 }

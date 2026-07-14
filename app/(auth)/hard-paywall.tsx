@@ -25,8 +25,6 @@ import {
 } from '../../lib/subscription';
 import { normalizeRoute } from '../../lib/routes';
 import { track } from '../../lib/analytics';
-// TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture.
-import { recordIapError } from '../../lib/iapDebug';
 
 const TERMS_URL   = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/terms-of-use.html';
 const PRIVACY_URL = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/privacy-policy.html';
@@ -62,8 +60,7 @@ export default function HardPaywallScreen() {
   useEffect(() => {
     if (!connected) return;
     fetchProducts({ skus: ALL_PRODUCT_IDS, type: 'subs' })
-      // TEMPORARY DEBUG: record-only (effect already swallows; behavior unchanged).
-      .catch((e) => recordIapError('hardPaywall.fetchProducts', e))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [connected]);
 
@@ -237,11 +234,10 @@ export default function HardPaywallScreen() {
         }
       }
       showError('No active subscription found.');
-    } catch (err) {
-      // The store restore threw. Log via the IAP debug channel, then on Amazon
-      // fall back to backend entitlement so a failed live query can't block a
-      // user whose subscription is already recorded server-side.
-      recordIapError('hardPaywall.handleRestore', err);
+    } catch {
+      // The store restore threw. On Amazon, fall back to backend entitlement so
+      // a failed live query can't block a user whose subscription is already
+      // recorded server-side.
       if (isAmazon) {
         const next = await resolveEntitlementRoute().catch(() => null);
         if (next && !isPaywallRoute(next)) {

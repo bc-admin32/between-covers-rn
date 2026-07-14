@@ -13,25 +13,6 @@ import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
 import { initAnalytics, track } from '../lib/analytics';
 import { captureFromUrl } from '../lib/attribution';
-// TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture.
-import IapDebugBanner from '../components/IapDebugBanner';
-import { recordIapError } from '../lib/iapDebug';
-
-// Global safety net: record any otherwise-unhandled JS error so we still capture
-// the Amazon PurchasingListener trace even if it fires from an un-wrapped site.
-// Chains (does NOT drop) the previous handler. Installed once at module load.
-const __errorUtils: any = (globalThis as any)?.ErrorUtils;
-const __prevGlobalHandler = __errorUtils?.getGlobalHandler?.();
-__errorUtils?.setGlobalHandler?.((error: any, isFatal?: boolean) => {
-  try {
-    recordIapError('global', error);
-  } catch {
-    // never let the debug net itself crash the handler chain
-  }
-  if (typeof __prevGlobalHandler === 'function') {
-    __prevGlobalHandler(error, isFatal);
-  }
-});
 
 // Fonts are natively bundled via expo-font plugin in app.json.
 // We still call useFonts() so they're registered under these exact keys
@@ -214,9 +195,6 @@ function RootLayout() {
         <Stack.Screen name="book/index" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="submissions/[type]" options={{ animation: 'slide_from_right' }} />
       </Stack>
-      {/* TEMPORARY DEBUG INSTRUMENTATION — overlays the captured IAP trace above
-          all screens (incl. the paywall). Remove with the trace capture. */}
-      <IapDebugBanner />
     </>
   );
 }

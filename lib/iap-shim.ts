@@ -39,10 +39,6 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { useEffect, useState } from 'react';
 import { Alert, NativeModules, Platform } from 'react-native';
-// TEMPORARY DEBUG INSTRUMENTATION — remove with the IAP trace capture. Only
-// referenced inside functions (not at module load), so the iapDebug ↔ iap-shim
-// import cycle is safe.
-import { recordIapError } from './iapDebug';
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
@@ -239,13 +235,9 @@ if (!isExpoGo) {
           .then(() => {
             if (!cancelled) setReady(true);
           })
-          .catch((e: unknown) => {
-            // TEMPORARY DEBUG: record the init failure (record-only — do NOT
-            // re-throw, that would turn today's intentional swallow into an
-            // unhandled rejection and change behavior). Stay not-ready: paywalls
-            // keep their fallback prices and the 8s loading timeout takes over,
-            // exactly as on any init failure today.
-            recordIapError('shim.initConnection', e);
+          .catch(() => {
+            // Stay not-ready: paywalls keep their fallback prices and the 8s
+            // loading timeout takes over, exactly as on any init failure today.
           });
         return () => {
           cancelled = true;
@@ -255,23 +247,16 @@ if (!isExpoGo) {
       const shimSubs: ShimSubscription[] = (real.subscriptions ?? []).map(toShimSubscription);
 
       const fetchProducts = async (opts: FetchProductsOpts): Promise<ShimSubscription[]> => {
-        try {
-          if (opts.type === 'subs') {
-            await real.getSubscriptions({ skus: opts.skus });
-          } else {
-            await real.getProducts({ skus: opts.skus });
-          }
-        } catch (e) {
-          // TEMPORARY DEBUG: record then re-throw (behavior unchanged).
-          recordIapError('shim.fetchProducts', e);
-          throw e;
+        if (opts.type === 'subs') {
+          await real.getSubscriptions({ skus: opts.skus });
+        } else {
+          await real.getProducts({ skus: opts.skus });
         }
         // Hook state updates asynchronously; return the latest snapshot we have.
         return ((real.subscriptions ?? []) as any[]).map(toShimSubscription);
       };
 
       const requestPurchase = async (opts: RequestPurchaseOpts): Promise<void> => {
-       try {
         const isSubs = opts.type === 'subs';
 
         if (platform === 'ios') {
@@ -327,11 +312,6 @@ if (!isExpoGo) {
         } else {
           await rniap.requestPurchase({ skus });
         }
-       } catch (e) {
-         // TEMPORARY DEBUG: record then re-throw (behavior unchanged).
-         recordIapError('shim.requestPurchase', e);
-         throw e;
-       }
       };
 
       const finishTransaction = async (opts: FinishTransactionOpts): Promise<void> => {
@@ -382,8 +362,8 @@ if (!isExpoGo) {
       if (!amazonModule?.getUser) return;
       try {
         await amazonModule.getUser();
-      } catch (e) {
-        recordIapError('shim.amazonGetUser', e);
+      } catch {
+        // Non-fatal — proceed to the query even if the user can't resolve.
       }
     };
 
@@ -392,15 +372,7 @@ if (!isExpoGo) {
 
       // Apple / Google: unchanged — surface errors to the caller.
       if (platform !== 'amazon') {
-        let purchases: any[];
-        try {
-          purchases = await rniap.getAvailablePurchases();
-        } catch (e) {
-          // TEMPORARY DEBUG: record then re-throw (behavior unchanged).
-          recordIapError('shim.getAvailablePurchases', e);
-          throw e;
-        }
-        return mapPurchases(purchases);
+        return mapPurchases(await rniap.getAvailablePurchases());
       }
 
       // ── Amazon path ────────────────────────────────────────────────────────
@@ -414,8 +386,8 @@ if (!isExpoGo) {
       // transient E_UNKNOWN; and degrade to an empty result rather than throwing.
       try {
         await rniap.initConnection();
-      } catch (e) {
-        recordIapError('shim.getAvailablePurchases.init', e);
+      } catch {
+        // best-effort — proceed to resolve/query regardless
       }
       await resolveAmazonUser();
 
@@ -424,9 +396,8 @@ if (!isExpoGo) {
       } catch (e) {
         const code = (e as any)?.code;
         if (code !== 'E_UNKNOWN') {
-          // Non-transient (e.g. service unavailable). Record and treat as "no
-          // purchases" so the reconcile never throws before the backend call.
-          recordIapError('shim.getAvailablePurchases', e);
+          // Non-transient (e.g. service unavailable). Treat as "no purchases" so
+          // the reconcile never throws before the backend call.
           return [];
         }
         // Transient E_UNKNOWN: the user/listener likely hadn't settled. Give
@@ -435,10 +406,9 @@ if (!isExpoGo) {
         await resolveAmazonUser();
         try {
           return mapPurchases(await rniap.getAvailablePurchases());
-        } catch (e2) {
+        } catch {
           // Still failing — degrade gracefully to empty. The next launch /
           // paywall-load reconcile will try again.
-          recordIapError('shim.getAvailablePurchases.retry', e2);
           return [];
         }
       }
@@ -450,10 +420,8 @@ if (!isExpoGo) {
       // throw on a connection hiccup.
       try {
         await rniap.initConnection();
-      } catch (e) {
-        // TEMPORARY DEBUG: record-only (do NOT re-throw — this path intentionally
-        // swallows so callers treat a missing connection as "no purchases found").
-        recordIapError('shim.ensureConnection', e);
+      } catch {
+        // ignore — caller treats a missing connection as "no purchases found"
       }
     };
 
