@@ -51,7 +51,7 @@ export default function BookCard({
         <Text style={styles.genre} numberOfLines={1}>{prettifyEnum(book.primarySubgenre)}</Text>
       )}
 
-      <BookCardMeta spice={book.spice} tropes={book.tropes} triggers={book.triggers} />
+      <BookCardMeta spice={book.spice} tropes={book.tropes} />
     </TouchableOpacity>
   );
 }

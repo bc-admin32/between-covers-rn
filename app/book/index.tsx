@@ -22,7 +22,7 @@ import {
   type RetailerKey,
   type RetailerCTAFields,
 } from '../../lib/retailerCta';
-import { type RatingKey } from '../../lib/tagTaxonomy';
+import { TRIGGERS, prettifyEnum, type RatingKey } from '../../lib/tagTaxonomy';
 
 const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: string }> = {
   trash:      { emoji: '🗑️', phrase: 'they say skip it',       color: '#E57373' },
@@ -48,6 +48,9 @@ type BookDetailResponse = {
     coverUrl: string | null;
     synopsis?: string | null;
     series?: string | null;
+    // Work-level content warnings (libraryDetailGet returns these on the work).
+    // Distinct from libraryItem.userTriggers, which are the user's own tags.
+    triggers?: string[] | null;
   } & RetailerCTAFields;
   libraryItem: {
     status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
@@ -83,6 +86,12 @@ function scoreToVerdict(score: number): string {
   if (score < 3.5) return 'cute';
   if (score < 4.5) return 'obsessed';
   return 'chefs_kiss';
+}
+
+// Work-level content warnings arrive as taxonomy keys. Prefer the TRIGGERS
+// taxonomy's human label; fall back to prettifying an unrecognized enum key.
+function triggerLabel(key: string): string {
+  return TRIGGERS.find((t) => t.key === key)?.label ?? prettifyEnum(key);
 }
 
 export default function BookDetailsScreen() {
@@ -382,6 +391,22 @@ export default function BookDetailsScreen() {
             </>
           )}
 
+          {/* CONTENT WARNINGS — detail page only (removed from cards). Labeled
+              and legible, distinct from the compact card pill treatment. */}
+          {work.triggers && work.triggers.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>Content Warnings</Text>
+              <View style={styles.cwRow}>
+                {work.triggers.map((t) => (
+                  <View key={t} style={styles.cwBadge}>
+                    <Text style={styles.cwBadgeText}>{triggerLabel(t)}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.divider} />
+            </>
+          )}
+
           {/* COMMUNITY RATING */}
           <View style={styles.ratingSection}>
             <View style={styles.ratingCard}>
@@ -552,6 +577,9 @@ const styles = StyleSheet.create({
   verdictHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginVertical: spacing.lg },
   synopsis: { fontSize: 17, color: '#0F2A48', lineHeight: 30, marginBottom: spacing.md },
+  cwRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.sm },
+  cwBadge: { backgroundColor: 'rgba(184,50,85,0.06)', borderWidth: 1, borderColor: 'rgba(184,50,85,0.22)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  cwBadgeText: { fontSize: 12, fontWeight: '600', color: '#B83255' },
   ratingSection: { marginBottom: spacing.md },
   ratingCard: { backgroundColor: 'rgba(15,42,72,0.04)', borderWidth: 1, borderColor: 'rgba(15,42,72,0.07)', borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md },
   ratingText: { fontSize: 18, color: '#0F2A48', lineHeight: 26, fontStyle: 'italic' },
