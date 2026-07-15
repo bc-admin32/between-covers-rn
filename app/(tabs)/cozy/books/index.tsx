@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft, Funnel } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
@@ -107,12 +107,21 @@ export default function CozyBooksScreen() {
             <Text style={styles.headerTitle}>On Iris's Shelf</Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.irisButton}
-          onPress={() => router.push('/iris/chat?from=cozy/books' as any)}
-        >
-          <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => router.push('/(tabs)/cozy/catalog' as any)}
+            accessibilityLabel="Filter the catalog"
+          >
+            <Funnel size={20} color="#0F2A48" weight="bold" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.irisButton}
+            onPress={() => router.push('/iris/chat?from=cozy/books' as any)}
+          >
+            <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* IRIS NOTE */}
@@ -178,6 +187,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F4F8' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  filterButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
   backButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
   backArrow: { fontSize: 18, color: '#0F2A48', fontWeight: '600' },
   headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4' },

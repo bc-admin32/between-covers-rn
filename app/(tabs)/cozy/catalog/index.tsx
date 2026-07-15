@@ -11,8 +11,8 @@ import { spacing, colors } from '../../../../lib/theme';
 import { PRIMARY_SUBGENRES, TROPES } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
-// TODO(nav): This screen has no entry point yet — add a button/link into
-// /(tabs)/cozy/catalog from an appropriate Cozy surface. Left out per request.
+// Entered via the filter (funnel) button in the Cozy Books ("On Iris's Shelf")
+// header — see app/(tabs)/cozy/books/index.tsx.
 
 type TropeMode = 'any' | 'all';
 
