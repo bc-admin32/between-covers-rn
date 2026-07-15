@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate } from '../../../lib/dateUtils';
+import BookCardMeta from '../../../components/cozy/BookCardMeta';
 
 type LibraryItem = {
   workId: string;
@@ -19,6 +20,11 @@ type LibraryItem = {
   currentPage?: number;
   totalPages?: number;
   finishedAt?: string;
+  spice?: number | null;
+  spiceLevel?: string | null;
+  tropes?: string[];
+  primarySubgenre?: string | null;
+  triggers?: string[];
 };
 
 type LibrarySnapshot = {
@@ -188,6 +194,8 @@ export default function LibraryScreen() {
                   </View>
                   <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
                   <Text style={styles.bookAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                  {/* Tighter 3-col card — keep it compact: peppers + 1 pill. */}
+                  <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={1} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -217,6 +225,7 @@ export default function LibraryScreen() {
                   <View style={styles.listInfo}>
                     <Text style={styles.listTitle} numberOfLines={2}>{item.title}</Text>
                     <Text style={styles.listAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                    <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={2} />
                   </View>
                   {item.status === 'CURRENTLY_READING' && item.currentPage && (
                     <Text style={styles.listMeta}>p. {item.currentPage}</Text>

@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import BookCardMeta from '../../../../components/cozy/BookCardMeta';
 
 type DiscoverItem = {
   workId: string;
@@ -16,6 +17,11 @@ type DiscoverItem = {
   coverUrl: string | null;
   series?: string | null;
   seriesNumber?: number | null;
+  spice?: number | null;
+  spiceLevel?: string | null;
+  tropes?: string[];
+  primarySubgenre?: string | null;
+  triggers?: string[];
 };
 
 type DiscoverSection = {
@@ -178,6 +184,7 @@ export default function LibraryDiscoverScreen() {
                       </View>
                       <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
                       <Text style={styles.bookAuthor} numberOfLines={1}>{book.primaryAuthor}</Text>
+                      <BookCardMeta spice={book.spice} tropes={book.tropes} />
                     </TouchableOpacity>
 
                     {isAdded ? (

@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, Image, StyleSheet, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { prettifyEnum } from '../../lib/tagTaxonomy';
+import BookCardMeta from './BookCardMeta';
 
 export type BookCardData = {
   bookId: string;
@@ -28,10 +29,6 @@ export default function BookCard({
   const handlePress =
     onPress ?? (() => router.push(`/book?workId=${book.bookId}` as any));
 
-  const hasSpice = typeof book.spice === 'number' && book.spice > 0;
-  const tropes = (book.tropes ?? []).slice(0, 2);
-  const triggers = book.triggers ?? [];
-
   return (
     <TouchableOpacity style={[styles.card, style]} onPress={handlePress} activeOpacity={0.85}>
       <View style={styles.cover}>
@@ -54,31 +51,7 @@ export default function BookCard({
         <Text style={styles.genre} numberOfLines={1}>{prettifyEnum(book.primarySubgenre)}</Text>
       )}
 
-      {hasSpice && (
-        <Text style={styles.spice} numberOfLines={1}>
-          {'🌶️'.repeat(book.spice as number)}
-        </Text>
-      )}
-
-      {tropes.length > 0 && (
-        <View style={styles.tropeRow}>
-          {tropes.map((t) => (
-            <View key={t} style={styles.tropePill}>
-              <Text style={styles.tropePillText} numberOfLines={1}>{prettifyEnum(t)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {triggers.length > 0 && (
-        <View style={styles.cwRow}>
-          {triggers.map((t) => (
-            <View key={t} style={styles.cwPill}>
-              <Text style={styles.cwPillText} numberOfLines={1}>{prettifyEnum(t)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      <BookCardMeta spice={book.spice} tropes={book.tropes} triggers={book.triggers} />
     </TouchableOpacity>
   );
 }
@@ -111,11 +84,4 @@ const styles = StyleSheet.create({
   title: { marginTop: 10, fontSize: 13, fontWeight: '400', color: '#0F2A48', lineHeight: 18 },
   author: { fontSize: 11, color: '#6A5969', marginTop: 3, fontWeight: '300' },
   genre: { marginTop: 4, fontSize: 9, fontWeight: '700', color: '#A9C0D4', textTransform: 'uppercase', letterSpacing: 0.8 },
-  spice: { marginTop: 5, fontSize: 11, letterSpacing: 1 },
-  tropeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  tropePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '100%' },
-  tropePillText: { fontSize: 8, fontWeight: '700', color: '#6A5969', textTransform: 'uppercase', letterSpacing: 0.5 },
-  cwRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
-  cwPill: { backgroundColor: 'rgba(15,42,72,0.03)', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 1, maxWidth: '100%' },
-  cwPillText: { fontSize: 7, fontWeight: '500', color: '#A9A0A6', letterSpacing: 0.3 },
 });
