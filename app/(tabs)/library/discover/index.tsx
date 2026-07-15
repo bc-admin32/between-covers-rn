@@ -184,7 +184,7 @@ export default function LibraryDiscoverScreen() {
                       </View>
                       <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
                       <Text style={styles.bookAuthor} numberOfLines={1}>{book.primaryAuthor}</Text>
-                      <BookCardMeta spice={book.spice} tropes={book.tropes} />
+                      <BookCardMeta spice={book.spice} tropes={book.tropes} triggers={book.triggers} />
                     </TouchableOpacity>
 
                     {isAdded ? (
