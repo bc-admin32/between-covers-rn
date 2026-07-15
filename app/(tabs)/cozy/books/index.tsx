@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
-import { PRIMARY_SUBGENRES, prettifyEnum } from '../../../../lib/tagTaxonomy';
+import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
@@ -64,32 +64,7 @@ export default function CozyBooksScreen() {
 
   // Group by primarySubgenre, ordered by the shared taxonomy so this screen's
   // genre order matches New Releases. Untagged books fall into "Other", last.
-  const sections = useMemo(() => {
-    const groups = new Map<string, BookItem[]>();
-    for (const book of books) {
-      const key = book.primarySubgenre || 'OTHER';
-      const arr = groups.get(key);
-      if (arr) arr.push(book);
-      else groups.set(key, [book]);
-    }
-
-    const ordered: { key: string; label: string; books: BookItem[] }[] = [];
-    for (const g of PRIMARY_SUBGENRES) {
-      const arr = groups.get(g.value);
-      if (arr?.length) {
-        ordered.push({ key: g.value, label: prettifyEnum(g.value), books: arr });
-        groups.delete(g.value);
-      }
-    }
-    // Any unexpected non-empty subgenre keys, alphabetized, before Other.
-    for (const key of [...groups.keys()].filter((k) => k !== 'OTHER').sort()) {
-      ordered.push({ key, label: prettifyEnum(key), books: groups.get(key)! });
-    }
-    const other = groups.get('OTHER');
-    if (other?.length) ordered.push({ key: 'OTHER', label: 'Other', books: other });
-
-    return ordered;
-  }, [books]);
+  const sections = useMemo(() => groupBooksBySubgenre(books), [books]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

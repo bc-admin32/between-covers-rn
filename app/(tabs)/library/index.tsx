@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Image, ActivityIndicator,
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiGet } from '../../../lib/api';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate } from '../../../lib/dateUtils';
+import { groupBooksBySubgenre } from '../../../lib/tagTaxonomy';
 import BookCardMeta from '../../../components/cozy/BookCardMeta';
 
 type LibraryItem = {
@@ -84,6 +85,12 @@ export default function LibraryScreen() {
     }
     reload();
   }, [statusFilter, sortAsc]);
+
+  // Group the status-filtered items into genre sections, same taxonomy order as
+  // CozyBooksScreen. `items` already arrives sorted by title (A–Z / Z–A) from the
+  // API, and grouping preserves that order, so the sort applies within each
+  // section. Untagged books land in "Other", last.
+  const sections = useMemo(() => groupBooksBySubgenre(items), [items]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -175,73 +182,85 @@ export default function LibraryScreen() {
             </View>
           )}
 
-          {loaded && items.length > 0 && gridView && (
-            <View style={styles.grid}>
-              {items.map((item) => (
-                <TouchableOpacity
-                  key={item.workId}
-                  style={styles.gridItem}
-                  onPress={() => router.push(`/book?workId=${item.workId}` as any)}
-                >
-                  <View style={styles.coverWrapper}>
-                    {item.coverUrl ? (
-                      <Image source={{ uri: item.coverUrl }} style={styles.coverImage} />
-                    ) : (
-                      <View style={[styles.coverImage, styles.noCover]}>
-                        <Ionicons name="book" size={24} color="#A9C0D4" />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.bookAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
-                  {/* Tighter 3-col card — keep it compact: peppers + 1 pill. */}
-                  <BookCardMeta spice={item.spice} tropes={item.tropes} triggers={item.triggers} maxTropes={1} />
-                </TouchableOpacity>
-              ))}
+          {loaded && items.length > 0 && gridView && sections.map((section) => (
+            <View key={section.key} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{section.label}</Text>
+                <Text style={styles.sectionCount}>{section.books.length}</Text>
+              </View>
+              <View style={styles.grid}>
+                {section.books.map((item) => (
+                  <TouchableOpacity
+                    key={item.workId}
+                    style={styles.gridItem}
+                    onPress={() => router.push(`/book?workId=${item.workId}` as any)}
+                  >
+                    <View style={styles.coverWrapper}>
+                      {item.coverUrl ? (
+                        <Image source={{ uri: item.coverUrl }} style={styles.coverImage} />
+                      ) : (
+                        <View style={[styles.coverImage, styles.noCover]}>
+                          <Ionicons name="book" size={24} color="#A9C0D4" />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={styles.bookAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                    {/* Tighter 3-col card — keep it compact: peppers + 1 pill. */}
+                    <BookCardMeta spice={item.spice} tropes={item.tropes} triggers={item.triggers} maxTropes={1} />
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          )}
+          ))}
 
-          {loaded && items.length > 0 && !gridView && (
-            <View style={styles.list}>
-              {items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.workId}
-                  style={[
-                    styles.listItem,
-                    i === 0 && styles.listItemFirst,
-                    i === items.length - 1 && styles.listItemLast,
-                  ]}
-                  onPress={() => router.push(`/book?workId=${item.workId}` as any)}
-                >
-                  <View style={styles.listCover}>
-                    {item.coverUrl ? (
-                      <Image source={{ uri: item.coverUrl }} style={styles.listCoverImage} />
-                    ) : (
-                      <View style={[styles.listCoverImage, styles.noCover]}>
-                        <Ionicons name="book" size={16} color="#A9C0D4" />
-                      </View>
+          {loaded && items.length > 0 && !gridView && sections.map((section) => (
+            <View key={section.key} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{section.label}</Text>
+                <Text style={styles.sectionCount}>{section.books.length}</Text>
+              </View>
+              <View style={styles.list}>
+                {section.books.map((item, i) => (
+                  <TouchableOpacity
+                    key={item.workId}
+                    style={[
+                      styles.listItem,
+                      i === 0 && styles.listItemFirst,
+                      i === section.books.length - 1 && styles.listItemLast,
+                    ]}
+                    onPress={() => router.push(`/book?workId=${item.workId}` as any)}
+                  >
+                    <View style={styles.listCover}>
+                      {item.coverUrl ? (
+                        <Image source={{ uri: item.coverUrl }} style={styles.listCoverImage} />
+                      ) : (
+                        <View style={[styles.listCoverImage, styles.noCover]}>
+                          <Ionicons name="book" size={16} color="#A9C0D4" />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.listInfo}>
+                      <Text style={styles.listTitle} numberOfLines={2}>{item.title}</Text>
+                      <Text style={styles.listAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                      <BookCardMeta spice={item.spice} tropes={item.tropes} triggers={item.triggers} maxTropes={2} />
+                    </View>
+                    {item.status === 'CURRENTLY_READING' && item.currentPage && (
+                      <Text style={styles.listMeta}>p. {item.currentPage}</Text>
                     )}
-                  </View>
-                  <View style={styles.listInfo}>
-                    <Text style={styles.listTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.listAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
-                    <BookCardMeta spice={item.spice} tropes={item.tropes} triggers={item.triggers} maxTropes={2} />
-                  </View>
-                  {item.status === 'CURRENTLY_READING' && item.currentPage && (
-                    <Text style={styles.listMeta}>p. {item.currentPage}</Text>
-                  )}
-                  {item.status === 'FINISHED' && item.finishedAt && (
-                    <Text style={styles.listMeta}>
-                      {(/^\d{4}-\d{2}-\d{2}$/.test(item.finishedAt)
-                        ? parseLocalDate(item.finishedAt)
-                        : new Date(item.finishedAt)
-                      ).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {item.status === 'FINISHED' && item.finishedAt && (
+                      <Text style={styles.listMeta}>
+                        {(/^\d{4}-\d{2}-\d{2}$/.test(item.finishedAt)
+                          ? parseLocalDate(item.finishedAt)
+                          : new Date(item.finishedAt)
+                        ).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          )}
+          ))}
         </View>
 
         <View style={{ height: 100 }} />
@@ -288,6 +307,11 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300' },
   discoverButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, backgroundColor: '#0F2A48' },
   discoverButtonText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  // Genre section header — mirrors CozyBooksScreen ("On Iris's Shelf").
+  section: { marginBottom: spacing.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: spacing.xs },
+  sectionTitle: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62' },
+  sectionCount: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   gridItem: { width: '30%' },
   coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 4 },

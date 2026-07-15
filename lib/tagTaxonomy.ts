@@ -49,6 +49,43 @@ export const PRIMARY_SUBGENRES: Array<{ value: PrimarySubgenreKey; label: string
   { value: 'SPICY_EROTIC_ROMANCE', label: '🔥 Spicy / Erotic Romance', sub: 'high heat · explicit romance' },
 ];
 
+export type GenreSection<T> = { key: string; label: string; books: T[] };
+
+// Group books into genre sections keyed by primarySubgenre, ordered by the
+// PRIMARY_SUBGENRES taxonomy; any unexpected subgenre keys follow alphabetically,
+// and untagged books (missing/null primarySubgenre) fall into an "Other" section
+// last. Within-section order is preserved from the input array, so a pre-sorted
+// list stays sorted inside each section. Shared by CozyBooksScreen (Iris's Shelf)
+// and the personal Library screen — keep this the single source of the ordering.
+export function groupBooksBySubgenre<T extends { primarySubgenre?: string | null }>(
+  books: T[],
+): GenreSection<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const book of books) {
+    const key = book.primarySubgenre || 'OTHER';
+    const arr = groups.get(key);
+    if (arr) arr.push(book);
+    else groups.set(key, [book]);
+  }
+
+  const ordered: GenreSection<T>[] = [];
+  for (const g of PRIMARY_SUBGENRES) {
+    const arr = groups.get(g.value);
+    if (arr?.length) {
+      ordered.push({ key: g.value, label: prettifyEnum(g.value), books: arr });
+      groups.delete(g.value);
+    }
+  }
+  // Any unexpected non-empty subgenre keys, alphabetized, before Other.
+  for (const key of [...groups.keys()].filter((k) => k !== 'OTHER').sort()) {
+    ordered.push({ key, label: prettifyEnum(key), books: groups.get(key)! });
+  }
+  const other = groups.get('OTHER');
+  if (other?.length) ordered.push({ key: 'OTHER', label: 'Other', books: other });
+
+  return ordered;
+}
+
 export const SPICE_LEVELS: Array<{ key: SpiceKey; label: string; emoji: string }> = [
   { key: 'NONE',     label: 'Clean & cozy',         emoji: '🫖' },
   { key: 'LIGHT',    label: 'Keep it cute',         emoji: '😇' },
