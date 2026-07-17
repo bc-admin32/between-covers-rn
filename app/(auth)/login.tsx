@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { normalizeRoute } from '../../lib/routes';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
@@ -136,9 +137,23 @@ export default function LoginScreen() {
           <Text style={styles.socialButtonText}>Continue with Amazon</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('SignInWithApple')}>
-          <Text style={styles.socialButtonText}>Continue with Apple</Text>
-        </TouchableOpacity>
+        {/* iOS: Apple's own compliant button (App Store Guideline 4 requires it).
+            Android has no native Apple button, so keep the existing styled button
+            — same Cognito hosted-UI flow, unchanged. Apple-only; Amazon/Google
+            below are untouched. */}
+        {Platform.OS === 'ios' ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={8}
+            style={styles.appleButton}
+            onPress={() => handleSocialLogin('SignInWithApple')}
+          />
+        ) : (
+          <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('SignInWithApple')}>
+            <Text style={styles.socialButtonText}>Continue with Apple</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Google')}>
           <Text style={styles.socialButtonText}>Continue with Google</Text>
@@ -216,6 +231,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Apple's button controls its own color/radius (via buttonStyle/cornerRadius);
+  // only width + height may be set here, per the component's docs.
+  appleButton: {
+    width: '100%',
+    height: 52,
   },
   socialButtonText: {
     color: '#0F2A48',
