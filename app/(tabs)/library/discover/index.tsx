@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Image,
@@ -8,7 +8,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import { PRIMARY_SUBGENRES, TROPES } from '../../../../lib/tagTaxonomy';
 import BookCardMeta from '../../../../components/cozy/BookCardMeta';
+import { BookCardData } from '../../../../components/cozy/BookCard';
 
 type DiscoverItem = {
   workId: string;
@@ -32,16 +34,41 @@ type DiscoverSection = {
 
 type StatusType = 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
 
+type Mode = 'search' | 'filter';
+type TropeMode = 'any' | 'all';
+
+const FILTER_SPICE_LEVELS = [1, 2, 3, 4, 5];
+
+type FilterResponse = {
+  count: number;
+  appliedFilters?: unknown;
+  boundariesApplied: string[];
+  books: BookCardData[];
+};
+
 export default function LibraryDiscoverScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [mode, setMode] = useState<Mode>('search');
+
+  // --- Text search (untouched) ---
   const [searchQuery, setSearchQuery] = useState('');
   const [sections, setSections] = useState<DiscoverSection[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const latestQueryRef = useRef('');
+
+  // --- Filter/browse mode (reuses the Cozy catalog filter picker + endpoint) ---
+  const [filterSpices, setFilterSpices] = useState<number[]>([]);
+  const [filterGenres, setFilterGenres] = useState<string[]>([]);
+  const [filterTropes, setFilterTropes] = useState<string[]>([]);
+  const [filterTropeMode, setFilterTropeMode] = useState<TropeMode>('any');
+  const [filterBooks, setFilterBooks] = useState<BookCardData[]>([]);
+  const [filterBoundaries, setFilterBoundaries] = useState<string[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
+
   const [added, setAdded] = useState<Record<string, true>>({});
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const latestQueryRef = useRef('');
 
   useEffect(() => {
     const query = searchQuery.trim();
@@ -71,6 +98,76 @@ export default function LibraryDiscoverScreen() {
     }
   }
 
+  // Build the query string from active filters, matching the Cozy catalog
+  // filter screen's shape (comma-joined enum keys / numbers).
+  const filterQueryString = useMemo(() => {
+    const parts: string[] = [];
+    if (filterGenres.length) parts.push(`genre=${filterGenres.join(',')}`);
+    if (filterSpices.length) parts.push(`spice=${[...filterSpices].sort((a, b) => a - b).join(',')}`);
+    if (filterTropes.length) {
+      parts.push(`tropes=${filterTropes.join(',')}`);
+      parts.push(`tropeMode=${filterTropeMode}`);
+    }
+    return parts.length ? `?${parts.join('&')}` : '';
+  }, [filterGenres, filterSpices, filterTropes, filterTropeMode]);
+
+  useEffect(() => {
+    if (mode !== 'filter') return;
+    let cancelled = false;
+    setIsFiltering(true);
+    setAdded({});
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiGet<FilterResponse>(`/catalog/filter${filterQueryString}`);
+        if (cancelled) return;
+        setFilterBooks(res?.books ?? []);
+        setFilterBoundaries(res?.boundariesApplied ?? []);
+      } catch {
+        if (!cancelled) {
+          setFilterBooks([]);
+          setFilterBoundaries([]);
+        }
+      } finally {
+        if (!cancelled) setIsFiltering(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [mode, filterQueryString]);
+
+  const toggle = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>) => (value: T) => {
+    setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  };
+  const toggleFilterSpice = toggle(setFilterSpices);
+  const toggleFilterGenre = toggle(setFilterGenres);
+  const toggleFilterTrope = toggle(setFilterTropes);
+
+  const hasActiveFilters = filterSpices.length > 0 || filterGenres.length > 0 || filterTropes.length > 0;
+  const clearFilters = () => {
+    setFilterSpices([]);
+    setFilterGenres([]);
+    setFilterTropes([]);
+    setFilterTropeMode('any');
+  };
+
+  // Normalize catalog-filter results (bookId/author) into the same item shape
+  // the text-search results use (workId/primaryAuthor) so the existing grid +
+  // add-to-library rendering below can serve both modes unchanged.
+  const filterItems: DiscoverItem[] = filterBooks.map((b) => ({
+    workId: b.bookId,
+    title: b.title,
+    primaryAuthor: b.author,
+    coverUrl: b.coverUrl,
+    spice: b.spice,
+    spiceLevel: b.spiceLevel,
+    tropes: b.tropes,
+    primarySubgenre: b.primarySubgenre,
+    triggers: b.triggers,
+  }));
+
+  const displaySections: DiscoverSection[] =
+    mode === 'search' ? sections : filterItems.length > 0 ? [{ type: 'filtered', label: '', items: filterItems }] : [];
+  const isLoading = mode === 'search' ? isSearching : isFiltering;
+
   async function addBook(book: DiscoverItem, status: StatusType) {
     if (added[book.workId]) return;
     try {
@@ -89,7 +186,7 @@ export default function LibraryDiscoverScreen() {
     } catch {}
   }
 
-  const allItems = sections.flatMap((s) => s.items);
+  const allItems = displaySections.flatMap((s) => s.items);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -122,29 +219,144 @@ export default function LibraryDiscoverScreen() {
         </Text>
       </View>
 
-      {/* SEARCH */}
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search by title or author"
-          placeholderTextColor="#9c8f7e"
-          style={styles.searchInput}
-          returnKeyType="search"
-        />
+      {/* MODE SWITCH */}
+      <View style={styles.modeSwitch}>
+        <TouchableOpacity
+          style={[styles.modeTab, mode === 'search' && styles.modeTabActive]}
+          onPress={() => setMode('search')}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.modeTabText, mode === 'search' && styles.modeTabTextActive]}>Search</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, mode === 'filter' && styles.modeTabActive]}
+          onPress={() => setMode('filter')}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.modeTabText, mode === 'filter' && styles.modeTabTextActive]}>Browse Filters</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.divider} />
+      {/* SEARCH */}
+      {mode === 'search' && (
+        <>
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by title or author"
+              placeholderTextColor="#9c8f7e"
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+          </View>
+          <View style={styles.divider} />
+        </>
+      )}
 
       {/* RESULTS */}
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultsContent}>
 
-        {isSearching && (
+        {mode === 'filter' && (
+          <View style={styles.filterPanel}>
+            <View style={styles.filterPanelHeader}>
+              <Text style={styles.filterLabel}>Spice Level</Text>
+              {hasActiveFilters && (
+                <TouchableOpacity onPress={clearFilters}>
+                  <Text style={styles.clearFiltersText}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.pepperRow}>
+              {FILTER_SPICE_LEVELS.map((n) => {
+                const active = filterSpices.includes(n);
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    style={[styles.pepper, active && styles.pepperActive]}
+                    onPress={() => toggleFilterSpice(n)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>🌶️</Text>
+                    <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.filterLabel}>Genre</Text>
+            <View style={styles.chipRow}>
+              {PRIMARY_SUBGENRES.map((g) => {
+                const active = filterGenres.includes(g.value);
+                return (
+                  <TouchableOpacity
+                    key={g.value}
+                    style={[styles.genrePill, active && styles.genrePillActive]}
+                    onPress={() => toggleFilterGenre(g.value)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.genrePillText, active && styles.genrePillTextActive]}>
+                      {g.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.tropeHeader}>
+              <Text style={styles.filterLabel}>Tropes</Text>
+              <View style={styles.tropeModeToggle}>
+                {(['any', 'all'] as TropeMode[]).map((m) => {
+                  const active = filterTropeMode === m;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.tropeModeSegment, active && styles.tropeModeSegmentActive]}
+                      onPress={() => setFilterTropeMode(m)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.tropeModeText, active && styles.tropeModeTextActive]}>
+                        Match {m}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={styles.chipRow}>
+              {TROPES.map((t) => {
+                const active = filterTropes.includes(t.key);
+                return (
+                  <TouchableOpacity
+                    key={t.key}
+                    style={[styles.tropePill, active && styles.tropePillActive]}
+                    onPress={() => toggleFilterTrope(t.key)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.tropePillText, active && styles.tropePillTextActive]}>
+                      {t.emoji} {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {filterBoundaries.length > 0 && (
+              <Text style={styles.boundaryNote}>
+                Some books are hidden by your comfort settings.
+              </Text>
+            )}
+
+            <View style={styles.divider} />
+          </View>
+        )}
+
+        {isLoading && (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         )}
 
-        {!isSearching && hasSearched && allItems.length === 0 && (
+        {!isLoading && mode === 'search' && hasSearched && allItems.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
               No results found. Try a different title or author, or ask Iris for a recommendation ✦
@@ -152,13 +364,19 @@ export default function LibraryDiscoverScreen() {
           </View>
         )}
 
-        {!isSearching && !hasSearched && (
+        {!isLoading && mode === 'search' && !hasSearched && (
           <View style={styles.emptyState}>
             <Text style={styles.placeholderText}>Search for a title, author, or series</Text>
           </View>
         )}
 
-        {!isSearching && sections.map((section) => (
+        {!isLoading && mode === 'filter' && allItems.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No matches. Try broadening your filters.</Text>
+          </View>
+        )}
+
+        {!isLoading && displaySections.map((section) => (
           <View key={section.type} style={styles.section}>
             {section.label && (
               <Text style={styles.sectionLabel}>{section.label}</Text>
@@ -240,6 +458,38 @@ const styles = StyleSheet.create({
   irisNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, backgroundColor: '#fff', borderRadius: radius.md, borderWidth: 1, borderColor: '#D7E2E9' },
   irisNoteIcon: { fontSize: 14, marginTop: 1 },
   irisNoteText: { flex: 1, fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 21 },
+  modeSwitch: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', padding: 3 },
+  modeTab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
+  modeTabActive: { backgroundColor: '#0F2A48' },
+  modeTabText: { fontSize: 12, fontWeight: '700', color: '#9c8f7e' },
+  modeTabTextActive: { color: '#fff' },
+  filterPanel: { marginBottom: spacing.sm },
+  filterPanelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  filterLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#7a6e62', marginBottom: 12 },
+  clearFiltersText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
+  pepperRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg },
+  pepper: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#D7E2E9' },
+  pepperActive: { backgroundColor: '#FDE8ED', borderColor: '#B83255' },
+  pepperEmoji: { fontSize: 24 },
+  pepperEmojiMuted: { opacity: 0.25 },
+  pepperNum: { fontSize: 10, fontWeight: '700', color: '#A9C0D4', marginTop: 4 },
+  pepperNumActive: { color: '#B83255' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
+  genrePill: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#D7E2E9' },
+  genrePillActive: { backgroundColor: '#0F2A48', borderColor: '#0F2A48' },
+  genrePillText: { fontSize: 12, fontWeight: '400', color: '#6A5969' },
+  genrePillTextActive: { color: '#fff', fontWeight: '600' },
+  tropeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tropePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
+  tropePillActive: { backgroundColor: '#0F2A48' },
+  tropePillText: { fontSize: 10, fontWeight: '700', color: '#6A5969', textTransform: 'uppercase', letterSpacing: 0.5 },
+  tropePillTextActive: { color: '#fff' },
+  tropeModeToggle: { flexDirection: 'row', borderRadius: 20, borderWidth: 1, borderColor: '#D7E2E9', overflow: 'hidden', marginBottom: 12 },
+  tropeModeSegment: { paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#fff' },
+  tropeModeSegmentActive: { backgroundColor: '#A9C0D4' },
+  tropeModeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: '#9c8f7e' },
+  tropeModeTextActive: { color: '#0F2A48' },
+  boundaryNote: { fontSize: 12, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center', marginBottom: spacing.md, lineHeight: 18 },
   searchContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', paddingHorizontal: spacing.md },
   searchIcon: { fontSize: 14, marginRight: spacing.sm },
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: '#0F2A48' },
