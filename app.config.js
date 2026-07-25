@@ -6,9 +6,11 @@
  * by RNIAP_VARIANT (set per EAS build profile):
  *
  *   amazon (default): unchanged from app.json — react-native-iap@12.16.4 with
- *     paymentProvider "both" + the three Amazon config plugins.
- *   play:            drop the Amazon plugins and swap the react-native-iap
- *     plugin for expo-iap (iOS + Google Play, Billing 8/9). No Amazon code.
+ *     paymentProvider "both" + the three Amazon config plugins. Used by BOTH the
+ *     Amazon build AND iOS — iOS is out of scope for this migration (the Aug 31
+ *     Billing-8 deadline is Google Play only), so iOS stays 100% unchanged.
+ *   play:            GOOGLE PLAY ONLY — drop the Amazon plugins and swap the
+ *     react-native-iap plugin for expo-iap (Billing 8/9). No Amazon/iOS impact.
  *
  * NOTE: this only governs NATIVE config (plugins/entitlements). The JS shim swap
  * (lib/iap-shim.ts → iap-shim.play.ts) is handled separately by the Metro

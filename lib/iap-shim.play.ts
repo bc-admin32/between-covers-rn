@@ -1,11 +1,16 @@
 /**
- * iap-shim.play.ts — Google Play + iOS variant, backed by expo-iap (OpenIAP).
+ * iap-shim.play.ts — GOOGLE PLAY variant, backed by expo-iap (OpenIAP).
  *
- * ⚠️ SPIKE / UNVERIFIED. Selected at build time for RNIAP_VARIANT=play via the
- * Metro resolver redirect in metro.config.js. The Amazon variant keeps the
- * existing lib/iap-shim.ts on react-native-iap@12.16.4. A build only ever
- * bundles ONE of the two, so the play build never resolves react-native-iap and
- * the amazon build never resolves expo-iap.
+ * ⚠️ SPIKE / UNVERIFIED. Selected at build time for RNIAP_VARIANT=play (the
+ * production-google EAS profile ONLY) via the Metro resolver redirect in
+ * metro.config.js. iOS and the Amazon build both keep the existing
+ * lib/iap-shim.ts on react-native-iap@12.16.4 (RNIAP_VARIANT=amazon) — iOS is
+ * out of scope for the Billing-8 migration (Aug 31 is Google Play only). A build
+ * only ever bundles ONE shim, so the play build never resolves react-native-iap
+ * and the amazon build never resolves expo-iap.
+ *
+ * The iOS branch in requestPurchase() below is retained (defensive/self-
+ * contained) but is DEAD on this variant — iOS never resolves to this file.
  *
  * Exported surface is byte-identical to lib/iap-shim.ts, so subscription.ts,
  * _layout.tsx, and the paywalls import the SAME symbols and need zero changes:

@@ -33,16 +33,25 @@
       }
     },
     "production-ios": {
-      "extends": "production"
+      "extends": "production",
+      "env": {
+        "RNIAP_VARIANT": "amazon"
+      }
     },
     "production-google": {
       "extends": "production",
+      "env": {
+        "RNIAP_VARIANT": "play"
+      },
       "android": {
-        "gradleCommand": ":app:bundleGooglePlayRelease"
+        "gradleCommand": ":app:bundleRelease"
       }
     },
     "production-amazon": {
       "extends": "production",
+      "env": {
+        "RNIAP_VARIANT": "amazon"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleAmazonRelease"
