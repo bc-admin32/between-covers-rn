@@ -37,7 +37,9 @@ type StatusType = 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
 type Mode = 'search' | 'filter';
 type TropeMode = 'any' | 'all';
 
-const FILTER_SPICE_LEVELS = [1, 2, 3, 4, 5];
+// 0 = "No Spice" (clean romance: books store spice:0). Flows through the same
+// filterSpices state + `spice=<CSV>` query as 1–5; only its chip renders differently.
+const FILTER_SPICE_LEVELS = [0, 1, 2, 3, 4, 5];
 
 type FilterResponse = {
   count: number;
@@ -271,6 +273,7 @@ export default function LibraryDiscoverScreen() {
             <View style={styles.pepperRow}>
               {FILTER_SPICE_LEVELS.map((n) => {
                 const active = filterSpices.includes(n);
+                const isNone = n === 0;
                 return (
                   <TouchableOpacity
                     key={n}
@@ -278,8 +281,18 @@ export default function LibraryDiscoverScreen() {
                     onPress={() => toggleFilterSpice(n)}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>🌶️</Text>
-                    <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
+                    {/* "No Spice" gets a teapot (clean/cozy), not a pepper — 0 peppers
+                        would read as nothing selected. */}
+                    <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>
+                      {isNone ? '🫖' : '🌶️'}
+                    </Text>
+                    {isNone ? (
+                      <Text style={[styles.noneLabel, active && styles.pepperNumActive]} numberOfLines={1}>
+                        No Spice
+                      </Text>
+                    ) : (
+                      <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -474,6 +487,7 @@ const styles = StyleSheet.create({
   pepperEmojiMuted: { opacity: 0.25 },
   pepperNum: { fontSize: 10, fontWeight: '700', color: '#A9C0D4', marginTop: 4 },
   pepperNumActive: { color: '#B83255' },
+  noneLabel: { fontSize: 8, fontWeight: '700', color: '#A9C0D4', marginTop: 4, textAlign: 'center' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   genrePill: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#D7E2E9' },
   genrePillActive: { backgroundColor: '#0F2A48', borderColor: '#0F2A48' },
