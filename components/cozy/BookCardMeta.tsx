@@ -1,6 +1,22 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { prettifyEnum } from '../../lib/tagTaxonomy';
 
+// Defensive normalization: a field typed string[] may arrive from backfilled
+// catalog data as a real array, a comma-joined string, or an array containing
+// null/non-string elements. Produce a clean string[] so malformed data renders
+// blank instead of crashing (e.g. `.map` on a string, or prettifyEnum(null)).
+function toStringList(value: unknown): string[] {
+  const arr = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',') // only split when it's NOT already an array
+      : [];
+  return arr
+    .filter((v): v is string => typeof v === 'string')
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
+
 /**
  * Shared spice-peppers + trope-pills (+ optional content-warning badges) row,
  * extracted from BookCard so every surface renders spice/tropes identically
@@ -24,15 +40,22 @@ export default function BookCardMeta({
   triggers?: string[];
   maxTropes?: number;
 }) {
-  const hasSpice = typeof spice === 'number' && spice > 0;
-  const shownTropes = (tropes ?? []).slice(0, maxTropes);
-  const shownTriggers = triggers ?? [];
+  // Guard the actual value reaching String.repeat(): a non-integer truncates,
+  // but Infinity/NaN or a negative/corrupted value would throw a RangeError.
+  // Clamp to the valid 1–5 domain (leaves genuine data unchanged).
+  const spiceCount =
+    typeof spice === 'number' && Number.isFinite(spice)
+      ? Math.min(Math.max(Math.trunc(spice), 0), 5)
+      : 0;
+  const hasSpice = spiceCount > 0;
+  const shownTropes = toStringList(tropes).slice(0, maxTropes);
+  const shownTriggers = toStringList(triggers);
 
   return (
     <>
       {hasSpice && (
         <Text style={styles.spice} numberOfLines={1}>
-          {'🌶️'.repeat(spice as number)}
+          {'🌶️'.repeat(spiceCount)}
         </Text>
       )}
 

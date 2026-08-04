@@ -47,7 +47,7 @@ export default function BookCard({
       {/* Genre — flat lists (e.g. Iris's Shelf) render it on the card; New
           Releases passes no primarySubgenre (genre lives in its section header),
           so this stays hidden there. */}
-      {!!book.primarySubgenre && (
+      {typeof book.primarySubgenre === 'string' && book.primarySubgenre.length > 0 && (
         <Text style={styles.genre} numberOfLines={1}>{prettifyEnum(book.primarySubgenre)}</Text>
       )}
 

@@ -31,6 +31,10 @@ export type PrimarySubgenreKey =
 // SPICY_EROTIC_ROMANCE → "Spicy Erotic Romance". Shared so cards, section
 // headers, and filters all label taxonomy values the same way.
 export function prettifyEnum(key: string): string {
+  // Defensive: backfilled/corrupted catalog data may deliver a non-string
+  // (null, undefined, number, object) where an enum key is expected. Degrade to
+  // blank rather than crashing on `.toLowerCase()`.
+  if (typeof key !== 'string') return '';
   return key
     .toLowerCase()
     .split('_')
@@ -62,7 +66,11 @@ export function groupBooksBySubgenre<T extends { primarySubgenre?: string | null
 ): GenreSection<T>[] {
   const groups = new Map<string, T[]>();
   for (const book of books) {
-    const key = book.primarySubgenre || 'OTHER';
+    // Coerce a missing/blank/non-string primarySubgenre into the "Other" bucket
+    // so a corrupted value never becomes a non-string Map key or reaches
+    // prettifyEnum below.
+    const raw = book.primarySubgenre;
+    const key = typeof raw === 'string' && raw.length > 0 ? raw : 'OTHER';
     const arr = groups.get(key);
     if (arr) arr.push(book);
     else groups.set(key, [book]);
