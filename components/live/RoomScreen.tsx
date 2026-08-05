@@ -11,7 +11,8 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Notifications from 'expo-notifications';
 import { apiGet, apiPost, ApiError } from '../../lib/api';
 import { radius, spacing, colors } from '../../lib/theme';
-import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse } from '../../lib/types';
+import type { LiveRoom, LiveEvent, RoomState, RoomJoinResponse, VotePrompt, VoteGameType } from '../../lib/types';
+import { VOTE_GAME_TYPES } from '../../lib/types';
 import ReportMessageSheet, { type ReportTarget } from './ReportMessageSheet';
 import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from './LiveEventRestrictionScreen';
 import LiveEventTermsModal from './LiveEventTermsModal';
@@ -71,6 +72,13 @@ export default function RoomScreen({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pinnedMessage, setPinnedMessage] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
+  // Structured voting (iris:prompt) — separate from chat/pinned. votePrompt
+  // reflects the latest event as-is; myVoteChoiceIndex/voteClosed are local
+  // per-round state reset whenever a new roundId arrives.
+  const [votePrompt, setVotePrompt] = useState<VotePrompt | null>(null);
+  const [myVoteChoiceIndex, setMyVoteChoiceIndex] = useState<number | null>(null);
+  const [voteSubmitting, setVoteSubmitting] = useState(false);
+  const [voteClosed, setVoteClosed] = useState(false);
   const [liveRoom, setLiveRoom] = useState<LiveRoom>(room);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -91,6 +99,9 @@ export default function RoomScreen({
   // Read inside ws.onmessage so the closure sees the current userId even
   // when /profile resolves after the WebSocket is established.
   const myUserIdRef = useRef<string | null>(null);
+  // Tracks the last-seen votePrompt.roundId so ws.onmessage can detect a
+  // new round and reset per-round vote state without an extra effect.
+  const voteRoundIdRef = useRef<string | null>(null);
 
   // Initial mount: fetch profile + join room
   useEffect(() => {
@@ -181,6 +192,42 @@ export default function RoomScreen({
               type: data.EventName === 'iris:closing' ? 'IRIS_CLOSING' : 'IRIS_CHIME',
               timestamp: new Date(),
             }]);
+          }
+          if (data.EventName === 'iris:prompt') {
+            const attrs = data.Attributes ?? {};
+            const roundId = attrs.roundId ?? '';
+            const phase: 'open' | 'closed' = attrs.phase === 'closed' ? 'closed' : 'open';
+            let parsedOptions: string[] = [];
+            try { parsedOptions = attrs.options ? JSON.parse(attrs.options) : []; } catch { parsedOptions = []; }
+            let tally: number[] | null = null;
+            try { tally = attrs.tally ? JSON.parse(attrs.tally) : null; } catch { tally = null; }
+            const windowEndsAtNum = attrs.voteWindowEndsAt ? Number(attrs.voteWindowEndsAt) : NaN;
+
+            // New round → clear last round's "did I vote" / rejection state.
+            if (roundId !== voteRoundIdRef.current) {
+              voteRoundIdRef.current = roundId;
+              setMyVoteChoiceIndex(null);
+              setVoteClosed(false);
+            }
+
+            setVotePrompt((prev) => {
+              // Backend contract: "closed" events send an empty options
+              // string (only tally is resent). Reuse the options captured
+              // from this same round's "open" event so results can still
+              // label each tally bucket instead of rendering blank.
+              const options = parsedOptions.length > 0
+                ? parsedOptions
+                : (prev && prev.roundId === roundId ? prev.options : []);
+              return {
+                phase,
+                gameType: attrs.gameType ?? '',
+                roundId,
+                seed: attrs.seed ?? '',
+                options,
+                voteWindowEndsAt: Number.isFinite(windowEndsAtNum) ? windowEndsAtNum : null,
+                tally,
+              };
+            });
           }
           if (data.EventName === 'bc:ejection') {
             const attrs = data.Attributes ?? {};
@@ -344,6 +391,14 @@ export default function RoomScreen({
   const revealedAnswer = roomState?.revealedAnswer ?? null;
   const isRevealing = isSketchTheScene && sketchPhase === 'revealing' && !!revealedAnswer;
 
+  // ── Structured voting (redFlag, moralDilemma, wouldYouRather, twoTruthsLie) ──
+  // These games run on iris:prompt events instead of sketchTheScene's video
+  // flow — showVoteBox is a sibling gate to videoUrl/isSketchTheScene below,
+  // not a replacement for either.
+  const isVoteGameType = !!liveRoom.gameType
+    && VOTE_GAME_TYPES.includes(liveRoom.gameType as VoteGameType);
+  const showVoteBox = isVoteGameType && !!votePrompt;
+
   const player = useVideoPlayer(videoUrl ?? '', (p) => {
     if (videoUrl) {
       p.loop = false;
@@ -388,6 +443,32 @@ export default function RoomScreen({
       setInput('');
     } finally {
       setSending(false);
+    }
+  }
+
+  // POST, not a chat message — a real HTTP call so the backend can gate on
+  // window-open state server-side. The endpoint intentionally doesn't echo
+  // the live tally back (preserves the reveal moment); we only track our
+  // own choiceIndex locally.
+  async function handleVote(choiceIndex: number) {
+    if (!votePrompt || votePrompt.phase !== 'open' || voteSubmitting || voteClosed) return;
+    setVoteSubmitting(true);
+    try {
+      await apiPost<{ accepted: boolean; choiceIndex: number }>(
+        `/live/${eventId}/rooms/${roomId}/vote`,
+        { choiceIndex }
+      );
+      setMyVoteChoiceIndex(choiceIndex);
+    } catch (err) {
+      // 403 = window already closed server-side (race with the closing
+      // iris:prompt event) — show a closed state, not an error toast.
+      if (err instanceof ApiError && err.status === 403) {
+        setVoteClosed(true);
+      } else {
+        console.warn('Vote submit failed:', err);
+      }
+    } finally {
+      setVoteSubmitting(false);
     }
   }
 
@@ -462,7 +543,7 @@ export default function RoomScreen({
           </View>
         )}
 
-        {chatToken && (videoUrl || isSketchTheScene) && (
+        {chatToken && (videoUrl || isSketchTheScene || showVoteBox) && (
           <>
             {artistName && (
               <View style={styles.artistBar}>
@@ -472,9 +553,19 @@ export default function RoomScreen({
             )}
 
             {/* Video + Reveal overlay container. The video stays mounted; the */}
-            {/* overlay sits on top during reveal phase. */}
+            {/* overlay sits on top during reveal phase. Structured-vote games */}
+            {/* occupy this same space instead of video — showVoteBox takes */}
+            {/* priority since a voting game never also has a videoUrl. */}
             <View style={styles.videoWrapper}>
-              {videoUrl ? (
+              {showVoteBox && votePrompt ? (
+                <VoteBox
+                  votePrompt={votePrompt}
+                  myVoteChoiceIndex={myVoteChoiceIndex}
+                  voteSubmitting={voteSubmitting}
+                  voteClosed={voteClosed}
+                  onVote={handleVote}
+                />
+              ) : videoUrl ? (
                 <VideoView
                   style={styles.video}
                   player={player}
@@ -691,6 +782,96 @@ function ChatMessageRow({
           <Text style={chatStyles.userText}>{msg.message}</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+// Structured-vote box — occupies the video slot for redFlag / moralDilemma /
+// wouldYouRather / twoTruthsLie rounds. "open": tappable options + countdown;
+// re-tapping changes the vote (backend allows this before the window
+// closes). "closed": same options, now showing tally counts/bars — no
+// interaction, and this view is transient (cleared once the next round's
+// "open" event replaces votePrompt).
+function VoteBox({
+  votePrompt,
+  myVoteChoiceIndex,
+  voteSubmitting,
+  voteClosed,
+  onVote,
+}: {
+  votePrompt: VotePrompt;
+  myVoteChoiceIndex: number | null;
+  voteSubmitting: boolean;
+  voteClosed: boolean;
+  onVote: (choiceIndex: number) => void;
+}) {
+  const isOpen = votePrompt.phase === 'open';
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isOpen || !votePrompt.voteWindowEndsAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isOpen, votePrompt.voteWindowEndsAt]);
+
+  const secondsLeft = isOpen && votePrompt.voteWindowEndsAt
+    ? Math.max(0, Math.ceil((votePrompt.voteWindowEndsAt - now) / 1000))
+    : null;
+
+  const maxTally = votePrompt.tally && votePrompt.tally.length > 0
+    ? Math.max(1, ...votePrompt.tally)
+    : 1;
+
+  return (
+    <View style={voteStyles.container}>
+      {votePrompt.seed ? <Text style={voteStyles.seed}>{votePrompt.seed}</Text> : null}
+
+      {isOpen && secondsLeft !== null && (
+        <Text style={voteStyles.countdown}>
+          {secondsLeft > 0 ? `${secondsLeft}s left` : 'Closing…'}
+        </Text>
+      )}
+
+      <View style={voteStyles.options}>
+        {isOpen
+          ? votePrompt.options.map((opt, i) => {
+              const selected = myVoteChoiceIndex === i;
+              return (
+                <TouchableOpacity
+                  key={`${votePrompt.roundId}-${i}`}
+                  style={[
+                    voteStyles.optionButton,
+                    selected && voteStyles.optionButtonSelected,
+                    voteClosed && voteStyles.optionButtonDisabled,
+                  ]}
+                  onPress={() => onVote(i)}
+                  disabled={voteSubmitting || voteClosed}
+                  accessibilityRole="button"
+                >
+                  <Text style={[voteStyles.optionText, selected && voteStyles.optionTextSelected]}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })
+          : votePrompt.options.map((opt, i) => {
+              const count = votePrompt.tally?.[i] ?? 0;
+              const pct = Math.round((count / maxTally) * 100);
+              return (
+                <View key={`${votePrompt.roundId}-${i}`} style={voteStyles.resultRow}>
+                  <Text style={voteStyles.resultLabel}>{opt}</Text>
+                  <View style={voteStyles.resultBarTrack}>
+                    <View style={[voteStyles.resultBarFill, { width: `${pct}%` }]} />
+                  </View>
+                  <Text style={voteStyles.resultCount}>{count}</Text>
+                </View>
+              );
+            })}
+      </View>
+
+      {voteClosed && isOpen && (
+        <Text style={voteStyles.closedNote}>Voting closed</Text>
+      )}
     </View>
   );
 }
@@ -961,4 +1142,67 @@ const chatStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   userText: { fontSize: 13, color: 'rgba(253,250,246,0.85)' },
+});
+
+const voteStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    minHeight: 160,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  seed: {
+    fontSize: 15,
+    color: '#FDFAF6',
+    fontStyle: 'italic',
+    fontWeight: '600',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  countdown: {
+    fontSize: 11,
+    color: '#F5A3BC',
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  options: { gap: spacing.sm },
+  optionButton: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: radius.full,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  optionButtonSelected: {
+    backgroundColor: 'rgba(184,50,85,0.25)',
+    borderColor: '#B83255',
+  },
+  optionButtonDisabled: { opacity: 0.5 },
+  optionText: { fontSize: 14, color: 'rgba(253,250,246,0.9)', fontWeight: '600' },
+  optionTextSelected: { color: '#FDFAF6' },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  resultLabel: { fontSize: 13, color: 'rgba(253,250,246,0.9)', width: 48 },
+  resultBarTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  resultBarFill: {
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: '#B83255',
+  },
+  resultCount: { fontSize: 12, color: 'rgba(253,250,246,0.7)', width: 28, textAlign: 'right' },
+  closedNote: {
+    fontSize: 11,
+    color: 'rgba(253,250,246,0.5)',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
 });

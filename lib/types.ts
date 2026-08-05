@@ -59,6 +59,26 @@ export type RoomState = {
   avatarHealthy?: boolean;
 };
 
+// Structured voting games — these run on a backend-driven timer/tally system
+// (iris:prompt WebSocket events) rather than chat-based voting.
+export const VOTE_GAME_TYPES = ['redFlag', 'moralDilemma', 'wouldYouRather', 'twoTruthsLie'] as const;
+export type VoteGameType = typeof VOTE_GAME_TYPES[number];
+
+export type VotePromptPhase = 'open' | 'closed';
+
+// Client-parsed shape of an "iris:prompt" IVS Chat event. `options` is empty
+// on "closed" events; `tally` is null until the round closes (backend omits
+// it on "open" events by design, to preserve the reveal moment).
+export type VotePrompt = {
+  phase: VotePromptPhase;
+  gameType: string;
+  roundId: string;
+  seed: string;
+  options: string[];
+  voteWindowEndsAt: number | null;
+  tally: number[] | null;
+};
+
 export type RoomJoinResponse = {
   token: string;
   sessionExpirationTime?: string;
