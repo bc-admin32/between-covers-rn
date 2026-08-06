@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, FlatList,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
@@ -85,6 +85,130 @@ export default function CatalogFilterScreen() {
   const books = data?.books ?? [];
   const boundaries = data?.boundariesApplied ?? [];
 
+  // Filter chips + results count live in ListHeaderComponent so they scroll
+  // as part of the same FlatList instead of a separate wrapping ScrollView
+  // (which is what let large result sets mount every BookCard at once).
+  const renderListHeader = () => (
+    <>
+      {/* SPICE — primary control */}
+      <Text style={styles.filterLabel}>Spice Level</Text>
+      <View style={styles.pepperRow}>
+        {SPICE_LEVELS.map((n) => {
+          const active = spices.includes(n);
+          const isNone = n === 0;
+          return (
+            <TouchableOpacity
+              key={n}
+              style={[styles.pepper, active && styles.pepperActive]}
+              onPress={() => toggleSpice(n)}
+              activeOpacity={0.85}
+            >
+              {/* "No Spice" gets a teapot (clean/cozy), not a pepper — 0 peppers
+                  would read as nothing selected. */}
+              <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>
+                {isNone ? '🫖' : '🌶️'}
+              </Text>
+              {isNone ? (
+                <Text style={[styles.noneLabel, active && styles.pepperNumActive]} numberOfLines={1}>
+                  No Spice
+                </Text>
+              ) : (
+                <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* GENRE */}
+      <Text style={styles.filterLabel}>Genre</Text>
+      <View style={styles.chipRow}>
+        {PRIMARY_SUBGENRES.map((g) => {
+          const active = genres.includes(g.value);
+          return (
+            <TouchableOpacity
+              key={g.value}
+              style={[styles.genrePill, active && styles.genrePillActive]}
+              onPress={() => toggleGenre(g.value)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.genrePillText, active && styles.genrePillTextActive]}>
+                {g.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* TROPES */}
+      <View style={styles.tropeHeader}>
+        <Text style={styles.filterLabel}>Tropes</Text>
+        <View style={styles.modeToggle}>
+          {(['any', 'all'] as TropeMode[]).map((mode) => {
+            const active = tropeMode === mode;
+            return (
+              <TouchableOpacity
+                key={mode}
+                style={[styles.modeSegment, active && styles.modeSegmentActive]}
+                onPress={() => setTropeMode(mode)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.modeText, active && styles.modeTextActive]}>
+                  Match {mode}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+      <View style={styles.chipRow}>
+        {TROPES.map((t) => {
+          const active = tropes.includes(t.key);
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[styles.tropePill, active && styles.tropePillActive]}
+              onPress={() => toggleTrope(t.key)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.tropePillText, active && styles.tropePillTextActive]}>
+                {t.emoji} {t.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* RESULTS */}
+      <View style={styles.countRow}>
+        <View style={styles.countLine} />
+        {!loading && (
+          <Text style={styles.countText}>
+            {books.length} {books.length === 1 ? 'Match' : 'Matches'}
+          </Text>
+        )}
+        <View style={styles.countLine} />
+      </View>
+
+      {boundaries.length > 0 && (
+        <Text style={styles.boundaryNote}>
+          Some books are hidden by your comfort settings.
+        </Text>
+      )}
+    </>
+  );
+
+  const renderListEmpty = () =>
+    loading ? (
+      <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+    ) : (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyEmoji}>🔍</Text>
+        <Text style={styles.emptyTitle}>No matches</Text>
+        <Text style={styles.emptyText}>Try broadening your filters.</Text>
+      </View>
+    );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* HEADER */}
@@ -105,131 +229,23 @@ export default function CatalogFilterScreen() {
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* SPICE — primary control */}
-        <Text style={styles.filterLabel}>Spice Level</Text>
-        <View style={styles.pepperRow}>
-          {SPICE_LEVELS.map((n) => {
-            const active = spices.includes(n);
-            const isNone = n === 0;
-            return (
-              <TouchableOpacity
-                key={n}
-                style={[styles.pepper, active && styles.pepperActive]}
-                onPress={() => toggleSpice(n)}
-                activeOpacity={0.85}
-              >
-                {/* "No Spice" gets a teapot (clean/cozy), not a pepper — 0 peppers
-                    would read as nothing selected. */}
-                <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>
-                  {isNone ? '🫖' : '🌶️'}
-                </Text>
-                {isNone ? (
-                  <Text style={[styles.noneLabel, active && styles.pepperNumActive]} numberOfLines={1}>
-                    No Spice
-                  </Text>
-                ) : (
-                  <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* GENRE */}
-        <Text style={styles.filterLabel}>Genre</Text>
-        <View style={styles.chipRow}>
-          {PRIMARY_SUBGENRES.map((g) => {
-            const active = genres.includes(g.value);
-            return (
-              <TouchableOpacity
-                key={g.value}
-                style={[styles.genrePill, active && styles.genrePillActive]}
-                onPress={() => toggleGenre(g.value)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.genrePillText, active && styles.genrePillTextActive]}>
-                  {g.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* TROPES */}
-        <View style={styles.tropeHeader}>
-          <Text style={styles.filterLabel}>Tropes</Text>
-          <View style={styles.modeToggle}>
-            {(['any', 'all'] as TropeMode[]).map((mode) => {
-              const active = tropeMode === mode;
-              return (
-                <TouchableOpacity
-                  key={mode}
-                  style={[styles.modeSegment, active && styles.modeSegmentActive]}
-                  onPress={() => setTropeMode(mode)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.modeText, active && styles.modeTextActive]}>
-                    Match {mode}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-        <View style={styles.chipRow}>
-          {TROPES.map((t) => {
-            const active = tropes.includes(t.key);
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.tropePill, active && styles.tropePillActive]}
-                onPress={() => toggleTrope(t.key)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.tropePillText, active && styles.tropePillTextActive]}>
-                  {t.emoji} {t.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* RESULTS */}
-        <View style={styles.countRow}>
-          <View style={styles.countLine} />
-          {!loading && (
-            <Text style={styles.countText}>
-              {books.length} {books.length === 1 ? 'Match' : 'Matches'}
-            </Text>
-          )}
-          <View style={styles.countLine} />
-        </View>
-
-        {boundaries.length > 0 && (
-          <Text style={styles.boundaryNote}>
-            Some books are hidden by your comfort settings.
-          </Text>
-        )}
-
-        {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : books.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🔍</Text>
-            <Text style={styles.emptyTitle}>No matches</Text>
-            <Text style={styles.emptyText}>Try broadening your filters.</Text>
-          </View>
-        ) : (
-          <View style={styles.gridInner}>
-            {books.map((book, i) => (
-              <BookCard key={book?.bookId ?? i} book={book} style={styles.bookCard} />
-            ))}
-          </View>
-        )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      {/* Virtualized so large result sets (e.g. 2,000+ books) only mount the
+          cards currently near-screen instead of every BookCard at once. */}
+      <FlatList
+        style={styles.list}
+        data={loading ? [] : books}
+        keyExtractor={(item, index) => item?.bookId ?? String(index)}
+        numColumns={2}
+        columnWrapperStyle={styles.gridRow}
+        renderItem={({ item }) => <BookCard book={item} style={styles.bookCard} />}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={renderListEmpty}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        initialNumToRender={8}
+        windowSize={5}
+        removeClippedSubviews
+      />
     </View>
   );
 }
@@ -243,7 +259,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', lineHeight: 30 },
   clearButton: { borderWidth: 1, borderColor: '#ddd4c8', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 4 },
   clearButtonText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
-  scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  list: { flex: 1 },
+  scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 100 },
   filterLabel: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62', marginBottom: 12, paddingHorizontal: spacing.xs },
   // Spice — the prominent primary control: 5 tappable peppers.
   pepperRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg, paddingHorizontal: spacing.xs },
@@ -277,8 +294,11 @@ const styles = StyleSheet.create({
   countLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.1)' },
   countText: { fontSize: 11, fontWeight: '700', color: '#A9C0D4', letterSpacing: 0.8, textTransform: 'uppercase' },
   boundaryNote: { fontSize: 12, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center', marginBottom: spacing.md, paddingHorizontal: spacing.lg, lineHeight: 18 },
-  gridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  bookCard: { width: '45%' },
+  // FlatList's columnWrapperStyle (per-row) replaces the old flexWrap grid —
+  // gap covers the horizontal space between the 2 columns, marginBottom the
+  // vertical space between rows.
+  gridRow: { gap: 14, marginBottom: 14 },
+  bookCard: { flex: 1 },
   emptyState: { alignItems: 'center', paddingTop: 48, gap: spacing.sm },
   emptyEmoji: { fontSize: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48' },

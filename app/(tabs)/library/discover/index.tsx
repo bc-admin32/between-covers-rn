@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image,
+  View, Text, TextInput, TouchableOpacity, SectionList,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,6 +48,17 @@ type FilterResponse = {
   boundariesApplied: string[];
   books: BookCardData[];
 };
+
+// SectionList has no numColumns support (unlike FlatList), so the 3-column
+// grid is built by hand: each section's items are pre-chunked into rows of
+// NUM_COLUMNS, and each row is one virtualized SectionList row.
+const NUM_COLUMNS = 3;
+
+function chunkRows<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
 
 export default function LibraryDiscoverScreen() {
   const router = useRouter();
@@ -188,7 +200,150 @@ export default function LibraryDiscoverScreen() {
     } catch {}
   }
 
-  const allItems = displaySections.flatMap((s) => s.items);
+  // Filtered so SectionList's ListEmptyComponent triggers reliably (sections
+  // with zero items would otherwise still count as "present" data).
+  const listSections = (isLoading ? [] : displaySections)
+    .filter((s) => s.items.length > 0)
+    .map((s) => ({ type: s.type, label: s.label, data: chunkRows(s.items, NUM_COLUMNS) }));
+
+  // Filter chips live in ListHeaderComponent so they scroll as part of the
+  // same SectionList instead of a separate wrapping ScrollView (which is
+  // what let large result sets mount every grid item at once).
+  const renderListHeader = () =>
+    mode === 'filter' ? (
+      <View style={styles.filterPanel}>
+        <View style={styles.filterPanelHeader}>
+          <Text style={styles.filterLabel}>Spice Level</Text>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={clearFilters}>
+              <Text style={styles.clearFiltersText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.pepperRow}>
+          {FILTER_SPICE_LEVELS.map((n) => {
+            const active = filterSpices.includes(n);
+            const isNone = n === 0;
+            return (
+              <TouchableOpacity
+                key={n}
+                style={[styles.pepper, active && styles.pepperActive]}
+                onPress={() => toggleFilterSpice(n)}
+                activeOpacity={0.85}
+              >
+                {/* "No Spice" gets a teapot (clean/cozy), not a pepper — 0 peppers
+                    would read as nothing selected. */}
+                <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>
+                  {isNone ? '🫖' : '🌶️'}
+                </Text>
+                {isNone ? (
+                  <Text style={[styles.noneLabel, active && styles.pepperNumActive]} numberOfLines={1}>
+                    No Spice
+                  </Text>
+                ) : (
+                  <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.filterLabel}>Genre</Text>
+        <View style={styles.chipRow}>
+          {PRIMARY_SUBGENRES.map((g) => {
+            const active = filterGenres.includes(g.value);
+            return (
+              <TouchableOpacity
+                key={g.value}
+                style={[styles.genrePill, active && styles.genrePillActive]}
+                onPress={() => toggleFilterGenre(g.value)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.genrePillText, active && styles.genrePillTextActive]}>
+                  {g.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.tropeHeader}>
+          <Text style={styles.filterLabel}>Tropes</Text>
+          <View style={styles.tropeModeToggle}>
+            {(['any', 'all'] as TropeMode[]).map((m) => {
+              const active = filterTropeMode === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.tropeModeSegment, active && styles.tropeModeSegmentActive]}
+                  onPress={() => setFilterTropeMode(m)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.tropeModeText, active && styles.tropeModeTextActive]}>
+                    Match {m}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+        <View style={styles.chipRow}>
+          {TROPES.map((t) => {
+            const active = filterTropes.includes(t.key);
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tropePill, active && styles.tropePillActive]}
+                onPress={() => toggleFilterTrope(t.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.tropePillText, active && styles.tropePillTextActive]}>
+                  {t.emoji} {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {filterBoundaries.length > 0 && (
+          <Text style={styles.boundaryNote}>
+            Some books are hidden by your comfort settings.
+          </Text>
+        )}
+
+        <View style={styles.divider} />
+      </View>
+    ) : null;
+
+  const renderListEmpty = () => {
+    if (isLoading) {
+      return <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />;
+    }
+    if (mode === 'search' && hasSearched) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>
+            No results found. Try a different title or author, or ask Iris for a recommendation ✦
+          </Text>
+        </View>
+      );
+    }
+    if (mode === 'search' && !hasSearched) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.placeholderText}>Search for a title, author, or series</Text>
+        </View>
+      );
+    }
+    if (mode === 'filter') {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No matches. Try broadening your filters.</Text>
+        </View>
+      );
+    }
+    return null;
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -258,202 +413,111 @@ export default function LibraryDiscoverScreen() {
       )}
 
       {/* RESULTS */}
-      <ScrollView style={styles.results} showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultsContent}>
+      {/* Virtualized: SectionList row-chunks each section's items into groups
+          of NUM_COLUMNS so a large filter result (e.g. 2,000+ books) only
+          mounts the rows currently near-screen instead of every card at
+          once. SectionList over FlatList because search mode can return
+          multiple labeled sections — FlatList has no section support, so
+          the grid columns are pre-chunked into rows here instead of relying
+          on numColumns. */}
+      <SectionList
+        style={styles.results}
+        sections={listSections}
+        keyExtractor={(_row, index) => `row-${index}`}
+        renderItem={({ item: row }) => (
+          <View style={styles.gridRow}>
+            {row.map((book) => (
+              <DiscoverBookCard
+                key={book.workId}
+                book={book}
+                isAdded={!!added[book.workId]}
+                isMenuOpen={activeMenu === book.workId}
+                onPress={() => router.push(`/book?workId=${book.workId}` as any)}
+                onToggleMenu={() => setActiveMenu(activeMenu === book.workId ? null : book.workId)}
+                onAdd={(status) => addBook(book, status)}
+              />
+            ))}
+          </View>
+        )}
+        renderSectionHeader={({ section }) =>
+          section.label ? <Text style={styles.sectionLabel}>{section.label}</Text> : null
+        }
+        renderSectionFooter={() => <View style={{ height: spacing.xl }} />}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={renderListEmpty}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.resultsContent}
+        initialNumToRender={6}
+        windowSize={5}
+        removeClippedSubviews
+      />
+    </View>
+  );
+}
 
-        {mode === 'filter' && (
-          <View style={styles.filterPanel}>
-            <View style={styles.filterPanelHeader}>
-              <Text style={styles.filterLabel}>Spice Level</Text>
-              {hasActiveFilters && (
-                <TouchableOpacity onPress={clearFilters}>
-                  <Text style={styles.clearFiltersText}>Clear</Text>
+function DiscoverBookCard({
+  book,
+  isAdded,
+  isMenuOpen,
+  onPress,
+  onToggleMenu,
+  onAdd,
+}: {
+  book: DiscoverItem;
+  isAdded: boolean;
+  isMenuOpen: boolean;
+  onPress: () => void;
+  onToggleMenu: () => void;
+  onAdd: (status: StatusType) => void;
+}) {
+  return (
+    <View style={styles.gridItem}>
+      <TouchableOpacity onPress={onPress}>
+        <View style={styles.coverWrapper}>
+          {book.coverUrl ? (
+            <Image
+              source={{ uri: book.coverUrl }}
+              style={styles.coverImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={[styles.coverImage, styles.noCover]}>
+              <Text style={styles.noCoverText}>No cover</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+        <Text style={styles.bookAuthor} numberOfLines={1}>{book.primaryAuthor}</Text>
+        <BookCardMeta spice={book.spice} tropes={book.tropes} />
+      </TouchableOpacity>
+
+      {isAdded ? (
+        <View style={styles.addedRow}>
+          <Text style={styles.addedText}>✓ Added</Text>
+        </View>
+      ) : (
+        <View>
+          <TouchableOpacity style={styles.addButton} onPress={onToggleMenu}>
+            <Text style={styles.addButtonText}>+ Add</Text>
+          </TouchableOpacity>
+          {isMenuOpen && (
+            <View style={styles.addMenu}>
+              {(['WANT_TO_READ', 'CURRENTLY_READING', 'FINISHED'] as StatusType[]).map((status) => (
+                <TouchableOpacity
+                  key={status}
+                  style={styles.addMenuItem}
+                  onPress={() => onAdd(status)}
+                >
+                  <Text style={styles.addMenuItemText}>
+                    {status === 'WANT_TO_READ' ? 'Wishlist' : status === 'CURRENTLY_READING' ? 'Reading' : 'Finished'}
+                  </Text>
                 </TouchableOpacity>
-              )}
+              ))}
             </View>
-            <View style={styles.pepperRow}>
-              {FILTER_SPICE_LEVELS.map((n) => {
-                const active = filterSpices.includes(n);
-                const isNone = n === 0;
-                return (
-                  <TouchableOpacity
-                    key={n}
-                    style={[styles.pepper, active && styles.pepperActive]}
-                    onPress={() => toggleFilterSpice(n)}
-                    activeOpacity={0.85}
-                  >
-                    {/* "No Spice" gets a teapot (clean/cozy), not a pepper — 0 peppers
-                        would read as nothing selected. */}
-                    <Text style={[styles.pepperEmoji, !active && styles.pepperEmojiMuted]}>
-                      {isNone ? '🫖' : '🌶️'}
-                    </Text>
-                    {isNone ? (
-                      <Text style={[styles.noneLabel, active && styles.pepperNumActive]} numberOfLines={1}>
-                        No Spice
-                      </Text>
-                    ) : (
-                      <Text style={[styles.pepperNum, active && styles.pepperNumActive]}>{n}</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={styles.filterLabel}>Genre</Text>
-            <View style={styles.chipRow}>
-              {PRIMARY_SUBGENRES.map((g) => {
-                const active = filterGenres.includes(g.value);
-                return (
-                  <TouchableOpacity
-                    key={g.value}
-                    style={[styles.genrePill, active && styles.genrePillActive]}
-                    onPress={() => toggleFilterGenre(g.value)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.genrePillText, active && styles.genrePillTextActive]}>
-                      {g.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.tropeHeader}>
-              <Text style={styles.filterLabel}>Tropes</Text>
-              <View style={styles.tropeModeToggle}>
-                {(['any', 'all'] as TropeMode[]).map((m) => {
-                  const active = filterTropeMode === m;
-                  return (
-                    <TouchableOpacity
-                      key={m}
-                      style={[styles.tropeModeSegment, active && styles.tropeModeSegmentActive]}
-                      onPress={() => setFilterTropeMode(m)}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={[styles.tropeModeText, active && styles.tropeModeTextActive]}>
-                        Match {m}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-            <View style={styles.chipRow}>
-              {TROPES.map((t) => {
-                const active = filterTropes.includes(t.key);
-                return (
-                  <TouchableOpacity
-                    key={t.key}
-                    style={[styles.tropePill, active && styles.tropePillActive]}
-                    onPress={() => toggleFilterTrope(t.key)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.tropePillText, active && styles.tropePillTextActive]}>
-                      {t.emoji} {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {filterBoundaries.length > 0 && (
-              <Text style={styles.boundaryNote}>
-                Some books are hidden by your comfort settings.
-              </Text>
-            )}
-
-            <View style={styles.divider} />
-          </View>
-        )}
-
-        {isLoading && (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        )}
-
-        {!isLoading && mode === 'search' && hasSearched && allItems.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No results found. Try a different title or author, or ask Iris for a recommendation ✦
-            </Text>
-          </View>
-        )}
-
-        {!isLoading && mode === 'search' && !hasSearched && (
-          <View style={styles.emptyState}>
-            <Text style={styles.placeholderText}>Search for a title, author, or series</Text>
-          </View>
-        )}
-
-        {!isLoading && mode === 'filter' && allItems.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No matches. Try broadening your filters.</Text>
-          </View>
-        )}
-
-        {!isLoading && displaySections.map((section) => (
-          <View key={section.type} style={styles.section}>
-            {section.label && (
-              <Text style={styles.sectionLabel}>{section.label}</Text>
-            )}
-            <View style={styles.grid}>
-              {section.items.map((book) => {
-                const isAdded = !!added[book.workId];
-                const isMenuOpen = activeMenu === book.workId;
-
-                return (
-                  <View key={book.workId} style={styles.gridItem}>
-                    <TouchableOpacity
-                      onPress={() => router.push(`/book?workId=${book.workId}` as any)}
-                    >
-                      <View style={styles.coverWrapper}>
-                        {book.coverUrl ? (
-                          <Image source={{ uri: book.coverUrl }} style={styles.coverImage} />
-                        ) : (
-                          <View style={[styles.coverImage, styles.noCover]}>
-                            <Text style={styles.noCoverText}>No cover</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-                      <Text style={styles.bookAuthor} numberOfLines={1}>{book.primaryAuthor}</Text>
-                      <BookCardMeta spice={book.spice} tropes={book.tropes} />
-                    </TouchableOpacity>
-
-                    {isAdded ? (
-                      <View style={styles.addedRow}>
-                        <Text style={styles.addedText}>✓ Added</Text>
-                      </View>
-                    ) : (
-                      <View>
-                        <TouchableOpacity
-                          style={styles.addButton}
-                          onPress={() => setActiveMenu(isMenuOpen ? null : book.workId)}
-                        >
-                          <Text style={styles.addButtonText}>+ Add</Text>
-                        </TouchableOpacity>
-                        {isMenuOpen && (
-                          <View style={styles.addMenu}>
-                            {(['WANT_TO_READ', 'CURRENTLY_READING', 'FINISHED'] as StatusType[]).map((status) => (
-                              <TouchableOpacity
-                                key={status}
-                                style={styles.addMenuItem}
-                                onPress={() => addBook(book, status)}
-                              >
-                                <Text style={styles.addMenuItemText}>
-                                  {status === 'WANT_TO_READ' ? 'Wishlist' : status === 'CURRENTLY_READING' ? 'Reading' : 'Finished'}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -513,9 +577,11 @@ const styles = StyleSheet.create({
   emptyState: { paddingTop: 48, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300', lineHeight: 22, textAlign: 'center' },
   placeholderText: { fontSize: 18, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center' },
-  section: { marginBottom: spacing.xl },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: spacing.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  // SectionList's renderItem gets one pre-chunked row (NUM_COLUMNS items) at
+  // a time — gap covers horizontal space between items, marginBottom the
+  // vertical space between rows (replacing the old flexWrap grid's gap).
+  gridRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   gridItem: { width: '30%' },
   coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: 6, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 4 },
   coverImage: { width: '100%', height: '100%' },

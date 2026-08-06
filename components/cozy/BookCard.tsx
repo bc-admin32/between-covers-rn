@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Image, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { prettifyEnum } from '../../lib/tagTaxonomy';
 import BookCardMeta from './BookCardMeta';
@@ -33,7 +34,12 @@ export default function BookCard({
     <TouchableOpacity style={[styles.card, style]} onPress={handlePress} activeOpacity={0.85}>
       <View style={styles.cover}>
         {book.coverUrl ? (
-          <Image source={{ uri: book.coverUrl }} style={styles.coverImage} />
+          <Image
+            source={{ uri: book.coverUrl }}
+            style={styles.coverImage}
+            contentFit="cover"
+            transition={200}
+          />
         ) : (
           <View style={styles.coverPlaceholder}>
             <Text style={styles.coverPlaceholderEmoji}>📖</Text>
