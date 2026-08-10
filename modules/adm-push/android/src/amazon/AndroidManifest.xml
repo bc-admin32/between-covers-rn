@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission
+        android:name="com.betweencovers.app.permission.RECEIVE_ADM_MESSAGE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.betweencovers.app.permission.RECEIVE_ADM_MESSAGE" />
+    <uses-permission android:name="com.amazon.device.messaging.permission.RECEIVE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application>
+        <uses-library
+            android:name="com.amazon.device.messaging"
+            android:required="true" />
+
+        <service
+            android:name="expo.modules.admpush.AdmMessageHandlerService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <receiver
+            android:name="expo.modules.admpush.AdmMessageReceiver"
+            android:permission="com.amazon.device.messaging.permission.SEND"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.amazon.device.messaging.intent.REGISTRATION" />
+                <action android:name="com.amazon.device.messaging.intent.RECEIVE" />
+                <category android:name="com.betweencovers.app" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

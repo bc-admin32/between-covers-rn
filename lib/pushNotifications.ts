@@ -36,6 +36,21 @@ function detectPlatform(): 'ios' | 'android' | 'amazon' {
   return 'android';
 }
 
+async function getAmazonAdmToken(): Promise<string | null> {
+  // Lazy require, not a static import: modules/adm-push declares
+  // platforms: ["android"] in its expo-module.config.json, so it isn't
+  // linked into the iOS build at all. A top-level import would throw at
+  // bundle-eval time on iOS; requiring it only inside this amazon-only
+  // branch means the module is never touched there.
+  const { isAdmSupported, registerAdmAsync } = require('../modules/adm-push');
+  if (!isAdmSupported()) {
+    // Expected on the googlePlay flavor (links the no-op AdmPushBridge) —
+    // not an error, just means this build can't register ADM.
+    return null;
+  }
+  return registerAdmAsync();
+}
+
 export async function registerForPushNotifications(): Promise<void> {
   try {
     const existing = await Notifications.getPermissionsAsync();
@@ -51,24 +66,21 @@ export async function registerForPushNotifications(): Promise<void> {
       return;
     }
 
-    // DEFERRED — Fire OS / ADM branch goes here.
-    // On Amazon devices detectPlatform() returns 'amazon', but the call below
-    // uses FCM, which is unavailable on Fire OS (no Google Play Services) → it
-    // throws and is swallowed by the catch, so Fire never registers. When the
-    // ADM native module lands (credential bundled via plugins/withAdmApiKey.js),
-    // branch here: if detectPlatform() === 'amazon', obtain the ADM registration
-    // token from that module instead of getDevicePushTokenAsync(), then POST to
-    // /push/register with platform: 'amazon' exactly as below. Deferred until a
-    // Fire HD device is available to test against.
-    const tokenResult = await Notifications.getDevicePushTokenAsync();
-    const token = tokenResult.data;
+    const platform = detectPlatform();
+
+    // Fire OS has no Google Play Services, so getDevicePushTokenAsync() (FCM)
+    // always throws there — route to the ADM native module instead. That
+    // module (modules/adm-push) links a no-op on the googlePlay flavor and
+    // the real ADM.startRegister() flow on the amazon flavor; see its README
+    // for the SDK jar/credential it still needs to build.
+    const token = platform === 'amazon'
+      ? await getAmazonAdmToken()
+      : (await Notifications.getDevicePushTokenAsync()).data;
 
     if (!token) {
       console.warn('No push token returned from device');
       return;
     }
-
-    const platform = detectPlatform();
 
     await apiPost('/push/register', { token, platform });
 

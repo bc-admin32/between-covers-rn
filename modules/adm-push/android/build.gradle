@@ -1,0 +1,43 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+group = 'expo.modules.admpush'
+version = '1.0.0'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+android {
+  namespace "expo.modules.admpush"
+
+  // Same dimension + flavor names as android/app/build.gradle (set by
+  // react-native-iap's config plugin, paymentProvider: "both" — verified
+  // against node_modules/react-native-iap/plugin/build/withIAP.js). Matching
+  // names means Gradle aligns this module's `amazon` variant to :app's
+  // `amazon` variant directly, no missingDimensionStrategy needed.
+  flavorDimensions "appstore"
+  productFlavors {
+    googlePlay { dimension "appstore" }
+    amazon     { dimension "appstore" }
+  }
+
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // ADM SDK isn't on Maven Central — download from the Amazon Developer
+  // Console and place at modules/adm-push/android/libs/amazon-device-messaging.jar
+  // (see modules/adm-push/README.md). amazonImplementation scopes it to the
+  // amazon variant only — the googlePlay build never touches this dependency.
+  amazonImplementation files('libs/amazon-device-messaging.jar')
+}
