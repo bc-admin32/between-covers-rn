@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { apiPost } from './api';
 
@@ -32,8 +31,15 @@ Notifications.setNotificationHandler({
 
 function detectPlatform(): 'ios' | 'android' | 'amazon' {
   if (Platform.OS === 'ios') return 'ios';
-  if (Platform.OS === 'android' && Device.manufacturer === 'Amazon') return 'amazon';
-  return 'android';
+  // Platform.OS is 'android' for both Google Play and Fire OS builds, and a
+  // device-property heuristic (e.g. checking manufacturer strings) isn't
+  // reliable across devices/OS versions. isAdmSupported() is compiled per
+  // Gradle product flavor (see modules/adm-push/android/build.gradle) — true
+  // only on the real amazon flavor, false on googlePlay's no-op stub — so
+  // it's a build-time-accurate signal, not a runtime guess. Lazy require,
+  // same reason as getAmazonAdmToken() below: adm-push isn't linked on iOS.
+  const { isAdmSupported } = require('../modules/adm-push');
+  return isAdmSupported() ? 'amazon' : 'android';
 }
 
 async function getAmazonAdmToken(): Promise<string | null> {
