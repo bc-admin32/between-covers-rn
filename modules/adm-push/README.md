@@ -86,6 +86,45 @@ to provide isn't applicable in the first place. No other module in this repo
 needs this flag because none of them declare product flavors — `adm-push` is
 the first, so it's the first to hit this.
 
+## Notification icon/color: compile-time resources, not a runtime lookup (fixed — needs device re-verification)
+
+`AdmNotificationDisplay.kt` originally resolved its small icon and color at
+runtime via `PackageManager.getApplicationInfo(GET_META_DATA)`, reading the
+same `expo.modules.notifications.default_notification_icon` /
+`..._color` manifest meta-data keys `ExpoNotificationBuilder.kt` (the FCM
+path, in `expo-notifications`) reads — confirmed identical, both keys point
+at `@drawable/notification_icon` / `@color/notification_icon_color` in the
+shared main `AndroidManifest.xml`. On real Fire HD hardware this rendered
+visibly differently (washed out, untinted) than the same push shown via FCM
+on Google Play, despite the identical resource. Searched for a documented
+Fire-OS-specific `PackageManager`/`ApplicationInfo.metaData` bug — found
+nothing; the closest match was an unrelated Expo issue (location foreground
+service icon) showing the same *symptom* (fallback-to-launcher-icon producing
+a washed-out icon) from a metadata miss, not a Fire-OS-specific cause.
+
+Since I couldn't pin down *why* the lookup diverges (no device/adb access to
+add logging and actually watch it fire), fixed per the fallback plan: removed
+the runtime lookup and its silent fallback entirely.
+`modules/adm-push/android/src/amazon/res/` now carries its own copies of the
+icon (all 5 densities, copied byte-for-byte from the app's already-generated,
+confirmed-working-on-FCM `android/app/src/main/res/drawable-*/notification_icon.png`)
+and color (`values/colors.xml`, `#B83255`, matching `app.json`'s
+`notification.color`). `AdmNotificationDisplay.kt` references them as
+`R.drawable.notification_icon` / `R.color.notification_icon_color` — this
+module's own generated `R` class (namespace `expo.modules.admpush`), resolved
+by the Kotlin compiler, not `PackageManager` at runtime. **Note:** this is
+technically a second, independent copy of that icon/color — if `app.json`'s
+`notification.icon`/`color` ever changes, both this module's
+`src/amazon/res/` and the app's own `expo-notifications`-generated copy need
+updating by hand; nothing keeps them in sync automatically.
+
+**Not confirmed fixed** — this needs a real `production-amazon` build tested
+on Fire HD hardware. If the icon/color still render wrong after this change,
+the cause isn't the metadata-lookup mechanism at all, and the next thing to
+check is whatever's actually reaching `AdmNotificationDisplay.show()` — e.g.
+whether the ADM data-message payload itself carries different values, or a
+Fire OS notification-rendering quirk unrelated to resource resolution.
+
 ## Still unverified
 
 - The example app predates JobScheduler-only delivery and includes an
@@ -97,6 +136,3 @@ the first, so it's the first to hit this.
   JobScheduler.
 - The `ADM_JOB_ID` constant in `AdmMessageReceiver.kt` (1001) must not collide
   with any other JobService id in the app.
-- `onMessage()` in both handler classes doesn't render notifications yet —
-  only registration is wired. Confirm the backend's ADM payload shape before
-  building that out.

@@ -40,15 +40,6 @@ internal object AdmNotificationDisplay {
   private const val CHANNEL_ID = "expo_notifications_fallback_notification_channel"
   private const val CHANNEL_NAME = "Miscellaneous" // matches expo-notifications' fallback channel name
 
-  // Same manifest meta-data keys expo-notifications reads for its own default
-  // icon/color (populated by the expo-notifications config plugin from
-  // app.json's top-level "notification" block: icon + color). Reading the
-  // same meta-data — rather than hardcoding a drawable name — means this
-  // stays correct if that icon/color config ever changes, with no dependency
-  // on expo-notifications' Android module itself.
-  private const val META_DATA_ICON_KEY = "expo.modules.notifications.default_notification_icon"
-  private const val META_DATA_COLOR_KEY = "expo.modules.notifications.default_notification_color"
-
   fun show(context: Context, intent: Intent) {
     val extras = intent.extras ?: return
     val title = extras.getString("title")
@@ -62,13 +53,36 @@ internal object AdmNotificationDisplay {
 
     ensureChannel(context)
 
+    // Icon/color used to be resolved at runtime via
+    // PackageManager.getApplicationInfo(GET_META_DATA), reading the same
+    // expo.modules.notifications.default_notification_icon/color meta-data
+    // keys expo-notifications' own ExpoNotificationBuilder.kt reads. On real
+    // Fire HD hardware that produced a visibly different (washed-out,
+    // untinted) result than the identical FCM path on Google Play, despite
+    // both resolving to the same @drawable/notification_icon /
+    // @color/notification_icon_color meta-data entries in the shared main
+    // manifest — no code-level or documented Fire-OS-specific PackageManager
+    // bug was found to explain the divergence (checked; nothing turned up).
+    // Rather than depend on a runtime lookup whose behavior isn't fully
+    // understood on this OS, R.drawable.notification_icon /
+    // R.color.notification_icon_color below are this module's OWN local
+    // resources (modules/adm-push/android/src/amazon/res/) — copied directly
+    // from the app's already-generated, confirmed-working-on-FCM
+    // android/app/src/main/res/drawable-*/notification_icon.png and
+    // notification_icon_color value. Referencing them this way is a
+    // compile-time constant, not a runtime PackageManager call, so there's no
+    // lookup left to diverge or silently fall back from. Tradeoff: this is a
+    // second copy of that icon/color, independent of app.json's
+    // notification.icon/color — if either ever changes, both
+    // modules/adm-push/android/src/amazon/res/ and the app's own generated
+    // copy need updating.
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setContentTitle(title)
       .setContentText(body)
-      .setSmallIcon(resolveIcon(context))
+      .setSmallIcon(R.drawable.notification_icon)
+      .setColor(ContextCompat.getColor(context, R.color.notification_icon_color))
       .setAutoCancel(true)
       .setContentIntent(buildContentIntent(context, deepLink))
-    resolveColor(context)?.let { builder.setColor(it) }
     val notification = builder.build()
 
     // POST_NOTIFICATIONS (API 33+) is requested from the JS side via
@@ -90,34 +104,6 @@ internal object AdmNotificationDisplay {
     channel.setShowBadge(true)
     channel.enableVibration(true)
     manager.createNotificationChannel(channel)
-  }
-
-  private fun resolveIcon(context: Context): Int {
-    return try {
-      val ai = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-      val metaData = ai.metaData
-      if (metaData != null && metaData.containsKey(META_DATA_ICON_KEY)) {
-        metaData.getInt(META_DATA_ICON_KEY)
-      } else {
-        context.applicationInfo.icon
-      }
-    } catch (e: Exception) {
-      context.applicationInfo.icon
-    }
-  }
-
-  private fun resolveColor(context: Context): Int? {
-    return try {
-      val ai = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-      val metaData = ai.metaData
-      if (metaData != null && metaData.containsKey(META_DATA_COLOR_KEY)) {
-        context.resources.getColor(metaData.getInt(META_DATA_COLOR_KEY), null)
-      } else {
-        null
-      }
-    } catch (e: Exception) {
-      null
-    }
   }
 
   // Deep-link approach: build a real ACTION_VIEW intent against the app's own

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must be kept in sync with app.json's top-level notification.color.
+         expo-notifications' config plugin generates the app's own copy of
+         this same value at android/app/src/main/res/values/colors.xml
+         (name="notification_icon_color") — this is a second, independent
+         copy so AdmNotificationDisplay.kt can reference it as a compile-time
+         R.color.notification_icon_color instead of a runtime lookup. -->
+    <color name="notification_icon_color">#B83255</color>
+</resources>
