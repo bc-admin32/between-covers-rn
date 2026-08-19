@@ -1,9 +1,10 @@
 /**
- * Maps API route strings (e.g. "/home", "/door", "/onboarding/name")
+ * Maps API route strings (e.g. "/home", "/hard-paywall", "/onboarding/name")
  * to their corresponding expo-router file paths (e.g. "/(tabs)/home",
- * "/(auth)/door", "/(onboarding)/name").
+ * "/(auth)/hard-paywall", "/(onboarding)/name").
  *
- * Falls back to "/(auth)/login" for any unknown path.
+ * Falls back to "/(auth)/login" for any unknown path — including a stray
+ * "/door" from the backend, now that the soft-paywall screen is retired.
  */
 
 const ONBOARDING_SLUGS = new Set([
@@ -16,7 +17,7 @@ const TAB_SLUGS = new Set([
 ]);
 
 const AUTH_SLUGS = new Set([
-  'login', 'door', 'hard-paywall', 'redirect',
+  'login', 'hard-paywall', 'redirect',
 ]);
 
 export function normalizeRoute(apiRoute: string): string {

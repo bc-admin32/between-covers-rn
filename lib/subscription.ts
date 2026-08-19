@@ -10,8 +10,8 @@ import {
 const API_BASE = 'https://api.betweencovers.app';
 
 // ── Membership product IDs ──────────────────────────────────────────────────
-// Single source of truth, imported by door.tsx, hard-paywall.tsx, and the
-// launch reconcile in index.tsx (previously duplicated in each paywall screen).
+// Single source of truth, imported by hard-paywall.tsx and the launch
+// reconcile in index.tsx (previously duplicated in each paywall screen).
 export const MONTHLY_PRODUCT_ID = 'com.betweencovers.app.membership.monthly';
 export const ANNUAL_PRODUCT_ID = 'com.betweencovers.app.membership.annual';
 export const ALL_PRODUCT_IDS = [MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID];

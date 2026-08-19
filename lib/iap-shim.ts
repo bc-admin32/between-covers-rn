@@ -31,8 +31,8 @@
  *
  * The exported surface (`useIAP`, `restorePurchases`, `ensureConnection`,
  * `withIAPContext`, `getResolvedPlatform`) is stable across all three paths so
- * callers (`door.tsx`, `hard-paywall.tsx`, `subscription.ts`) don't need
- * branching logic of their own.
+ * callers (`hard-paywall.tsx`, `subscription.ts`) don't need branching logic
+ * of their own.
  */
 
 import Constants from 'expo-constants';
