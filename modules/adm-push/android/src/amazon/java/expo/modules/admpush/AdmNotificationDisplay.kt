@@ -54,28 +54,38 @@ internal object AdmNotificationDisplay {
     ensureChannel(context)
 
     // Icon/color used to be resolved at runtime via
-    // PackageManager.getApplicationInfo(GET_META_DATA), reading the same
-    // expo.modules.notifications.default_notification_icon/color meta-data
-    // keys expo-notifications' own ExpoNotificationBuilder.kt reads. On real
-    // Fire HD hardware that produced a visibly different (washed-out,
-    // untinted) result than the identical FCM path on Google Play, despite
-    // both resolving to the same @drawable/notification_icon /
-    // @color/notification_icon_color meta-data entries in the shared main
-    // manifest — no code-level or documented Fire-OS-specific PackageManager
-    // bug was found to explain the divergence (checked; nothing turned up).
-    // Rather than depend on a runtime lookup whose behavior isn't fully
-    // understood on this OS, R.drawable.notification_icon /
-    // R.color.notification_icon_color below are this module's OWN local
-    // resources (modules/adm-push/android/src/amazon/res/) — copied directly
-    // from the app's already-generated, confirmed-working-on-FCM
-    // android/app/src/main/res/drawable-*/notification_icon.png and
-    // notification_icon_color value. Referencing them this way is a
-    // compile-time constant, not a runtime PackageManager call, so there's no
-    // lookup left to diverge or silently fall back from. Tradeoff: this is a
-    // second copy of that icon/color, independent of app.json's
-    // notification.icon/color — if either ever changes, both
-    // modules/adm-push/android/src/amazon/res/ and the app's own generated
-    // copy need updating.
+    // PackageManager.getApplicationInfo(GET_META_DATA) — replaced with the
+    // compile-time R.drawable/R.color references below (see git history for
+    // that change). That fix regressed on real Fire HD hardware: the icon
+    // went from washed-out-but-visible to not showing at all. Root cause
+    // (confirmed via aapt2/dexdump against the actual shipped APK, not
+    // guessed): AAPT2's PNG crunch step losslessly (and silently) converts
+    // any PNG whose alpha-bearing pixels are all exactly R=G=B into 8-bit
+    // gray+alpha — which this icon's source was, unintentionally. Fire OS's
+    // notification renderer doesn't display that format the way stock
+    // Android/Google Play does. The actual source of truth,
+    // assets/notification-icon.png at the JS project root, now has every
+    // alpha-bearing pixel's blue channel nudged by 1/255 — imperceptible
+    // visually, but enough to make the grayscale conversion lossy, so
+    // AAPT2's own documented safety check (it only grayscale-converts when
+    // doing so loses no information) skips it.
+    //
+    // R.drawable.notification_icon / R.color.notification_icon_color below
+    // are this module's OWN local resources
+    // (modules/adm-push/android/src/amazon/res/), kept byte-identical to the
+    // app's own copy for consistency — but note Android's resource merge
+    // gives the APP module's same-named resource precedence over this
+    // library's, so in practice the app's copy (regenerated from
+    // assets/notification-icon.png by expo-notifications' config plugin at
+    // every prebuild) is what actually determines the packaged bytes,
+    // regardless of what's committed here. This module's copy exists so
+    // R.drawable.notification_icon / R.color.notification_icon_color resolve
+    // to something at THIS module's own compile time — confirmed via
+    // dexdump that the compiled reference correctly patches to the real
+    // final merged resource ID either way. If app.json's notification.icon
+    // or notification.color ever changes, update assets/notification-icon.png
+    // (the actual source of truth) and mirror the change here to keep them
+    // in sync, even though only the app's copy is load-bearing for content.
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setContentTitle(title)
       .setContentText(body)

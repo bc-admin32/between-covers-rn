@@ -112,18 +112,67 @@ and color (`values/colors.xml`, `#B83255`, matching `app.json`'s
 `notification.color`). `AdmNotificationDisplay.kt` references them as
 `R.drawable.notification_icon` / `R.color.notification_icon_color` — this
 module's own generated `R` class (namespace `expo.modules.admpush`), resolved
-by the Kotlin compiler, not `PackageManager` at runtime. **Note:** this is
-technically a second, independent copy of that icon/color — if `app.json`'s
-`notification.icon`/`color` ever changes, both this module's
-`src/amazon/res/` and the app's own `expo-notifications`-generated copy need
-updating by hand; nothing keeps them in sync automatically.
+by the Kotlin compiler, not `PackageManager` at runtime. **Correction:** this
+is *not* actually an independent copy in terms of packaged content — Android's
+resource merge gives the app module's same-named resource precedence over a
+library's, so only `assets/notification-icon.png` (the app's real source of
+truth, regenerated into `android/app/src/main/res/` by expo-notifications'
+config plugin at every prebuild) determines what's actually packaged; this
+module's `src/amazon/res/` copy exists only so `R.drawable.notification_icon`
+resolves to something at *this module's own* compile time. Confirmed via
+`dexdump` on a real shipped APK that the compiled reference correctly patches
+to the true final merged resource ID regardless (`aapt2 dump resources`
+showed exactly one merged entry, not two) — so this was never a source of the
+regression below, just a documentation inaccuracy worth fixing.
 
-**Not confirmed fixed** — this needs a real `production-amazon` build tested
-on Fire HD hardware. If the icon/color still render wrong after this change,
-the cause isn't the metadata-lookup mechanism at all, and the next thing to
-check is whatever's actually reaching `AdmNotificationDisplay.show()` — e.g.
-whether the ADM data-message payload itself carries different values, or a
-Fire OS notification-rendering quirk unrelated to resource resolution.
+### Regression: icon went from washed-out-but-visible to not showing at all (fixed)
+
+The compile-time-reference fix above shipped in `production-amazon` build 59
+(commit `52bede3`) and regressed on real Fire HD hardware — worse than
+before, not fixed. Root cause, confirmed against the actual shipped APK
+(`aapt2 dump resources`, `dexdump` on the extracted `.dex`, and diffing
+against the prior build's APK), not guessed:
+
+1. `dexdump` showed `Lexpo/modules/admpush/R$drawable;.notification_icon`
+   compiled to `2131231156` = `0x7f0801b4`, exactly matching the one merged
+   `drawable/notification_icon` entry `aapt2 dump resources` reports — the
+   compile-time reference was correctly wired all along.
+2. Extracting the actual packaged icon file from the APK showed it's `8-bit
+   gray+alpha`, not the `8-bit RGBA` the source file on disk is — AAPT2's PNG
+   crunch (`crunchPngs`, on by default for release builds) losslessly
+   converts a PNG to grayscale whenever every alpha-bearing pixel has exactly
+   `R=G=B`, which — confirmed by manually decoding the PNG — was true for
+   every one of this icon's 3725 alpha-bearing pixels.
+3. Diffing that same packaged file against the *previous* build's APK (58,
+   pre-fix) showed it byte-for-byte identical — the icon file itself never
+   changed. So the regression isn't a content change at all: the old
+   metadata-lookup code was almost certainly silently hitting its
+   `context.applicationInfo.icon` fallback (the full-color launcher icon) the
+   whole time on Fire OS, which is why *something* recognizable (if
+   wrong-colored) showed before. The new code (per point 1) now correctly
+   reaches the real, intended small icon for the first time — and Fire OS's
+   notification renderer apparently doesn't display that specific gray+alpha
+   PNG format the way stock Android/Google Play does (which has always used
+   this same packaged file successfully).
+
+**Fix:** rather than touch any build config (`cruncherEnabled`/`crunchPngs`
+are module/variant-wide in this AGP version — no Gradle-DSL mechanism exists
+to exempt a single named resource; confirmed via AOSP's own `aapt2 compile
+--no-crunch` docs and the `androidResources`/`aaptOptions` DSL reference, and
+via this module's own `compileAmazonReleaseLibraryResources` task existing
+separately from `:app`'s resource step, which doesn't change that conclusion
+since crunch eligibility is a property of the merged resource, not the
+originating module), `assets/notification-icon.png` had every alpha-bearing
+pixel's blue channel nudged by 1/255 (visually imperceptible — confirmed via
+manual pixel diff, max channel delta 1 out of 255). That makes the
+grayscale conversion lossy, so AAPT2's own documented safety check (it only
+performs this optimization when it loses no information) skips it.
+This module's own `src/amazon/res/` copies were updated to match, for
+consistency, though per the correction above they aren't what's actually
+packaged.
+
+**Not yet confirmed on-device** — needs a real `production-amazon` build
+tested on Fire HD hardware, same as last time.
 
 ## Still unverified
 
