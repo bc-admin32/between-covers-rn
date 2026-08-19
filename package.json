@@ -14,6 +14,7 @@
     "release:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
+    "adm-push": "file:./modules/adm-push",
     "@expo-google-fonts/cormorant": "^0.4.2",
     "@expo-google-fonts/dancing-script": "^0.4.2",
     "@expo-google-fonts/lato": "^0.4.1",

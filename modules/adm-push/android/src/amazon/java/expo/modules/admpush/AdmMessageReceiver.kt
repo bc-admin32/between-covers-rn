@@ -2,10 +2,12 @@ package expo.modules.admpush
 
 import com.amazon.device.messaging.ADMMessageReceiver
 
-// super() takes the legacy handler class (backward-compat for older Fire OS);
-// registerJobServiceClass wires the modern JobService path. Both required per
-// Amazon's own integration sample.
-class AdmMessageReceiver : ADMMessageReceiver(AdmMessageHandlerService::class.java) {
+// super() takes the legacy (pre-JobScheduler) handler class — required even
+// though AdmMessageHandlerService (registered via registerJobServiceClass
+// below) is what actually handles registration/messages on modern devices.
+// Verified against Amazon's own ADMMessenger sample
+// (SampleADMMessageReceiver.java).
+class AdmMessageReceiver : ADMMessageReceiver(AdmMessageHandlerLegacy::class.java) {
     init {
         registerJobServiceClass(AdmMessageHandlerService::class.java, ADM_JOB_ID)
     }

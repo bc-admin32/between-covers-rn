@@ -21,8 +21,6 @@ class AdmMessageHandlerService : ADMMessageHandlerJobBase() {
     }
 
     override fun onMessage(context: Context, intent: Intent) {
-        // TODO out of scope here: FCM pushes render via expo-notifications'
-        // handler; ADM messages arrive as a raw Intent and need equivalent
-        // handling once the backend's ADM send path/payload shape is confirmed.
+        AdmNotificationDisplay.show(context, intent)
     }
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:amazon="http://schemas.amazon.com/apk/res/android">
     <permission
         android:name="com.betweencovers.app.permission.RECEIVE_ADM_MESSAGE"
         android:protectionLevel="signature" />
@@ -8,15 +9,30 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application>
-        <uses-library
+        <!-- required="false": the Amazon Appstore (and thus this "amazon"
+             flavor) also installs on non-Fire Android devices without ADM —
+             the app must degrade gracefully there, per Amazon's own
+             ADMMessenger sample manifest. This replaces an earlier, wrong
+             <uses-library android:name="com.amazon.device.messaging"/> tag —
+             ADM uses this amazon:enable-feature declaration instead, not the
+             generic Android shared-library mechanism. -->
+        <amazon:enable-feature
             android:name="com.amazon.device.messaging"
-            android:required="true" />
+            android:required="false" />
+
+        <service
+            android:name="expo.modules.admpush.AdmMessageHandlerLegacy"
+            android:exported="false" />
 
         <service
             android:name="expo.modules.admpush.AdmMessageHandlerService"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="false" />
 
+        <!-- android:exported="true" (absent in Amazon's ~2019 sample manifest)
+             is required here: modern targetSdkVersion mandates an explicit
+             exported value on any manifest component with an intent-filter,
+             and this receiver must accept the external ADM system broadcast. -->
         <receiver
             android:name="expo.modules.admpush.AdmMessageReceiver"
             android:permission="com.amazon.device.messaging.permission.SEND"

@@ -1,14 +1,22 @@
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
 
 group = 'expo.modules.admpush'
 version = '1.0.0'
 
-def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
-apply from: expoModulesCorePlugin
-applyKotlinExpoModulesCorePlugin()
-useCoreDependencies()
-useExpoPublishing()
+// Local file: dependency — never published anywhere, so the plugin's default
+// Maven-publishing setup is both unnecessary and broken here: it hardcodes a
+// lookup of a SoftwareComponent literally named "release"
+// (expo-module-gradle-plugin's ProjectConfiguration.kt / PublicationInfo),
+// which doesn't exist once flavorDimensions/productFlavors are declared below
+// (AGP produces amazonRelease/googlePlayRelease instead). canBePublished is
+// the plugin's own supported opt-out for exactly this case — no other module
+// in this repo needs it because none of them declare product flavors.
+expoModule {
+  canBePublished = false
+}
 
 android {
   namespace "expo.modules.admpush"
@@ -40,4 +48,14 @@ dependencies {
   // (see modules/adm-push/README.md). amazonImplementation scopes it to the
   // amazon variant only — the googlePlay build never touches this dependency.
   amazonImplementation files('libs/amazon-device-messaging.jar')
+
+  // NotificationCompat/NotificationManagerCompat/ContextCompat, used by
+  // AdmNotificationDisplay.kt (src/amazon only) to render received ADM
+  // messages. Each Android Gradle module resolves its own compile classpath
+  // independently — this isn't inherited from :app just because the app
+  // already depends on it elsewhere. Version matches node_modules/expo-notifications/
+  // android/build.gradle's own androidx.core dependency for consistency;
+  // Gradle's normal conflict resolution picks the highest version requested
+  // anywhere in the app graph regardless, so this only sets a floor.
+  amazonImplementation 'androidx.core:core:1.6.0'
 }
