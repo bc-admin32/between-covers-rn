@@ -9,10 +9,23 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
+import { analytics, HeyCatchProvider } from '@heycatch/sdk';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
 import { initAnalytics, track } from '../lib/analytics';
 import { captureFromUrl } from '../lib/attribution';
+
+// HeyCatch (product analytics, wraps posthog-react-native) — separate from
+// this app's own lib/analytics.ts track() calls below, not a replacement.
+// Identity (setIdentity/setPersonProperties) is deliberately not wired yet.
+analytics.init({
+  projectKey: 'hck_pk_0c1TnsZjQG-nAS8UbZmQJyQv5vAfwnYG',
+  install: {
+    framework: 'react-native',
+    frameworkVersion: '0.81.5', // confirmed via package.json's react-native dep
+    agent: 'claude-code',
+  },
+});
 
 // Fonts are natively bundled via expo-font plugin in app.json.
 // We still call useFonts() so they're registered under these exact keys
@@ -178,7 +191,7 @@ function RootLayout() {
   }
 
   return (
-    <>
+    <HeyCatchProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -195,7 +208,7 @@ function RootLayout() {
         <Stack.Screen name="book/index" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="submissions/[type]" options={{ animation: 'slide_from_right' }} />
       </Stack>
-    </>
+    </HeyCatchProvider>
   );
 }
 
