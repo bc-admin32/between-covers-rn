@@ -398,6 +398,15 @@ export default function RoomScreen({
   const isVoteGameType = !!liveRoom.gameType
     && VOTE_GAME_TYPES.includes(liveRoom.gameType as VoteGameType);
   const showVoteBox = isVoteGameType && !!votePrompt;
+  // True only while a round is actually open/interactable (not during the
+  // closed/reveal phase, where showVoteBox stays true to show tallies but
+  // there's no redundant scenario-text problem to suppress the pinned
+  // banner for). Derived from votePrompt itself — not a separate effect —
+  // so it flips in lockstep with whatever the vote box already uses to
+  // know its own phase; gameType-agnostic, so a future non-vote iris:prompt
+  // interaction (e.g. a numeric-guess round) suppresses the banner the same
+  // way as long as it flows through the same phase: "open"/"closed" shape.
+  const isVoteBoxOpen = showVoteBox && votePrompt?.phase === 'open';
 
   const player = useVideoPlayer(videoUrl ?? '', (p) => {
     if (videoUrl) {
@@ -590,7 +599,13 @@ export default function RoomScreen({
           </>
         )}
 
-        {chatToken && pinnedMessage && (
+        {/* Suppressed (not cleared) while a vote/guess round is open — the
+            vote box already shows this same scenario text, and on small
+            phones both on screen at once push real chat off-screen.
+            pinnedMessage itself keeps updating from iris:pinned as normal;
+            this only gates the render, so it reappears immediately once
+            isVoteBoxOpen goes false without needing a fresh event. */}
+        {chatToken && pinnedMessage && !isVoteBoxOpen && (
           <View style={styles.pinnedBar}>
             <Text style={styles.pinnedLabel}>📌 IRIS PINNED</Text>
             <Text style={styles.pinnedMessage}>"{pinnedMessage}"</Text>
