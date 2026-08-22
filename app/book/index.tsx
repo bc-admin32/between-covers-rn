@@ -14,6 +14,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
 import { track } from '../../lib/analytics';
+import { maybeRequestReview } from '../../lib/reviewPrompt';
+import { getFinishedBookPromptEnabled } from '../../lib/finishedBookPromptPreference';
 import { spacing, radius, colors } from '../../lib/theme';
 import {
   getRetailerCTA,
@@ -160,7 +162,18 @@ export default function BookDetailsScreen() {
             }
           : prev,
       );
-      if (status === 'FINISHED') setTagModalVisible(true);
+      if (status === 'FINISHED') {
+        if (await getFinishedBookPromptEnabled()) {
+          setTagModalVisible(true);
+        }
+        // Satisfaction moment: user finished a book they discovered through
+        // the app. Native prompt only — never gates anything here, and
+        // iOS/Android's own throttling means this is safe to call without
+        // our own frequency cap (see lib/reviewPrompt.ts). Independent of
+        // the tag-modal preference above — turning off the rating prompt
+        // doesn't affect this.
+        maybeRequestReview();
+      }
     } catch {}
     setAdding(false);
   }
@@ -173,7 +186,10 @@ export default function BookDetailsScreen() {
         prev && prev.libraryItem ? { ...prev, libraryItem: { ...prev.libraryItem, status } } : prev
       );
       if (status === 'FINISHED' && !wasFinished) {
-        setTagModalVisible(true);
+        if (await getFinishedBookPromptEnabled()) {
+          setTagModalVisible(true);
+        }
+        maybeRequestReview();
       }
     } catch {}
   }

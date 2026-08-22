@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   AppState,
+  Alert,
   type AppStateStatus,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPatch } from '../../lib/api';
 import { track } from '../../lib/analytics';
 import { spacing } from '../../lib/theme';
+import { setFinishedBookPromptEnabled } from '../../lib/finishedBookPromptPreference';
 import {
   SPICE_LEVELS,
   TRIGGERS,
@@ -230,6 +232,36 @@ export default function TagBookModal({
     onClose();
   };
 
+  // Same dismiss as handleClose (commits anything the user actually
+  // interacted with, records nothing untouched) — separately named/labeled
+  // so it reads as an explicit "not now" rather than relying on the X icon.
+  const handleSkip = () => {
+    track('tag_modal_skipped', { workId });
+    handleClose();
+  };
+
+  // Confirms before persisting — this stops the modal from auto-opening on
+  // every future "Finished" book, not just this one, so it's a bigger
+  // commitment than Skip and shouldn't be a stray-tap away from it.
+  const handleTurnOffAutoPrompt = () => {
+    Alert.alert(
+      "Don't ask again?",
+      "You can always rate or tag a book later from its detail page.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Turn Off',
+          style: 'destructive',
+          onPress: async () => {
+            await setFinishedBookPromptEnabled(false);
+            track('tag_modal_auto_prompt_disabled', { workId });
+            handleClose();
+          },
+        },
+      ],
+    );
+  };
+
   // ─── Render helpers ─────────────────────────────────────────────────────────
 
   const renderChip = (
@@ -261,6 +293,15 @@ export default function TagBookModal({
             </View>
             <TouchableOpacity onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
               <X size={22} color="#0F2A48" weight="bold" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.dismissRow}>
+            <TouchableOpacity onPress={handleSkip} hitSlop={8}>
+              <Text style={styles.skipText}>Skip for now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleTurnOffAutoPrompt} hitSlop={8}>
+              <Text style={styles.turnOffText}>Don't show this again</Text>
             </TouchableOpacity>
           </View>
 
@@ -396,6 +437,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,42,72,0.07)',
     alignItems: 'center', justifyContent: 'center',
     marginLeft: spacing.sm,
+  },
+  dismissRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  skipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
+    textDecorationLine: 'underline',
+  },
+  // Deliberately smaller/muted than Skip — a bigger commitment (stops future
+  // auto-prompts entirely, not just this one book), so it shouldn't be
+  // visually equal-weight with the low-stakes Skip action next to it.
+  turnOffText: {
+    fontSize: 12,
+    color: '#9c8f7e',
+    textDecorationLine: 'underline',
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,

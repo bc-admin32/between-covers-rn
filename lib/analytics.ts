@@ -21,7 +21,9 @@ type EventName =
   | 'book_added_to_library'
   | 'retailer_cta_tapped'
   | 'book_tag_committed'
-  | 'tag_modal_closed';
+  | 'tag_modal_closed'
+  | 'tag_modal_skipped'
+  | 'tag_modal_auto_prompt_disabled';
 
 type AnalyticsEvent = {
   eventId: string;

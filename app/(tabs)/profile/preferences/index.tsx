@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView, Switch,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { CaretLeft } from 'phosphor-react-native';
@@ -9,6 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import {
+  getFinishedBookPromptEnabled,
+  setFinishedBookPromptEnabled,
+} from '../../../../lib/finishedBookPromptPreference';
 
 const READING_TIME_OPTIONS = [
   { key: 'Morning Light', label: 'Morning Light' },
@@ -152,6 +156,11 @@ export default function ReadingPreferencesScreen() {
   const [drinks, setDrinks] = useState<string[]>([]);
   const [readingLocation, setReadingLocation] = useState<string | null>(null);
 
+  // Local-only (SecureStore, not /profile) — unlike the fields above, this
+  // writes immediately on toggle rather than batching into "Save
+  // Preferences" below (see handleFinishedBookPromptToggle).
+  const [finishedBookPromptEnabled, setFinishedBookPromptEnabledState] = useState(true);
+
   useEffect(() => {
     const load = async () => {
       const data = await apiGet('/profile');
@@ -162,11 +171,18 @@ export default function ReadingPreferencesScreen() {
       setSnacks(data.snacks ?? []);
       setDrinks(data.drinks ?? []);
       setReadingLocation(data.readingLocation ?? null);
+      setFinishedBookPromptEnabledState(await getFinishedBookPromptEnabled());
       setSaved(true);
       setLoading(false);
     };
     load();
   }, []);
+
+  const handleFinishedBookPromptToggle = async (v: boolean) => {
+    Haptics.selectionAsync();
+    setFinishedBookPromptEnabledState(v); // optimistic UI update
+    await setFinishedBookPromptEnabled(v);
+  };
 
   const save = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -244,6 +260,18 @@ export default function ReadingPreferencesScreen() {
             <ChipGroup options={READING_LOCATION_OPTIONS} selected={readingLocation} onSelect={(v) => { Haptics.selectionAsync(); setReadingLocation(v); markUnsaved(); }} />
           </PrefCard>
 
+          {/* Local-only setting, not part of the batched Save below — it
+              writes immediately on toggle. */}
+          <PrefCard label="Book Ratings">
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Ask me to rate books when I finish them</Text>
+              <Switch
+                value={finishedBookPromptEnabled}
+                onValueChange={handleFinishedBookPromptToggle}
+              />
+            </View>
+          </PrefCard>
+
           <TouchableOpacity
             style={[styles.saveButton, saved ? styles.saveButtonSaved : styles.saveButtonUnsaved, saving && styles.saveButtonDisabled]}
             onPress={save}
@@ -276,6 +304,8 @@ const styles = StyleSheet.create({
   cardLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.08)' },
   cardLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
   boundaryNote: { fontSize: 12, color: '#A9C0D4', lineHeight: 18, marginBottom: spacing.md },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  toggleLabel: { flex: 1, fontSize: 14, color: '#0F2A48' },
   chipGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff' },
   chipSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
