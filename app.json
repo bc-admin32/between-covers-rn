@@ -8,6 +8,7 @@
     "icon": "./assets/icon.png",
     "scheme": "com.betweencovers.app",
     "userInterfaceStyle": "dark",
+    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -87,6 +88,7 @@
       ],
       "./plugins/withAdmApiKey",
       "./plugins/withAmazonIapAuthKey",
+      "./plugins/withAndroidReleaseOptimizations",
       "./withNoCameraFeatures"
     ],
     "experiments": {
