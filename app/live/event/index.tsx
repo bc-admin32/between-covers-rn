@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Pressable,
-  StyleSheet, ActivityIndicator, Image, TextInput,
+  StyleSheet, ActivityIndicator, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { OptimizedImage } from '../../../components/OptimizedImage';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -371,7 +373,7 @@ export default function LiveEventScreen() {
       {isScheduled && (
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scheduledContent} showsVerticalScrollIndicator={false}>
           {event.coverUrl && (
-            <Image source={{ uri: event.coverUrl }} style={styles.scheduledCover} resizeMode="cover" />
+            <Image source={{ uri: event.coverUrl }} style={styles.scheduledCover} contentFit="cover" />
           )}
           {event.description && (
             <Text style={styles.scheduledDescription}>{event.description}</Text>
@@ -438,7 +440,7 @@ export default function LiveEventScreen() {
               return (
                 <View key={msg.id} style={styles.userChatRow}>
                   {msg.photoUrl ? (
-                    <Image source={{ uri: msg.photoUrl }} style={styles.userChatAvatar} />
+                    <OptimizedImage uri={msg.photoUrl} style={styles.userChatAvatar} />
                   ) : (
                     <View style={[styles.userChatAvatar, styles.userChatAvatarFallback]}>
                       <Text style={styles.userChatAvatarText}>{msg.sender[0]?.toUpperCase()}</Text>

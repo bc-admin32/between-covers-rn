@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -117,7 +118,7 @@ export default function LoginScreen() {
       <Image
         source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/backgrounds/logo.png' }}
         style={styles.logo}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
       <Text style={styles.tagline}>A cozy escape into romance</Text>

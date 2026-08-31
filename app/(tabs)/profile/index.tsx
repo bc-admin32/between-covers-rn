@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, Alert,
+  StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { signOut } from '../../../lib/signout';
 import { FeedbackModal } from '../../../components/FeedbackModal';
+import { OptimizedImage } from '../../../components/OptimizedImage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost, apiPatch } from '../../../lib/api';
@@ -180,7 +181,7 @@ export default function ProfileScreen() {
             {isFounding && <Text style={styles.foundingBadge}>✦ Founding Member</Text>}
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
               <View style={styles.avatarWrapper}>
-                <Image source={{ uri: photoToShow }} style={styles.avatar} />
+                <OptimizedImage uri={photoToShow} style={styles.avatar} />
               </View>
               <View style={styles.cameraButton}>
                 <Text style={styles.cameraButtonText}>📷</Text>

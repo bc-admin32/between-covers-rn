@@ -1,17 +1,19 @@
 import { Stack } from 'expo-router';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 
 const BG = 'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/background.png';
 
 export default function OnboardingLayout() {
   return (
     <View style={styles.container}>
-      {/* Persistent background — loaded once, cached by OS HTTP cache.
-          Survives all screen transitions so there is never a black flash. */}
+      {/* Persistent background — loaded once, cached (memory+disk via
+          expo-image). Survives all screen transitions so there is never a
+          black flash. */}
       <Image
         source={{ uri: BG }}
         style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
+        contentFit="cover"
       />
       <Stack
         screenOptions={{

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
-  StyleSheet, ActivityIndicator, Image, Linking,
+  StyleSheet, ActivityIndicator, Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../../components/AffiliateDisclosure';
+import { OptimizedImage } from '../../../../components/OptimizedImage';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -80,7 +82,10 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.recipeContent}>
           {item.imageUrl && (
             <View style={styles.recipeImage}>
-              <Image source={{ uri: item.imageUrl }} style={styles.recipeImageImg} resizeMode="cover" />
+              {/* Always a recipe here (RecipeModal), i.e. a real user upload
+                  (recipe-submissions/) — unlike the generic grid below, no
+                  category check needed. */}
+              <OptimizedImage uri={item.imageUrl} style={styles.recipeImageImg} contentFit="cover" />
             </View>
           )}
 
@@ -211,7 +216,14 @@ export default function CozyItemsScreen() {
                     onPress={isRecipe ? () => setActiveRecipe(item) : undefined}
                   >
                     {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.itemCover} />
+                      // Recipe items are community submissions (recipe-submissions/,
+                      // a real upload); product/playlist items are admin-curated
+                      // content with no optimized variant.
+                      isRecipe ? (
+                        <OptimizedImage uri={item.imageUrl} style={styles.itemCover} />
+                      ) : (
+                        <Image source={{ uri: item.imageUrl }} style={styles.itemCover} />
+                      )
                     ) : (
                       <View style={[styles.itemCover, styles.itemCoverFallback]}>
                         <Text style={{ fontSize: 28 }}>

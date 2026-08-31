@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, Pressable,
-  StyleSheet, ActivityIndicator, Image, TextInput,
+  StyleSheet, ActivityIndicator, TextInput,
   KeyboardAvoidingView, Platform, Modal, AppState,
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { OptimizedImage } from '../OptimizedImage';
 import { CaretLeft } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -775,7 +777,7 @@ function ChatMessageRow({
   return (
     <View style={chatStyles.userRow}>
       {msg.photoUrl ? (
-        <Image source={{ uri: msg.photoUrl }} style={chatStyles.userAvatar} />
+        <OptimizedImage uri={msg.photoUrl} style={chatStyles.userAvatar} />
       ) : (
         <View style={[chatStyles.userAvatar, chatStyles.userAvatarFallback]}>
           <Text style={chatStyles.userAvatarText}>{(msg.sender[0] ?? '?').toUpperCase()}</Text>

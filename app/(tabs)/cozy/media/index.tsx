@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
-  StyleSheet, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -227,7 +228,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                       disabled={!url}
                     >
                       {platform?.logoUrl ? (
-                        <Image source={{ uri: platform.logoUrl }} style={styles.platformLogo} resizeMode="contain" />
+                        <Image source={{ uri: platform.logoUrl }} style={styles.platformLogo} contentFit="contain" />
                       ) : (
                         <Text style={styles.platformName}>Watch</Text>
                       )}

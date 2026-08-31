@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../lib/theme';
@@ -43,7 +44,7 @@ export default function LiveEventRestrictionScreen({ reason, liftsAt, onBack }: 
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.xl }]}>
-      <Image source={{ uri: BC_LOGO }} style={styles.logo} resizeMode="contain" />
+      <Image source={{ uri: BC_LOGO }} style={styles.logo} contentFit="contain" />
       <Text style={styles.headline}>{headline}</Text>
       <Text style={styles.body}>{body}</Text>
 

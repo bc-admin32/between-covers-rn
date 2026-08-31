@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

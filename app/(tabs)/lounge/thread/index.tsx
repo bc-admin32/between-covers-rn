@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView,
+  StyleSheet, ActivityIndicator, KeyboardAvoidingView,
   Platform, Keyboard,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
+import { OptimizedImage } from '../../../../components/OptimizedImage';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
@@ -49,7 +51,8 @@ function getInitials(name: string): string {
 
 function Avatar({ url, name, size = 34, isIris = false }: { url: string | null; name: string; size?: number; isIris?: boolean }) {
   if (isIris) return <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />;
-  if (url) return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  // User's own avatar — a real upload (profile-photos/), unlike the static Iris asset above.
+  if (url) return <OptimizedImage uri={url} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#B83255', alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#fff', fontSize: size * 0.35, fontWeight: '600' }}>{getInitials(name)}</Text>
@@ -107,7 +110,7 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, thread
             {reply.editedAt && <Text style={styles.editedLabel}> · edited</Text>}
           </View>
           {reply.body && <Text style={styles.bubbleBody}>{reply.body}</Text>}
-          {reply.mediaUrl && <Image source={{ uri: reply.mediaUrl }} style={styles.bubbleMedia} resizeMode="cover" />}
+          {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
         </View>
 
         <View style={styles.replyActions}>

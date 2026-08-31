@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal, TextInput,
-  StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Linking,
+  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -401,7 +402,7 @@ export default function CozyEventsScreen() {
             {event ? (
               <View>
                 {event.imageUrl && (
-                  <Image source={{ uri: event.imageUrl }} style={styles.eventCover} resizeMode="cover" />
+                  <Image source={{ uri: event.imageUrl }} style={styles.eventCover} contentFit="cover" />
                 )}
                 <Text style={styles.eventTitle}>{event.title}</Text>
                 {event.eventDate && (
@@ -450,7 +451,7 @@ export default function CozyEventsScreen() {
               </View>
             ) : (
               <View style={styles.emptyState}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c' }} style={styles.emptyImage} resizeMode="cover" />
+                <Image source={{ uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c' }} style={styles.emptyImage} contentFit="cover" />
                 <Text style={styles.emptyTitle}>Between Covers Live</Text>
                 <Text style={styles.emptySubtitle}>A Cozy Community Event</Text>
                 <Text style={styles.emptyText}>Check back soon — Iris is always planning something good.</Text>
