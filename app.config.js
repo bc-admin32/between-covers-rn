@@ -58,6 +58,14 @@ module.exports = ({ config }) => {
   // VERIFY: confirm the expo-iap config-plugin name + whether it takes options.
   playPlugins.push('expo-iap');
 
+  // Google Play only: react-native-iap's plugin (dropped above) is what
+  // normally gives :app its own "appstore" flavorDimensions/productFlavors
+  // matching adm-push's (modules/adm-push/android/build.gradle). Without it,
+  // :app has no product flavors at all in this variant, and Gradle can't
+  // resolve which adm-push variant (amazon vs googlePlay) to use — see
+  // plugins/withAdmPushFlavorFix.js for the full error and root cause.
+  playPlugins.push('./plugins/withAdmPushFlavorFix');
+
   return {
     ...config,
     plugins: playPlugins,
