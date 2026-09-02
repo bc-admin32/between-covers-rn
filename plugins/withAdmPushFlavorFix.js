@@ -1,4 +1,4 @@
-const { withAppBuildGradle } = require('expo/config-plugins');
+const { withAppBuildGradle, withProjectBuildGradle } = require('expo/config-plugins');
 
 /**
  * GOOGLE PLAY VARIANT ONLY (RNIAP_VARIANT=play). Fixes:
@@ -28,25 +28,66 @@ const { withAppBuildGradle } = require('expo/config-plugins');
  * generated android/app/build.gradle for RNIAP_VARIANT=play has no
  * flavorDimensions/productFlavors block whatsoever).
  *
- * Fix approach: add :app's own missingDimensionStrategy for "appstore" ->
- * "googlePlay", mirroring exactly how expo-iap's own plugin solves the same
- * class of problem for "platform" -> "play". Scoped to the play variant only
- * via app.config.js's existing IAP_VARIANT branch — adm-push's build.gradle
+ * Fix approach: add missingDimensionStrategy for "appstore" -> "googlePlay",
+ * mirroring exactly how expo-iap's own plugin solves the same class of
+ * problem for "platform" -> "play". Scoped to the play variant only via
+ * app.config.js's existing IAP_VARIANT branch — adm-push's build.gradle
  * itself is untouched, since its "appstore"/googlePlay/amazon declaration is
  * already correct (verified: it's what the AMAZON variant successfully
  * resolves against today). The alternative (renaming adm-push's dimension to
  * match some "platform"/"play" scheme) would be wrong on two counts: :app
  * doesn't have a "platform" dimension of its own either in this variant, and
  * it would break the amazon/iOS variant's already-working "appstore" match.
+ *
+ * Round 2: the :app-only fix below was necessary but not sufficient — :expo
+ * (Expo's own autolinking module, included as a plain subproject by
+ * expoAutolinking.useExpoModules() in settings.gradle, not something we
+ * hand-edit) ALSO transitively depends on adm-push and hit the identical
+ * ambiguity one module later (:expo:compileReleaseJavaWithJavac instead of
+ * :app:bundleRelease). Rather than chase this module-by-module as each one
+ * happens to surface it, the second fix below applies the same strategy to
+ * every Android subproject via a root-level `subprojects { afterEvaluate }`
+ * block — the standard Gradle/RN pattern for exactly this "some library
+ * needs a flavor dimension resolved and I don't want to hunt down every
+ * consumer" problem. Applying it to adm-push itself (which already has its
+ * own real "appstore" flavor) is harmless: missingDimensionStrategy is only
+ * ever consulted for a dimension a module doesn't itself participate in, so
+ * on adm-push it's simply never read.
  */
 module.exports = function withAdmPushFlavorFix(config) {
-  return withAppBuildGradle(config, (cfg) => {
+  config = withAppBuildGradle(config, (cfg) => {
     const marker = 'missingDimensionStrategy "appstore", "googlePlay"';
     if (!cfg.modResults.contents.includes(marker)) {
       cfg.modResults.contents = cfg.modResults.contents.replace(
         /defaultConfig\s*{/,
         `defaultConfig {\n        ${marker}`,
       );
+    }
+    return cfg;
+  });
+
+  return withProjectBuildGradle(config, (cfg) => {
+    const marker = 'adm-push flavor fix: project-wide "appstore" strategy';
+    if (!cfg.modResults.contents.includes(marker)) {
+      cfg.modResults.contents += `
+// ${marker} (RNIAP_VARIANT=play only — see plugins/withAdmPushFlavorFix.js).
+// :app already gets its own strategy above, but any OTHER module that
+// transitively depends on adm-push (e.g. Expo's own :expo autolinking
+// module) needs the same resolution or hits the identical variant-ambiguity
+// error one module later. Apply it to every Android subproject so nothing
+// else surfaces this bug next.
+subprojects {
+  afterEvaluate { project ->
+    if (project.plugins.hasPlugin('com.android.library') || project.plugins.hasPlugin('com.android.application')) {
+      android {
+        defaultConfig {
+          missingDimensionStrategy "appstore", "googlePlay"
+        }
+      }
+    }
+  }
+}
+`;
     }
     return cfg;
   });
