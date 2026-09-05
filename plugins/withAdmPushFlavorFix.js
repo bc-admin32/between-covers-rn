@@ -46,13 +46,21 @@ const { withAppBuildGradle, withProjectBuildGradle } = require('expo/config-plug
  * ambiguity one module later (:expo:compileReleaseJavaWithJavac instead of
  * :app:bundleRelease). Rather than chase this module-by-module as each one
  * happens to surface it, the second fix below applies the same strategy to
- * every Android subproject via a root-level `subprojects { afterEvaluate }`
- * block — the standard Gradle/RN pattern for exactly this "some library
- * needs a flavor dimension resolved and I don't want to hunt down every
- * consumer" problem. Applying it to adm-push itself (which already has its
- * own real "appstore" flavor) is harmless: missingDimensionStrategy is only
- * ever consulted for a dimension a module doesn't itself participate in, so
- * on adm-push it's simply never read.
+ * every Android subproject via a root-level `subprojects {}` block — the
+ * standard Gradle/RN pattern for exactly this "some library needs a flavor
+ * dimension resolved and I don't want to hunt down every consumer" problem.
+ * Applying it to adm-push itself (which already has its own real "appstore"
+ * flavor) is harmless: missingDimensionStrategy is only ever consulted for a
+ * dimension a module doesn't itself participate in, so on adm-push it's
+ * simply never read.
+ *
+ * Round 3: an unconditional `subprojects { afterEvaluate { ... } }` blew up
+ * with "Cannot run Project.afterEvaluate(Closure) when the project is
+ * already evaluated" — Expo's autolinking/RNGP setup evaluates at least one
+ * subproject before our root build.gradle's own subprojects{} block gets a
+ * chance to register the callback on it. Guarded with the standard
+ * project.state.executed check below: apply directly if the subproject has
+ * already finished evaluating, else fall back to afterEvaluate.
  */
 module.exports = function withAdmPushFlavorFix(config) {
   config = withAppBuildGradle(config, (cfg) => {
@@ -76,15 +84,26 @@ module.exports = function withAdmPushFlavorFix(config) {
 // module) needs the same resolution or hits the identical variant-ambiguity
 // error one module later. Apply it to every Android subproject so nothing
 // else surfaces this bug next.
-subprojects {
-  afterEvaluate { project ->
-    if (project.plugins.hasPlugin('com.android.library') || project.plugins.hasPlugin('com.android.application')) {
-      android {
+//
+// Guarded with project.state.executed: some subprojects are already
+// evaluated (by Expo's autolinking / RNGP setup) by the time this
+// subprojects{} block runs, and calling afterEvaluate on an
+// already-evaluated project throws "Cannot run Project.afterEvaluate
+// (Closure) when the project is already evaluated."
+subprojects { subproject ->
+  def applyFlavorFix = {
+    if (subproject.plugins.hasPlugin('com.android.library') || subproject.plugins.hasPlugin('com.android.application')) {
+      subproject.android {
         defaultConfig {
           missingDimensionStrategy "appstore", "googlePlay"
         }
       }
     }
+  }
+  if (subproject.state.executed) {
+    applyFlavorFix()
+  } else {
+    subproject.afterEvaluate { applyFlavorFix() }
   }
 }
 `;
