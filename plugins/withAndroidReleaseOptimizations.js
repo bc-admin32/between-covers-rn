@@ -34,10 +34,34 @@ const path = require('path');
  * every require('*.png'/'*.jpg'/etc.) in the repo); the raw/keep.xml below
  * protects the drawable resources those get bundled into so shrinkResources
  * can't strip them as apparently-unused.
+ *
+ * KEEP RULES (Amazon IAP): react-native-iap's Amazon flavor wraps the Amazon
+ * Appstore SDK (com.amazon.device.iap.**, com.amazon.device.drm.**), which
+ * does its own internal reflection/callback dispatch (PurchasingListener
+ * registration, receipt parsing) that R8 can't see either. Amazon's own docs
+ * (https://developer.amazon.com/docs/in-app-purchasing/iap-obfuscate-the-code.html)
+ * document this exact gap and specify the rule below verbatim — without it,
+ * minified Amazon release builds are a documented crash-on-launch/crash on
+ * first PurchasingService callback (matches a real world report of the exact
+ * error react-native-iap's own RNIapAmazonModule throws when the listener
+ * silently fails to register: "IllegalStateException: You must register a
+ * PurchasingListener before invoking this operation" —
+ * https://github.com/dooboolab/react-native-iap/issues/1865). Only the
+ * `amazon` flavor's classpath contains any com.amazon.** classes, so this
+ * rule is a complete no-op on the googlePlay flavor (nothing to match).
  */
 const KEEP_XML = `<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools"
     tools:keep="@drawable/*splash*,@drawable/*wig*,@drawable/*lips_loader*,@drawable/*lips-loader*" />
+`;
+
+const AMAZON_IAP_PROGUARD_MARKER = '# Amazon In-App Purchasing SDK';
+const AMAZON_IAP_PROGUARD_RULES = `
+${AMAZON_IAP_PROGUARD_MARKER} — required per Amazon's own ProGuard/R8 guidance,
+# see plugins/withAndroidReleaseOptimizations.js for the crash this prevents.
+-dontwarn com.amazon.**
+-keep class com.amazon.** { *; }
+-keepattributes *Annotation*
 `;
 
 module.exports = function withAndroidReleaseOptimizations(config) {
@@ -59,12 +83,19 @@ module.exports = function withAndroidReleaseOptimizations(config) {
   return withDangerousMod(config, [
     'android',
     async (cfg) => {
-      const dir = path.join(
+      const resDir = path.join(
         cfg.modRequest.platformProjectRoot,
         'app', 'src', 'main', 'res', 'raw',
       );
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'keep.xml'), KEEP_XML, 'utf8');
+      fs.mkdirSync(resDir, { recursive: true });
+      fs.writeFileSync(path.join(resDir, 'keep.xml'), KEEP_XML, 'utf8');
+
+      const proguardPath = path.join(cfg.modRequest.platformProjectRoot, 'app', 'proguard-rules.pro');
+      const existing = fs.readFileSync(proguardPath, 'utf8');
+      if (!existing.includes(AMAZON_IAP_PROGUARD_MARKER)) {
+        fs.writeFileSync(proguardPath, existing + AMAZON_IAP_PROGUARD_RULES, 'utf8');
+      }
+
       return cfg;
     },
   ]);
