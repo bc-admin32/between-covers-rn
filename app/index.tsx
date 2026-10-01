@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, AppState } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as NativeSplash from 'expo-splash-screen';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
 import { isPaywallRoute, reconcileAndroidPurchases, reconcileAmazonPurchases } from '../lib/subscription';
@@ -17,6 +18,80 @@ const JWT_RE = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
 
 function isValidJwt(token: string): boolean {
   return JWT_RE.test(token.trim());
+}
+
+// ── Biometric launch gate ─────────────────────────────────────────────────
+
+// iOS refuses to show the Face ID sheet while the app isn't the active,
+// foreground app (launch transition, native splash still up, a system alert on
+// screen). evaluatePolicy then fails at once — app_cancel / system_cancel /
+// invalid_context, or LAError.notInteractive (-1004), which expo maps to
+// "unknown: -1004, …" — and the user never sees a prompt. Those are retried.
+function isInterruption(error: string | undefined): boolean {
+  if (!error) return false;
+  return (
+    error === 'app_cancel' ||
+    error === 'system_cancel' ||
+    error === 'invalid_context' ||
+    error.startsWith('unknown')
+  );
+}
+
+// Biometrics can't be used on this device / for this app (no sensor, nothing
+// enrolled, no passcode, or Face ID turned off for the app in Settings, which
+// iOS reports as not available).
+const UNAVAILABLE_ERRORS = new Set(['not_available', 'not_enrolled', 'passcode_not_set']);
+
+const ACTIVE_WAIT_MS = 30_000;
+const SETTLE_MS = 300;
+
+// Resolves once AppState is 'active'. If we had to wait, give iOS a beat to
+// finish the transition before presenting system UI.
+function waitUntilActive(): Promise<void> {
+  if (AppState.currentState === 'active') return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      sub.remove();
+      clearTimeout(timer);
+      setTimeout(resolve, SETTLE_MS);
+    };
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') done(); });
+    const timer = setTimeout(done, ACTIVE_WAIT_MS);
+  });
+}
+
+type GateOutcome = 'passed' | 'unavailable' | 'failed';
+
+// Diagnostics for TestFlight: visible in the device console (Console.app /
+// Xcode → Devices) under the [biometric-gate] prefix.
+function logGate(step: string, info: Record<string, unknown>) {
+  console.warn(`[biometric-gate] ${step} ${JSON.stringify({ appState: AppState.currentState, ...info })}`);
+}
+
+async function runBiometricGate(): Promise<GateOutcome> {
+  const compatible = await LocalAuthentication.hasHardwareAsync();
+  const enrolled = await LocalAuthentication.isEnrolledAsync();
+  logGate('capability', { compatible, enrolled });
+  if (!compatible || !enrolled) return 'unavailable';
+
+  // Present only once the native splash is gone and the app is active.
+  await NativeSplash.hideAsync().catch(() => {});
+  await waitUntilActive();
+
+  const options = { promptMessage: 'Unlock Between Covers', fallbackLabel: 'Use passcode' };
+  let result = await LocalAuthentication.authenticateAsync(options);
+  logGate('attempt 1', { success: result.success, error: result.success ? null : result.error });
+
+  if (!result.success && isInterruption(result.error)) {
+    await waitUntilActive();
+    await new Promise((r) => setTimeout(r, SETTLE_MS));
+    result = await LocalAuthentication.authenticateAsync(options);
+    logGate('attempt 2', { success: result.success, error: result.success ? null : result.error });
+  }
+
+  if (result.success) return 'passed';
+  if (UNAVAILABLE_ERRORS.has(result.error)) return 'unavailable';
+  return 'failed';
 }
 
 // SplashScreen's effect can run more than once (React StrictMode double-invoke,
@@ -114,25 +189,20 @@ export default function SplashScreen() {
           } else {
             // Biometric launch gate (cold launch only). If the user enabled
             // Face ID / Touch ID, the retained token must NOT be trusted until
-            // biometric auth passes. Fail closed: any non-success (cancel, fail,
-            // sensor removed, not enrolled) routes to /login and never falls
-            // through to a resolved session. Full re-login (Google/Apple/Amazon)
-            // on the login screen is not biometric-gated, so a broken/removed
-            // sensor can't permanently lock a user out.
+            // biometric auth passes. The prompt is shown only once the app is
+            // active (see runBiometricGate); an interrupted prompt is retried.
+            //   passed      → continue into the app.
+            //   failed      → user cancel, failed match, lockout: /login (fail
+            //                 closed). Full re-login there isn't biometric-gated.
+            //   unavailable → no sensor, nothing enrolled, no passcode, or Face
+            //                 ID turned off for the app: biometrics can't be
+            //                 used at all, so continue with the (server-valid)
+            //                 session instead of locking the user out.
             const biometricEnabled = await SecureStore.getItemAsync('bc_biometric_enabled');
             if (biometricEnabled === 'true') {
-              const compatible = await LocalAuthentication.hasHardwareAsync();
-              const enrolled = await LocalAuthentication.isEnrolledAsync();
-              if (!compatible || !enrolled) {
-                await waitForSplash();
-                goLogin();
-                return;
-              }
-              const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Unlock Between Covers',
-                fallbackLabel: 'Use passcode',
-              });
-              if (!result.success) {
+              const outcome = await runBiometricGate();
+              logGate('outcome', { outcome });
+              if (outcome === 'failed') {
                 await waitForSplash();
                 goLogin();
                 return;
