@@ -10,7 +10,9 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../lib/theme';
 import { track } from '../../lib/analytics';
-import { clearGuestIntent } from '../../lib/guest';
+import { clearGuestIntent, guestEntryRoute } from '../../lib/guest';
+import { hasSession } from '../../lib/api';
+import { getFreshIdToken } from '../../lib/auth';
 import type { GateReason } from '../../lib/useGuest';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -55,11 +57,25 @@ const GATE_COPY: Record<GateReason, string> = {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { gate } = useLocalSearchParams<{ gate?: GateReason }>();
+  // gate: a guest sent here by a gated action. from: a guest who chose
+  // "Already a member? Sign in" on Home ('guest') or the age gate ('age-gate').
+  const { gate, from } = useLocalSearchParams<{ gate?: GateReason; from?: 'guest' | 'age-gate' }>();
   const gateCopy = gate ? GATE_COPY[gate] : undefined;
-  // Guests sent here by a gated action can go back to browsing; guests whose
-  // preview expired cannot.
-  const canDismiss = !!gate && gate !== 'expired';
+  // Guests sent here from guest mode can go back to it; guests whose preview
+  // expired cannot.
+  const canDismiss = (!!gate && gate !== 'expired') || !!from;
+  const [hasToken, setHasToken] = useState(true);
+  // Anyone else here without a session (after Log Out, a failed sign-in, an
+  // expired session) gets the same entry as launch: age gate -> guest mode ->
+  // guest paywall. Not offered once the preview has expired: that's the guest
+  // paywall they came from.
+  const showContinueAsGuest = !hasToken && !canDismiss && gate !== 'expired';
+
+  const handleContinueAsGuest = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    clearGuestIntent();
+    router.replace((await guestEntryRoute()) as any);
+  };
 
   const handleNotNow = () => {
     clearGuestIntent();
@@ -79,6 +95,10 @@ export default function LoginScreen() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    hasSession().then(setHasToken).catch(() => setHasToken(false));
+  }, []);
 
   useEffect(() => {
     async function checkBiometric() {
@@ -109,13 +129,10 @@ export default function LoginScreen() {
     });
     if (!result.success) return;
 
-    const rawToken = await SecureStore.getItemAsync('bc_id_token');
     const accessToken = await SecureStore.getItemAsync('bc_access_token');
-    const idToken = rawToken?.trim() ?? null;
+    // Well-formed stored id token, refreshed first if it's about to expire.
+    const idToken = await getFreshIdToken();
     if (!idToken || !accessToken) return;
-    // Reject malformed tokens before they hit the API
-    const jwtRe = /^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+$/;
-    if (!jwtRe.test(idToken)) return;
 
     try {
       const res = await fetch(`${API_BASE}/auth/resolve`, {
@@ -206,7 +223,15 @@ export default function LoginScreen() {
 
       {canDismiss && (
         <TouchableOpacity style={styles.notNow} onPress={handleNotNow}>
-          <Text style={styles.notNowText}>Not now — keep browsing</Text>
+          <Text style={styles.notNowText}>
+            {from === 'age-gate' ? 'Back' : 'Not now — keep browsing'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {showContinueAsGuest && (
+        <TouchableOpacity style={styles.notNow} onPress={handleContinueAsGuest}>
+          <Text style={styles.notNowText}>Continue as guest</Text>
         </TouchableOpacity>
       )}
     </View>

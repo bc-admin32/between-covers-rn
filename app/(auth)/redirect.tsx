@@ -8,6 +8,7 @@ import { colors } from '../../lib/theme';
 import { track } from '../../lib/analytics';
 import { getAttribution, clearAttribution } from '../../lib/attribution';
 import { landAfterAuth } from '../../lib/guest';
+import { saveRefreshToken } from '../../lib/auth';
 import { setSessionKnown } from '../../lib/useGuest';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -120,7 +121,7 @@ export default function RedirectScreen() {
         }
 
         const tokenData = await tokenRes.json();
-        const { id_token: idToken, access_token: accessToken } = tokenData;
+        const { id_token: idToken, access_token: accessToken, refresh_token: refreshToken } = tokenData;
 
         if (!idToken || !accessToken) {
           setErrorCode('REDIRECT_MISSING_TOKENS');
@@ -131,6 +132,8 @@ export default function RedirectScreen() {
 
         await SecureStore.setItemAsync('bc_id_token', idToken);
         await SecureStore.setItemAsync('bc_access_token', accessToken);
+        // Lets lib/auth refresh the 1-day id/access tokens (180-day refresh).
+        await saveRefreshToken(refreshToken);
         setSessionKnown(true);
 
         try {

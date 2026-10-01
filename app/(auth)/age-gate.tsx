@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, BackHandler, Platform } from 
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { confirmAge, isGuestExpired } from '../../lib/guest';
+import { confirmAge, guestEntryRoute } from '../../lib/guest';
 import { spacing, radius } from '../../lib/theme';
 
 // First-launch 18+ confirmation. Blocks the app until confirmed; the
@@ -30,7 +30,20 @@ export default function AgeGateScreen() {
       setConfirming(false);
       return;
     }
-    router.replace(((await isGuestExpired()) ? '/(auth)/guest-paywall' : '/(tabs)/home') as any);
+    router.replace((await guestEntryRoute()) as any);
+  };
+
+  // Members skip the guest flow. Sign-in and sign-up are the same OAuth flow
+  // and onboarding has no age check of its own, so signing in from here
+  // counts as the 18+ confirmation (stated under the link).
+  const handleSignIn = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await confirmAge();
+    } catch {
+      return;
+    }
+    router.push('/(auth)/login?from=age-gate' as any);
   };
 
   return (
@@ -74,6 +87,17 @@ export default function AgeGateScreen() {
           </>
         )}
       </View>
+
+      {!declined && (
+        <View style={styles.memberRow}>
+          <TouchableOpacity onPress={handleSignIn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.memberText}>
+              Already a member? <Text style={styles.memberLink}>Sign in</Text>
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.memberNote}>By signing in, you confirm you're 18 or older.</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -142,5 +166,23 @@ const styles = StyleSheet.create({
     color: '#0F2A48',
     fontSize: 15,
     fontWeight: '500',
+  },
+  memberRow: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    gap: spacing.xs,
+  },
+  memberText: {
+    color: '#0F2A48',
+    fontSize: 14,
+  },
+  memberLink: {
+    color: '#B83255',
+    fontWeight: '600',
+  },
+  memberNote: {
+    color: '#6A5969',
+    fontSize: 12,
+    opacity: 0.8,
   },
 });

@@ -378,6 +378,17 @@ export default function HomeScreen() {
         {/* GREETING */}
         <Text style={styles.greeting}>{data.greeting.text}</Text>
 
+        {isGuest === true && (
+          <TouchableOpacity
+            style={styles.memberSignIn}
+            onPress={() => router.push('/(auth)/login?from=guest' as any)}
+          >
+            <Text style={styles.memberSignInText}>
+              Already a member? <Text style={styles.memberSignInLink}>Sign in</Text>
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* CENTER CONTENT */}
         <View style={styles.center}>
 
@@ -467,6 +478,15 @@ const styles = StyleSheet.create({
   retryButton: { paddingHorizontal: 28, paddingVertical: 10, borderRadius: 999, backgroundColor: '#B83255' },
   retryText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   content: { flex: 1, alignItems: 'center' },
+  memberSignIn: {
+    marginTop: spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+  },
+  memberSignInText: { fontSize: 13, color: '#0F2A48' },
+  memberSignInLink: { color: '#B83255', fontWeight: '600' },
   greeting: {
     fontSize: 34,
     color: '#fff',

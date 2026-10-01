@@ -55,6 +55,16 @@ export async function confirmAge(): Promise<void> {
   await SecureStore.setItemAsync(AGE_CONFIRMED_KEY, 'true');
 }
 
+// Where a user without a session enters the app: the 18+ gate until it's
+// confirmed, then guest mode for GUEST_DAYS from first launch, then the
+// sign-up-only guest paywall. Shared by launch (index.tsx), the age gate and
+// "Continue as guest" on login so the rules can't drift.
+export async function guestEntryRoute(): Promise<'/(auth)/age-gate' | '/(auth)/guest-paywall' | '/(tabs)/home'> {
+  if (!(await isAgeConfirmed())) return '/(auth)/age-gate';
+  if (await isGuestExpired()) return '/(auth)/guest-paywall';
+  return '/(tabs)/home';
+}
+
 // ── Return-to after sign-up ────────────────────────────────────────────────
 
 export async function setReturnTo(href: string): Promise<void> {

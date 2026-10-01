@@ -9,7 +9,6 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases, getResolvedPlatform } from '../../lib/iap-shim';
 import {
@@ -25,6 +24,7 @@ import {
 } from '../../lib/subscription';
 import { normalizeRoute } from '../../lib/routes';
 import { track } from '../../lib/analytics';
+import { getFreshIdToken } from '../../lib/auth';
 
 const TERMS_URL   = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/terms-of-use.html';
 const PRIVACY_URL = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaws.com/privacy-policy.html';
@@ -125,7 +125,7 @@ export default function HardPaywallScreen() {
 
         // 3. Route via the backend entitlement check, as today.
         try {
-          const token = await SecureStore.getItemAsync('bc_id_token');
+          const token = await getFreshIdToken();
           if (token) {
             const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
               method: 'POST',
@@ -201,7 +201,7 @@ export default function HardPaywallScreen() {
         // re-resolving, so a stale/missing record can self-heal.
         await writeSubscription(active);
         try {
-          const idToken = await SecureStore.getItemAsync('bc_id_token');
+          const idToken = await getFreshIdToken();
           if (idToken) {
             const resolveRes = await fetch('https://api.betweencovers.app/auth/resolve', {
               method: 'POST',

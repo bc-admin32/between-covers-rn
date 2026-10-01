@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { invalidatePendingRefresh, revokeRefreshToken } from './auth';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -8,6 +9,7 @@ const REDIRECT_URI = 'com.betweencovers.app://redirect';
 const AUTH_KEYS = [
   'bc_id_token',
   'bc_access_token',
+  'bc_refresh_token',
 ];
 
 // Per-user data — MUST be cleared on every sign-out regardless of
@@ -80,15 +82,22 @@ export async function signOut(opts: { force?: boolean } = {}): Promise<void> {
   }
 
   // Hard sign-out path: invalidate Cognito session AND wipe everything.
-  try {
-    const logoutUrl =
-      `${COGNITO_DOMAIN}/logout` +
-      `?client_id=${CLIENT_ID}` +
-      `&logout_uri=${encodeURIComponent(REDIRECT_URI)}`;
-    await fetch(logoutUrl, { method: 'GET' });
-  } catch {
-    // Not fatal — tokens are cleared locally regardless.
-  }
+  // A refresh already in flight must not write tokens back after the wipe.
+  invalidatePendingRefresh();
+  const logout = async () => {
+    try {
+      const logoutUrl =
+        `${COGNITO_DOMAIN}/logout` +
+        `?client_id=${CLIENT_ID}` +
+        `&logout_uri=${encodeURIComponent(REDIRECT_URI)}`;
+      await fetch(logoutUrl, { method: 'GET' });
+    } catch {
+      // Not fatal — tokens are cleared locally regardless.
+    }
+  };
+  // /logout only ends the hosted-UI browser session; revoking the refresh
+  // token stops it minting new id/access tokens. Both best-effort, in parallel.
+  await Promise.all([logout(), revokeRefreshToken()]);
 
   await Promise.all(
     [...AUTH_KEYS, ...BIOMETRIC_KEYS].map((key) =>

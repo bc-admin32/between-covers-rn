@@ -150,7 +150,13 @@ export default function ProfileScreen() {
       {
         text: 'Log Out', style: 'destructive',
         onPress: async () => {
-          await signOut();
+          // Explicit sign-out ends the session: hard wipe (tokens + biometric
+          // preference + Cognito /logout). A soft sign-out kept the tokens for
+          // Face ID re-entry, so the next launch silently signed back in and
+          // guest mode was unreachable. Face ID launch-unlock comes back after
+          // the next full sign-in (redirect.tsx restores it from the profile's
+          // biometricPreferred).
+          await signOut({ force: true });
           router.replace('/(auth)/login' as any);
         },
       },

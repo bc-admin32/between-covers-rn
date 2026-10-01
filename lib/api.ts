@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { ensureFresh, refreshSession, clearRefreshToken } from './auth';
 
 const API_BASE = 'https://api.betweencovers.app';
 
@@ -95,8 +96,24 @@ export class ApiError extends Error {
   }
 }
 
+// After a 401 on an authenticated call: the token to retry with, or null to
+// give up. If another call already refreshed (stored token differs from the
+// one we sent), reuse that; otherwise refresh once. A rejected refresh token
+// is dropped (no retry storm) but the user is NOT signed out mid-screen — the
+// original 401 surfaces, and the next launch routes the dead session to guest.
+async function tokenForRetry(sent: string): Promise<string | null> {
+  const current = await getToken();
+  if (current && current !== sent) return current;
+  const result = await refreshSession();
+  if (result === 'refreshed') return getToken();
+  if (result === 'rejected') await clearRefreshToken();
+  return null;
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = await getToken();
+  let token = await getToken();
+  // Proactive: refresh before sending if the id token is about to expire.
+  if (token) token = await ensureFresh(token);
 
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> ?? {}),
@@ -114,10 +131,23 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     url = rewritten;
   }
 
-  const res = await fetch(`${API_BASE}${url}`, {
+  let res = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers,
   });
+
+  // Reactive: refresh once and retry once. Guest calls send no token and
+  // never get here.
+  if (res.status === 401 && token) {
+    const retryToken = await tokenForRetry(token);
+    if (retryToken) {
+      headers['Authorization'] = `Bearer ${retryToken}`;
+      res = await fetch(`${API_BASE}${url}`, {
+        ...options,
+        headers,
+      });
+    }
+  }
 
   if (res.status === 204) return undefined as T;
 

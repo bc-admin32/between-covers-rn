@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { getFreshIdToken } from './auth';
 import {
   getResolvedPlatform,
   isGooglePlay,
@@ -75,7 +75,9 @@ export function isPaywallRoute(route: string | null | undefined): boolean {
  * fire-and-forget.
  */
 export async function writeSubscription(purchase: ShimPurchase): Promise<boolean> {
-  const idToken = await SecureStore.getItemAsync('bc_id_token');
+  // Refreshed if about to expire: a stale token here would 401 and leave a
+  // paid purchase unrecorded.
+  const idToken = await getFreshIdToken();
   if (!idToken) return false;
 
   const platform = getResolvedPlatform();
@@ -244,7 +246,7 @@ export async function reconcileAmazonPurchases(): Promise<boolean> {
  * returns null on any failure or when no route is given. Never throws.
  */
 export async function resolveEntitlementRoute(): Promise<string | null> {
-  const idToken = await SecureStore.getItemAsync('bc_id_token');
+  const idToken = await getFreshIdToken();
   if (!idToken) return null;
   try {
     const res = await fetch(`${API_BASE}/auth/resolve`, {
