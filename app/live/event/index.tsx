@@ -70,7 +70,7 @@ type ChatMessage = {
 
 // Guests are sent to sign-up before any authenticated call fires.
 export default function LiveEventScreen() {
-  if (useGuestRedirect('live')) return null;
+  if (useGuestRedirect('live', 'live_watch')) return null;
   return <LiveEventScreenInner />;
 }
 

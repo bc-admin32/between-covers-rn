@@ -441,7 +441,7 @@ export default function CozyEventsScreen() {
                     <TouchableOpacity
                       style={styles.primaryButton}
                       onPress={() => {
-                        if (requireAccount('live')) return;
+                        if (requireAccount('live', { source: 'live_watch' })) return;
                         if (event.eventLink) Linking.openURL(event.eventLink).catch(() => {});
                       }}
                       disabled={!event.eventLink}
@@ -455,14 +455,14 @@ export default function CozyEventsScreen() {
                     </TouchableOpacity>
                   )}
                   {showSubmitButton && (
-                    <TouchableOpacity style={styles.primaryButton} onPress={() => { if (!requireAccount('submit')) setModalTab('submit'); }}>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => { if (!requireAccount('submit', { source: 'cozy_event' })) setModalTab('submit'); }}>
                       <Text style={styles.primaryButtonText}>
                         {event.submissionType === 'song' ? '🎵 Request a Song' : '✦ Submit a Question'}
                       </Text>
                     </TouchableOpacity>
                   )}
                   {showVoteButton && (
-                    <TouchableOpacity style={styles.outlineButton} onPress={() => { if (!requireAccount('vote')) setModalTab('vote'); }}>
+                    <TouchableOpacity style={styles.outlineButton} onPress={() => { if (!requireAccount('vote', { source: 'cozy_event' })) setModalTab('vote'); }}>
                       <Text style={styles.outlineButtonText}>
                         {event.submissionType === 'song' ? 'Vote on Requests' : 'Vote on Questions'}
                       </Text>

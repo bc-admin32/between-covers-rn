@@ -255,7 +255,7 @@ export default function AuthorDetailScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.submitCard}
-            onPress={() => { if (!requireAccount('submission')) router.push('/submissions/author' as never); }}
+            onPress={() => { if (!requireAccount('submission', { source: 'submissions' })) router.push('/submissions/author' as never); }}
           >
             <Text style={styles.submitCardBody}>
               Know an author or narrator we should spotlight?

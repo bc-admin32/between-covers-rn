@@ -9,6 +9,14 @@ export type GateReason =
   | 'iris' | 'live' | 'rate' | 'profile' | 'submission' | 'feedback' | 'library'
   | 'expired';
 
+// signup_started.source on the login screen: which gated action sent the
+// guest there. Finer-grained than GateReason (which only picks login copy);
+// defaults to the reason when a call site doesn't pass one.
+export type SignupSource =
+  | 'lounge_react' | 'lounge_reply' | 'poll_vote' | 'confession' | 'monthly_submit'
+  | 'lounge_report' | 'iris_send' | 'live_watch' | 'live_rsvp' | 'cozy_rate'
+  | 'book_rate' | 'cozy_event' | 'profile' | 'submissions' | 'feedback' | 'library';
+
 // Last known session state, shared across hook instances so a newly mounted
 // screen doesn't start from "unknown". Refreshed on every mount.
 let lastKnownGuest: boolean | null = null;
@@ -47,11 +55,15 @@ export function useGuest() {
     return () => { cancelled = true; };
   }, []);
 
-  const requireAccount = useCallback((reason: GateReason, returnTo?: string): boolean => {
+  const requireAccount = useCallback((
+    reason: GateReason,
+    opts: { returnTo?: string; source?: SignupSource } = {},
+  ): boolean => {
     if (isGuest !== true) return false;
-    const href = returnTo ?? currentHref(pathname, params);
+    const href = opts.returnTo ?? currentHref(pathname, params);
+    const source = opts.source ?? reason;
     setReturnTo(href).finally(() => {
-      router.push(`/(auth)/login?gate=${reason}` as any);
+      router.push(`/(auth)/login?gate=${reason}&source=${source}` as any);
     });
     return true;
   }, [isGuest, pathname, params, router]);
@@ -64,7 +76,7 @@ export function useGuest() {
 // authenticated calls fire. Uses replace (not push) so "Not now" on login goes
 // back to wherever the guest came from rather than re-entering this gate.
 // Returns true while the screen must not render (session unknown, or guest).
-export function useGuestRedirect(reason: GateReason): boolean {
+export function useGuestRedirect(reason: GateReason, source: SignupSource | GateReason = reason): boolean {
   const router = useRouter();
   const pathname = usePathname();
   const params = useGlobalSearchParams();
@@ -73,7 +85,7 @@ export function useGuestRedirect(reason: GateReason): boolean {
   useEffect(() => {
     if (isGuest !== true) return;
     setReturnTo(currentHref(pathname, params)).finally(() => {
-      router.replace(`/(auth)/login?gate=${reason}` as any);
+      router.replace(`/(auth)/login?gate=${reason}&source=${source}` as any);
     });
     // Run once when guest status resolves; pathname/params are the entry URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps

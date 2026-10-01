@@ -3,6 +3,7 @@ import { useEvent } from 'expo';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { apiPost } from '../../lib/api';
 import { ensureFirstLaunchAt, landAfterAuth } from '../../lib/guest';
+import { track, takePendingSignup } from '../../lib/analytics';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +56,10 @@ export default function AboutScreen() {
       const firstLaunchAt = await ensureFirstLaunchAt();
       const res = await apiPost('/onboarding/submit', { step: 'L9Com', value: 'ACK', firstLaunchAt });
       if (res?.nextRoute) {
+        // Onboarding complete: the new account's signup_completed, held since
+        // redirect.tsx. Taking it clears it, so it can't fire twice.
+        const pending = await takePendingSignup();
+        if (pending) track('signup_completed', { ...pending, accountType: 'new' });
         await landAfterAuth(router, res.nextRoute);
         return;
       }

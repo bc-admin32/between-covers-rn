@@ -143,7 +143,7 @@ export default function LiveEventBanner() {
 
   const handlePress = async () => {
     if (!activeEvent) return;
-    if (requireAccount('live')) return;
+    if (requireAccount('live', { source: 'live_watch' })) return;
     const entry: PendingEntry = activeEvent.eventType === 'IRIS_LIVE'
       && activeEvent.rooms && activeEvent.rooms.length > 0
       ? { kind: 'lobby', eventId: activeEvent.eventId }

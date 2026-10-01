@@ -9,6 +9,7 @@ import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
 import { isPaywallRoute, reconcileAndroidPurchases, reconcileAmazonPurchases } from '../lib/subscription';
 import { ensureFirstLaunchAt, guestEntryRoute } from '../lib/guest';
+import { getGuestId } from '../lib/analytics';
 import { REFRESH_MARGIN_MS, refreshSession, readIdToken, tokenExpiresWithin } from '../lib/auth';
 
 const API_BASE = 'https://api.betweencovers.app';
@@ -136,6 +137,7 @@ export default function SplashScreen() {
         // Start the guest clock on the first run of this build (fresh and
         // existing installs alike). Never overwrites an existing value.
         await ensureFirstLaunchAt();
+        await getGuestId();
 
         const raw = await SecureStore.getItemAsync('bc_id_token');
         let idToken = raw?.trim() ?? null;

@@ -59,7 +59,20 @@ export default function LoginScreen() {
   const router = useRouter();
   // gate: a guest sent here by a gated action. from: a guest who chose
   // "Already a member? Sign in" on Home ('guest') or the age gate ('age-gate').
-  const { gate, from } = useLocalSearchParams<{ gate?: GateReason; from?: 'guest' | 'age-gate' }>();
+  const { gate, from, source } = useLocalSearchParams<{
+    gate?: GateReason;
+    from?: 'guest' | 'age-gate';
+    source?: string;
+  }>();
+  // signup_started.source: the gated action (passed by requireAccount), the
+  // "Already a member?" links, the guest paywall, or 'login' when there's no
+  // guest context (after Log Out, a failed sign-in, an expired session).
+  const signupSource =
+    source ??
+    (from === 'guest' ? 'guest_home_signin'
+      : from === 'age-gate' ? 'age_gate_signin'
+      : gate === 'expired' ? 'guest_paywall'
+      : gate ?? 'login');
   const gateCopy = gate ? GATE_COPY[gate] : undefined;
   // Guests sent here from guest mode can go back to it; guests whose preview
   // expired cannot.
@@ -152,7 +165,7 @@ export default function LoginScreen() {
       provider === 'Google' ? 'google'
       : provider === 'SignInWithApple' ? 'apple'
       : 'amazon';
-    track('signup_started', { method });
+    track('signup_started', { method, source: signupSource });
     const url = buildCognitoUrl(provider, method);
     const result = await WebBrowser.openAuthSessionAsync(url, REDIRECT_URI);
     if (result.type === 'success') {

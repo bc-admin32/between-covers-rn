@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { invalidatePendingRefresh, revokeRefreshToken } from './auth';
+import { resetAnalyticsForSignOut } from './analytics';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -23,10 +24,9 @@ const USER_DATA_KEYS = [
   'bc_last_day6_video_shown',
   'bc_biometric_prompt_pending',
   'bc_biometric_prompt_dismissed',
-  'bc_event_buffer_v1',
-  'bc_session_id_v1',
   'bc_guest_return_to',
   'bc_pending_iris_msg',
+  'bc_pending_signup',
 ];
 
 // Biometric preference — only cleared on hard sign-out
@@ -82,6 +82,10 @@ export async function signOut(opts: { force?: boolean } = {}): Promise<void> {
   }
 
   // Hard sign-out path: invalidate Cognito session AND wipe everything.
+  // Analytics first, while the token is still valid: flush the buffer
+  // (best-effort, short timeout), then reset bc_session_id_v1 and
+  // bc_event_buffer_v1 — they live in AsyncStorage, not SecureStore.
+  await resetAnalyticsForSignOut();
   // A refresh already in flight must not write tokens back after the wipe.
   invalidatePendingRefresh();
   const logout = async () => {

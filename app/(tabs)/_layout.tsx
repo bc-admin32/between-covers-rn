@@ -114,7 +114,7 @@ export default function TabLayout() {
         name="profile"
         listeners={{
           tabPress: (e) => {
-            if (requireAccount('profile', '/profile')) e.preventDefault();
+            if (requireAccount('profile', { returnTo: '/profile' })) e.preventDefault();
           },
         }}
         options={{

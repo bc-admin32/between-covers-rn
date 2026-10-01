@@ -52,7 +52,7 @@ export default function MonthlySubmitScreen() {
 
   const handleSubmit = async () => {
     if (submitting || !text.trim() || !promptId) return;
-    if (requireAccount('submit')) return;
+    if (requireAccount('submit', { source: 'monthly_submit' })) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSubmitting(true);
     setSubmitError(null);

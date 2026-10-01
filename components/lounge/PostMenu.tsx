@@ -77,7 +77,7 @@ export default function PostMenu({
         style={styles.trigger}
         onPress={() => {
           // Every menu action (report, block) needs an account.
-          if (requireAccount('report')) return;
+          if (requireAccount('report', { source: 'lounge_report' })) return;
           Haptics.selectionAsync();
           setMenuOpen(true);
         }}

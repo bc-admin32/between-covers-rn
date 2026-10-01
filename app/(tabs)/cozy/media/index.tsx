@@ -129,7 +129,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   async function handleVerdictSelect(verdictKey: string) {
     if (!item.movieId || savingRating) return;
     // Close the sheet first — a native Modal would otherwise cover sign-in.
-    if (isGuest) { onClose(); requireAccount('rate'); return; }
+    if (isGuest) { onClose(); requireAccount('rate', { source: 'cozy_rate' }); return; }
     setSavingRating(true);
     try {
       const res: any = await apiPost(`/cozy/media/${item.movieId}/rate`, { verdict: verdictKey });

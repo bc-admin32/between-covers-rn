@@ -240,7 +240,7 @@ export default function LoungeThreadScreen() {
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
     if (!threadId) return;
-    if (requireAccount('react')) return;
+    if (requireAccount('react', { source: 'lounge_react' })) return;
     setReplies((prev) => prev.map((r) => {
       if (r.replyId !== replyId) return r;
       const existing = r.reactions.find((rx) => rx.emoji === emoji);
@@ -253,20 +253,20 @@ export default function LoungeThreadScreen() {
   }, [threadId, requireAccount]);
 
   const handleReplyTo = useCallback((reply: Reply) => {
-    if (requireAccount('reply')) return;
+    if (requireAccount('reply', { source: 'lounge_reply' })) return;
     Haptics.selectionAsync();
     setReplyingTo(reply);
   }, [requireAccount]);
 
   const handleEdit = useCallback((reply: Reply) => {
-    if (requireAccount('reply')) return;
+    if (requireAccount('reply', { source: 'lounge_reply' })) return;
     setEditingReply(reply);
     setEditText(reply.body ?? '');
   }, [requireAccount]);
 
   const submitReply = async () => {
     if (submitting || !text.trim()) return;
-    if (requireAccount('reply')) return;
+    if (requireAccount('reply', { source: 'lounge_reply' })) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     setSubmitError(null);
@@ -306,7 +306,7 @@ export default function LoungeThreadScreen() {
 
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
-    if (requireAccount('reply')) return;
+    if (requireAccount('reply', { source: 'lounge_reply' })) return;
     setEditError(null);
     setEditSubmitting(true);
     try {

@@ -144,7 +144,7 @@ export default function LoungeScreen() {
 
   const handleVote = async (pollId: string, optionId: string) => {
     if (pollSubmitting) return;
-    if (requireAccount('vote')) return;
+    if (requireAccount('vote', { source: 'poll_vote' })) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedOption(optionId);
     setPollSubmitting(true);

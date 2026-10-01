@@ -17,7 +17,7 @@ export default function GuestPaywallScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    track('paywall_shown', { type: 'guest', source: 'guest_expired' });
+    track('paywall_shown', { type: 'guest', source: 'day7' });
     // Signing up from here starts fresh — not a return to an earlier gate.
     clearGuestIntent();
   }, []);
@@ -30,7 +30,7 @@ export default function GuestPaywallScreen() {
 
   const goLogin = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(auth)/login?gate=expired' as any);
+    router.push('/(auth)/login?gate=expired&source=guest_paywall' as any);
   };
 
   return (

@@ -5,7 +5,8 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
-import { track } from '../../lib/analytics';
+import { track, setPendingSignup } from '../../lib/analytics';
+import { normalizeRoute } from '../../lib/routes';
 import { getAttribution, clearAttribution } from '../../lib/attribution';
 import { landAfterAuth } from '../../lib/guest';
 import { saveRefreshToken } from '../../lib/auth';
@@ -188,25 +189,31 @@ export default function RedirectScreen() {
         setStatus(`Routing to ${result?.nextRoute}…`);
 
         if (result?.nextRoute?.startsWith('/')) {
-          // Fire signup_completed only when this OAuth flow lands a new user
-          // in onboarding — returning logins skip the event.
-          if (typeof result.nextRoute === 'string' && result.nextRoute.includes('(onboarding)')) {
-            // Provider rides on OAuth `state`, which round-trips on the redirect
-            // URL regardless of whether WebBrowser or Linking delivered it, so
-            // method is deterministic on both paths. params.method kept as a
-            // legacy fallback.
-            const method =
-              (params.state as string | undefined) ??
-              (params.method as string | undefined) ??
-              'unknown';
-            const attr = await getAttribution();
-            const payload = {
-              method,
-              ...(attr ? { acquisitionType: attr.type, ...(attr.campaign ? { acquisitionCampaign: attr.campaign } : {}) } : {})
-            };
-            track('signup_completed', payload);
-            if (attr) await clearAttribution();
+          // signup_completed fires exactly once per sign-in:
+          //   existing account → here, now (accountType 'existing').
+          //   new account (routed into onboarding) → held, and fired by
+          //     (onboarding)/about.tsx once L9Com completes (accountType 'new').
+          // The backend sends bare routes ("/onboarding/name"), so compare the
+          // normalized route; the old includes('(onboarding)') never matched.
+          // Provider rides on OAuth `state`, which round-trips on the redirect
+          // URL regardless of whether WebBrowser or Linking delivered it, so
+          // method is deterministic on both paths. params.method kept as a
+          // legacy fallback.
+          const method =
+            (params.state as string | undefined) ??
+            (params.method as string | undefined) ??
+            'unknown';
+          const attr = await getAttribution();
+          const payload = {
+            method,
+            ...(attr ? { acquisitionType: attr.type, ...(attr.campaign ? { acquisitionCampaign: attr.campaign } : {}) } : {})
+          };
+          if (normalizeRoute(result.nextRoute).startsWith('/(onboarding)')) {
+            await setPendingSignup(payload);
+          } else {
+            track('signup_completed', { ...payload, accountType: 'existing' });
           }
+          if (attr) await clearAttribution();
           // Nav latch: enter the app at most once across instances.
           if (!navigatedIntoApp) {
             navigatedIntoApp = true;

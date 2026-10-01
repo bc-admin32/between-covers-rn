@@ -154,7 +154,7 @@ export default function LiveEventsScreen() {
                 <TouchableOpacity
                   style={styles.joinButton}
                   onPress={() => {
-                    if (requireAccount('live')) return;
+                    if (requireAccount('live', { source: 'live_watch' })) return;
                     if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms?.length) {
                       setLobbyEventId(activeEvent.eventId);
                       setLobbyOpen(true);
@@ -202,7 +202,7 @@ export default function LiveEventsScreen() {
                     <TouchableOpacity
                       style={styles.rsvpButton}
                       onPress={() => {
-                        if (requireAccount('live')) return;
+                        if (requireAccount('live', { source: 'live_rsvp' })) return;
                         router.push(`/live/event?eventId=${event.eventId}` as any);
                       }}
                     >

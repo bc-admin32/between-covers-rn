@@ -96,7 +96,7 @@ export default function MonthlyWallScreen() {
   }, [promptId]);
 
   const handleReact = useCallback(async (sk: string, emoji: string) => {
-    if (requireAccount('react')) return;
+    if (requireAccount('react', { source: 'confession' })) return;
     setSubmissions((prev) => prev.map((s) => {
       if (s.sk !== sk) return s;
       const existing = s.reactions?.find((r) => r.emoji === emoji);

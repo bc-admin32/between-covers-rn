@@ -201,7 +201,7 @@ export default function IrisThoughtsScreen() {
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
     if (!threadId) return;
-    if (requireAccount('react')) return;
+    if (requireAccount('react', { source: 'lounge_react' })) return;
     setReplies((prev) => prev.map((r) => {
       if (r.replyId !== replyId) return r;
       const existing = r.reactions.find((rx) => rx.emoji === emoji);
@@ -215,7 +215,7 @@ export default function IrisThoughtsScreen() {
 
   const submitReply = async () => {
     if (submitting || !text.trim() || !threadId) return;
-    if (requireAccount('reply')) return;
+    if (requireAccount('reply', { source: 'lounge_reply' })) return;
     setSubmitting(true);
     setSubmitError(null);
     setShowEmojiTray(false);

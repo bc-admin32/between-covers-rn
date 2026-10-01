@@ -109,7 +109,7 @@ export default function IrisChatScreen() {
     // input and in storage) and send it automatically after sign-up.
     if (isGuest === true) {
       await setPendingIrisMessage(text);
-      requireAccount('iris');
+      requireAccount('iris', { source: 'iris_send' });
       return;
     }
 

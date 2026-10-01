@@ -276,7 +276,7 @@ export default function CozyItemsScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.submitCard}
-            onPress={() => { if (!requireAccount('submission')) router.push('/submissions/recipe' as any); }}
+            onPress={() => { if (!requireAccount('submission', { source: 'submissions' })) router.push('/submissions/recipe' as any); }}
           >
             <Text style={styles.submitCardBody}>
               Have a recipe that pairs perfectly with your favorite read?

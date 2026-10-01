@@ -57,7 +57,7 @@ type FormType = 'recipe' | 'author';
 
 // Guests are sent to sign-up before any authenticated call fires.
 export default function SubmissionForm() {
-  if (useGuestRedirect('submission')) return null;
+  if (useGuestRedirect('submission', 'submissions')) return null;
   return <SubmissionFormInner />;
 }
 

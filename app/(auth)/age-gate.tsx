@@ -4,7 +4,12 @@ import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { confirmAge, guestEntryRoute } from '../../lib/guest';
+import { track } from '../../lib/analytics';
 import { spacing, radius } from '../../lib/theme';
+
+// age_gate_confirmed is on the backend allowlist (unknown event names are
+// dropped server-side). Flip to false to stop sending it.
+const SEND_AGE_GATE_CONFIRMED = true;
 
 // First-launch 18+ confirmation. Blocks the app until confirmed; the
 // confirmation is stored in SecureStore (bc_age_confirmed) and never asked
@@ -30,6 +35,7 @@ export default function AgeGateScreen() {
       setConfirming(false);
       return;
     }
+    if (SEND_AGE_GATE_CONFIRMED) track('age_gate_confirmed');
     router.replace((await guestEntryRoute()) as any);
   };
 

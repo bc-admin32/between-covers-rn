@@ -250,7 +250,7 @@ export default function BookDetailsScreen() {
 
   async function handleVerdictChange(value: Verdict) {
     if (savingRating) return;
-    if (requireAccount('rate')) return;
+    if (requireAccount('rate', { source: 'book_rate' })) return;
     if (value === 'chefs_kiss') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     else if (value === 'trash') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     else await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -499,7 +499,7 @@ export default function BookDetailsScreen() {
               <View style={styles.tagSection}>
                 <TouchableOpacity
                   style={styles.tagButton}
-                  onPress={() => { if (!requireAccount('rate')) setTagModalVisible(true); }}
+                  onPress={() => { if (!requireAccount('rate', { source: 'book_rate' })) setTagModalVisible(true); }}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.tagButtonText}>
