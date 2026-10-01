@@ -7,7 +7,8 @@ import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import QuickRatingModal from '../../../../components/QuickRatingModal';
 
@@ -57,6 +58,19 @@ type Submission = {
 };
 
 type ModalTab = 'submit' | 'vote';
+
+// Guests can't call /cozy/events/status; the public /live/active tells us
+// whether something is live (no viewer count or playback URLs).
+async function fetchGuestStatus(): Promise<EventStatus> {
+  const res = await apiGet<{ isLive: boolean }>('/live/active');
+  return {
+    isLive: res.isLive === true,
+    viewerCount: 0,
+    playbackUrl: null,
+    replayUrl: null,
+    playerState: res.isLive ? 'live' : 'offline',
+  };
+}
 
 function formatEventDate(dateStr?: string): string {
   if (!dateStr) return '';
@@ -293,12 +307,16 @@ export default function CozyEventsScreen() {
   const [liveEvent, setLiveEvent] = useState<LiveEventDetails | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const eventIdRef = useRef<string | undefined>(undefined);
+  const { isGuest, requireAccount } = useGuest();
 
   useEffect(() => {
+    const guestPromise = hasSession().then((signedIn) => !signedIn);
+
     async function load() {
       try {
+        const guest = await guestPromise;
         const [statusRes, homeRes] = await Promise.all([
-          apiGet('/cozy/events/status'),
+          guest ? fetchGuestStatus() : apiGet('/cozy/events/status'),
           apiGet('/cozy/home'),
         ]);
         setStatus(statusRes);
@@ -312,6 +330,10 @@ export default function CozyEventsScreen() {
 
     const interval = setInterval(async () => {
       try {
+        if (await guestPromise) {
+          setStatus(await fetchGuestStatus());
+          return;
+        }
         const statusRes = await apiGet('/cozy/events/status');
         setStatus(statusRes);
         if (eventIdRef.current) {
@@ -329,11 +351,12 @@ export default function CozyEventsScreen() {
   }, [event?.eventId]);
 
   useEffect(() => {
-    if (!event?.eventId) return;
+    // /live/:eventId needs an account; guests never get the rating prompt.
+    if (!event?.eventId || isGuest !== false) return;
     apiGet<{ event: LiveEventDetails }>(`/live/${event.eventId}`)
       .then((res) => setLiveEvent(res.event))
       .catch(() => {});
-  }, [event?.eventId]);
+  }, [event?.eventId, isGuest]);
 
   useEffect(() => {
     if (liveEvent?.ratingPrompt?.show === true) {
@@ -417,7 +440,10 @@ export default function CozyEventsScreen() {
                   {buttonState !== 'coming_soon' && buttonState !== 'submit_questions' && !showSubmitButton && (
                     <TouchableOpacity
                       style={styles.primaryButton}
-                      onPress={() => event.eventLink && Linking.openURL(event.eventLink).catch(() => {})}
+                      onPress={() => {
+                        if (requireAccount('live')) return;
+                        if (event.eventLink) Linking.openURL(event.eventLink).catch(() => {});
+                      }}
                       disabled={!event.eventLink}
                     >
                       <Text style={styles.primaryButtonText}>
@@ -429,14 +455,14 @@ export default function CozyEventsScreen() {
                     </TouchableOpacity>
                   )}
                   {showSubmitButton && (
-                    <TouchableOpacity style={styles.primaryButton} onPress={() => setModalTab('submit')}>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => { if (!requireAccount('submit')) setModalTab('submit'); }}>
                       <Text style={styles.primaryButtonText}>
                         {event.submissionType === 'song' ? '🎵 Request a Song' : '✦ Submit a Question'}
                       </Text>
                     </TouchableOpacity>
                   )}
                   {showVoteButton && (
-                    <TouchableOpacity style={styles.outlineButton} onPress={() => setModalTab('vote')}>
+                    <TouchableOpacity style={styles.outlineButton} onPress={() => { if (!requireAccount('vote')) setModalTab('vote'); }}>
                       <Text style={styles.outlineButtonText}>
                         {event.submissionType === 'song' ? 'Vote on Requests' : 'Vote on Questions'}
                       </Text>

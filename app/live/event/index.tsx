@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { apiGet, apiPost, ApiError } from '../../../lib/api';
+import { useGuestRedirect } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import QuickRatingModal from '../../../components/QuickRatingModal';
 import type { LiveRoom } from '../../../lib/types';
@@ -67,7 +68,13 @@ type ChatMessage = {
   photoUrl?: string;
 };
 
+// Guests are sent to sign-up before any authenticated call fires.
 export default function LiveEventScreen() {
+  if (useGuestRedirect('live')) return null;
+  return <LiveEventScreenInner />;
+}
+
+function LiveEventScreenInner() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { eventId } = useLocalSearchParams<{ eventId: string }>();

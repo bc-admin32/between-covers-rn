@@ -3,11 +3,12 @@ import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'rea
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { normalizeRoute } from '../../lib/routes';
 import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
 import { track } from '../../lib/analytics';
 import { getAttribution, clearAttribution } from '../../lib/attribution';
+import { landAfterAuth } from '../../lib/guest';
+import { setSessionKnown } from '../../lib/useGuest';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -64,7 +65,8 @@ export default function RedirectScreen() {
                 // Nav latch: enter the app at most once across instances.
                 if (!navigatedIntoApp) {
                   navigatedIntoApp = true;
-                  router.replace(normalizeRoute(result.nextRoute) as any);
+                  setSessionKnown(true);
+                  await landAfterAuth(router, result.nextRoute);
                 }
                 return true;
               }
@@ -129,6 +131,7 @@ export default function RedirectScreen() {
 
         await SecureStore.setItemAsync('bc_id_token', idToken);
         await SecureStore.setItemAsync('bc_access_token', accessToken);
+        setSessionKnown(true);
 
         try {
           const profileRes = await fetch(`${API_BASE}/profile`, {
@@ -204,7 +207,7 @@ export default function RedirectScreen() {
           // Nav latch: enter the app at most once across instances.
           if (!navigatedIntoApp) {
             navigatedIntoApp = true;
-            router.replace(normalizeRoute(result.nextRoute) as any);
+            await landAfterAuth(router, result.nextRoute);
           }
         } else {
           setErrorCode('REDIRECT_INVALID_NEXT_ROUTE');

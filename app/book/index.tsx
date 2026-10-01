@@ -12,7 +12,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
+import { apiGet, apiPost, apiPatch, apiDelete, hasSession } from '../../lib/api';
+import { getGuestBook, saveGuestBook, updateGuestBookStatus, removeGuestBook } from '../../lib/guest';
+import { useGuest } from '../../lib/useGuest';
 import { track } from '../../lib/analytics';
 import { maybeRequestReview } from '../../lib/reviewPrompt';
 import { getFinishedBookPromptEnabled } from '../../lib/finishedBookPromptPreference';
@@ -111,11 +113,28 @@ export default function BookDetailsScreen() {
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
   const [savingRating, setSavingRating] = useState(false);
   const [tagModalVisible, setTagModalVisible] = useState(false);
+  const { requireAccount } = useGuest();
 
   useEffect(() => {
     async function load() {
       try {
         const res = await apiGet<BookDetailResponse>(`/library/${workId}`);
+        // Guest responses always have libraryItem: null — overlay the
+        // on-device save, if any.
+        if (!(await hasSession())) {
+          const saved = await getGuestBook(workId);
+          if (saved) {
+            res.libraryItem = {
+              status: saved.status,
+              rating: null,
+              userSpiceLevel: null,
+              userTriggers: [],
+              userTropes: [],
+              userTaggedAt: null,
+              finishedAt: null,
+            };
+          }
+        }
         setData(res);
         setUserCommunityRating((res.userCommunityRating as Verdict) ?? null);
         setRatingSummary(res.ratingSummary ?? null);
@@ -134,13 +153,27 @@ export default function BookDetailsScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setAdding(true);
     try {
-      await apiPost('/library/add', {
-        workId: data.work.workId,
-        title: data.work.title,
-        primaryAuthor: data.work.primaryAuthor,
-        coverUrl: data.work.coverUrl,
-        status,
-      });
+      const guest = !(await hasSession());
+      if (guest) {
+        // Saved on-device; lib/guest flushes it via this same /library/add
+        // payload after sign-up.
+        await saveGuestBook({
+          workId: data.work.workId,
+          title: data.work.title,
+          primaryAuthor: data.work.primaryAuthor,
+          coverUrl: data.work.coverUrl,
+          status,
+          triggers: data.work.triggers ?? undefined,
+        });
+      } else {
+        await apiPost('/library/add', {
+          workId: data.work.workId,
+          title: data.work.title,
+          primaryAuthor: data.work.primaryAuthor,
+          coverUrl: data.work.coverUrl,
+          status,
+        });
+      }
       track('book_added_to_library', {
         workId: data.work.workId,
         status,
@@ -162,7 +195,8 @@ export default function BookDetailsScreen() {
             }
           : prev,
       );
-      if (status === 'FINISHED') {
+      // Tagging (PATCH /library/:workId) needs an account.
+      if (status === 'FINISHED' && !guest) {
         if (await getFinishedBookPromptEnabled()) {
           setTagModalVisible(true);
         }
@@ -181,11 +215,13 @@ export default function BookDetailsScreen() {
   async function updateStatus(status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED') {
     const wasFinished = data?.libraryItem?.status === 'FINISHED';
     try {
-      await apiPatch(`/library/${workId}`, { status });
+      const guest = !(await hasSession());
+      if (guest) await updateGuestBookStatus(workId, status);
+      else await apiPatch(`/library/${workId}`, { status });
       setData((prev) =>
         prev && prev.libraryItem ? { ...prev, libraryItem: { ...prev.libraryItem, status } } : prev
       );
-      if (status === 'FINISHED' && !wasFinished) {
+      if (status === 'FINISHED' && !wasFinished && !guest) {
         if (await getFinishedBookPromptEnabled()) {
           setTagModalVisible(true);
         }
@@ -201,7 +237,8 @@ export default function BookDetailsScreen() {
         text: 'Remove', style: 'destructive',
         onPress: async () => {
           try {
-            await apiDelete(`/library/${workId}`);
+            if (await hasSession()) await apiDelete(`/library/${workId}`);
+            else await removeGuestBook(workId);
             handleBack();
           } catch {
             Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
@@ -213,6 +250,7 @@ export default function BookDetailsScreen() {
 
   async function handleVerdictChange(value: Verdict) {
     if (savingRating) return;
+    if (requireAccount('rate')) return;
     if (value === 'chefs_kiss') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     else if (value === 'trash') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     else await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -239,7 +277,9 @@ export default function BookDetailsScreen() {
       validationStatus,
       isFallback,
     });
-    try { await apiPatch('/profile', { preferredRetailer: profileId }); } catch {}
+    if (await hasSession()) {
+      try { await apiPatch('/profile', { preferredRetailer: profileId }); } catch {}
+    }
     // Backend builds the full retailer URL (including any affiliate tags
     // and deep links). Frontend opens whatever URL it receives.
     await WebBrowser.openBrowserAsync(url);
@@ -276,7 +316,8 @@ export default function BookDetailsScreen() {
                     text: 'Remove', style: 'destructive',
                     onPress: async () => {
                       try {
-                        await apiDelete(`/library/${workId}`);
+                        if (await hasSession()) await apiDelete(`/library/${workId}`);
+                        else await removeGuestBook(workId);
                         handleBack();
                       } catch {
                         Alert.alert('Something went wrong', 'Could not remove this book. Please try again.');
@@ -458,7 +499,7 @@ export default function BookDetailsScreen() {
               <View style={styles.tagSection}>
                 <TouchableOpacity
                   style={styles.tagButton}
-                  onPress={() => setTagModalVisible(true)}
+                  onPress={() => { if (!requireAccount('rate')) setTagModalVisible(true); }}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.tagButtonText}>

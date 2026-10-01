@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, BackHandler } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -10,6 +10,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../lib/theme';
 import { track } from '../../lib/analytics';
+import { clearGuestIntent } from '../../lib/guest';
+import type { GateReason } from '../../lib/useGuest';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -33,8 +35,47 @@ function buildCognitoUrl(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApp
   return `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
 }
 
+// Context line shown when a guest is sent here by a gated action.
+const GATE_COPY: Record<GateReason, string> = {
+  reply: 'Create a free account to join the conversation.',
+  react: 'Create a free account to react to posts.',
+  vote: 'Create a free account to cast your vote.',
+  submit: 'Create a free account to share your submission.',
+  report: 'Create a free account to report posts.',
+  block: 'Create a free account to block members.',
+  iris: "Create a free account to chat with Iris — we'll send your message as soon as you're in.",
+  live: 'Create a free account to join live events.',
+  rate: 'Create a free account to rate.',
+  profile: 'Create a free account to set up your profile.',
+  submission: 'Create a free account to send a submission.',
+  feedback: 'Create a free account to share feedback.',
+  library: 'Create a free account to keep your library.',
+  expired: 'Create a free account or sign in to keep reading.',
+};
+
 export default function LoginScreen() {
   const router = useRouter();
+  const { gate } = useLocalSearchParams<{ gate?: GateReason }>();
+  const gateCopy = gate ? GATE_COPY[gate] : undefined;
+  // Guests sent here by a gated action can go back to browsing; guests whose
+  // preview expired cannot.
+  const canDismiss = !!gate && gate !== 'expired';
+
+  const handleNotNow = () => {
+    clearGuestIntent();
+    // A deep-linked gate (useGuestRedirect) may have no history to return to.
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/home');
+  };
+
+  useEffect(() => {
+    if (!canDismiss) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleNotNow();
+      return true;
+    });
+    return () => sub.remove();
+  }, [canDismiss]);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -123,6 +164,8 @@ export default function LoginScreen() {
 
       <Text style={styles.tagline}>A cozy escape into romance</Text>
 
+      {gateCopy && <Text style={styles.gateCopy}>{gateCopy}</Text>}
+
       {biometricAvailable && hasSavedCredentials && (
         <View style={styles.biometricContainer}>
           <TouchableOpacity style={styles.biometricButton} onPress={handleBiometricLogin}>
@@ -160,6 +203,12 @@ export default function LoginScreen() {
           <Text style={styles.socialButtonText}>Continue with Google</Text>
         </TouchableOpacity>
       </View>
+
+      {canDismiss && (
+        <TouchableOpacity style={styles.notNow} onPress={handleNotNow}>
+          <Text style={styles.notNowText}>Not now — keep browsing</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -182,6 +231,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: spacing.xl,
     opacity: 0.8,
+  },
+  gateCopy: {
+    color: '#0F2A48',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: -spacing.md,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  notNow: {
+    marginTop: spacing.lg,
+    padding: spacing.sm,
+  },
+  notNowText: {
+    color: '#B83255',
+    fontSize: 14,
+    fontWeight: '600',
   },
   biometricContainer: {
     width: '100%',

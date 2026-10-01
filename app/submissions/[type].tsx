@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost } from '../../lib/api';
+import { useGuestRedirect } from '../../lib/useGuest';
 import { signOut } from '../../lib/signout';
 import { spacing } from '../../lib/theme';
 
@@ -54,7 +55,13 @@ function isValidUrl(v: string): boolean {
 
 type FormType = 'recipe' | 'author';
 
+// Guests are sent to sign-up before any authenticated call fires.
 export default function SubmissionForm() {
+  if (useGuestRedirect('submission')) return null;
+  return <SubmissionFormInner />;
+}
+
+function SubmissionFormInner() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string }>();

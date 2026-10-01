@@ -7,6 +7,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
 import { isPaywallRoute, reconcileAndroidPurchases, reconcileAmazonPurchases } from '../lib/subscription';
+import { ensureFirstLaunchAt, isAgeConfirmed, isGuestExpired } from '../lib/guest';
 
 const API_BASE = 'https://api.betweencovers.app';
 const MIN_SPLASH_TIME = 1600;
@@ -56,6 +57,10 @@ export default function SplashScreen() {
       };
 
       try {
+        // Start the guest clock on the first run of this build (fresh and
+        // existing installs alike). Never overwrites an existing value.
+        await ensureFirstLaunchAt();
+
         const raw = await SecureStore.getItemAsync('bc_id_token');
         const idToken = raw?.trim() ?? null;
 
@@ -125,12 +130,24 @@ export default function SplashScreen() {
           // would leave it in place and trigger the same /auth/resolve failure
           // on every Face ID re-entry. Fall through to login after the wipe.
           await signOut({ force: true });
-        } else {
-          await waitForSplash();
+          goLogin();
+          return;
         }
 
-        // ── NEW / LOGGED-OUT USER ────────────────────────────────────────
-        goLogin();
+        await waitForSplash();
+
+        // ── GUEST (no token) ─────────────────────────────────────────────
+        // 18+ gate first, then guest browsing for GUEST_DAYS from first
+        // launch, then the sign-up-only guest paywall.
+        if (!(await isAgeConfirmed())) {
+          router.replace('/(auth)/age-gate' as any);
+          return;
+        }
+        if (await isGuestExpired()) {
+          router.replace('/(auth)/guest-paywall' as any);
+          return;
+        }
+        router.replace('/(tabs)/home');
       } catch {
         goLogin();
       }

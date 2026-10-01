@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { apiGet, apiPost } from '../../../lib/api';
+import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
 
@@ -28,6 +29,9 @@ type LoungeData = {
   active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
   loungeTermsAcceptedAt?: string | null;
+  // Set by the /guest/lounge/resolve mirror. Guests never see the terms
+  // prompt (loungeTermsAcceptedAt is always null for them).
+  isGuest?: boolean;
   // Populated when the current user has been temporarily restricted from
   // Lounge participation by an admin. The backend /lounge/resolve handler
   // must surface these from the user's DDB row for the restricted view to
@@ -68,6 +72,7 @@ function Divider() {
 
 export default function LoungeScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<LoungeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,7 +97,7 @@ export default function LoungeScreen() {
         loungeCache = res;
         setData(res);
         console.log('[Lounge] loungeTermsAcceptedAt from API:', res.loungeTermsAcceptedAt);
-        if (!res.loungeTermsAcceptedAt) setEulaModal(true);
+        if (!res.loungeTermsAcceptedAt && !res.isGuest) setEulaModal(true);
         const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
         if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
       } catch {
@@ -111,7 +116,7 @@ export default function LoungeScreen() {
   // the user accepts, the modal won't reappear.
   useFocusEffect(
     useCallback(() => {
-      if (data && !data.loungeTermsAcceptedAt) {
+      if (data && !data.loungeTermsAcceptedAt && !data.isGuest) {
         setEulaModal(true);
       }
     }, [data])
@@ -139,6 +144,7 @@ export default function LoungeScreen() {
 
   const handleVote = async (pollId: string, optionId: string) => {
     if (pollSubmitting) return;
+    if (requireAccount('vote')) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedOption(optionId);
     setPollSubmitting(true);

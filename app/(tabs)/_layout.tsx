@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../../lib/api';
 import { registerForPushNotifications } from '../../lib/pushNotifications';
+import { useGuest } from '../../lib/useGuest';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   HouseSimple,
@@ -40,6 +41,7 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 export default function TabLayout() {
   const [hasLiveEvent, setHasLiveEvent] = useState(false);
   const insets = useSafeAreaInsets();
+  const { isGuest, requireAccount } = useGuest();
 
   useEffect(() => {
     apiGet<{ events: { status: string }[] }>('/live?status=ACTIVE')
@@ -47,9 +49,11 @@ export default function TabLayout() {
       .catch(() => {});
   }, []);
 
+  // Push registration needs an account (and guests shouldn't get the
+  // permission prompt), so wait until we know this is a signed-in user.
   useEffect(() => {
-    registerForPushNotifications();
-  }, []);
+    if (isGuest === false) registerForPushNotifications();
+  }, [isGuest]);
 
   return (
     <Tabs
@@ -108,6 +112,11 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="profile"
+        listeners={{
+          tabPress: (e) => {
+            if (requireAccount('profile', '/profile')) e.preventDefault();
+          },
+        }}
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (

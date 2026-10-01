@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Image, ActivityIndicator,
@@ -6,7 +6,9 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { apiGet } from '../../../lib/api';
+import { apiGet, hasSession } from '../../../lib/api';
+import { getGuestBooks, type GuestBook } from '../../../lib/guest';
+import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate } from '../../../lib/dateUtils';
 import { groupBooksBySubgenre } from '../../../lib/tagTaxonomy';
@@ -39,6 +41,34 @@ type LibrarySnapshotResponse = {
   snapshot: LibrarySnapshot;
 };
 
+// Guest library: books saved on-device (lib/guest), filtered and sorted
+// locally since guests can't call /library or /library/snapshot.
+function guestSnapshot(books: GuestBook[]): LibrarySnapshot {
+  return {
+    reading: books.filter((b) => b.status === 'CURRENTLY_READING').length,
+    wishlist: books.filter((b) => b.status === 'WANT_TO_READ').length,
+    finished: books.filter((b) => b.status === 'FINISHED').length,
+  };
+}
+
+function guestItems(books: GuestBook[], status: LibraryItem['status'] | null, asc: boolean): LibraryItem[] {
+  return books
+    .filter((b) => !status || b.status === status)
+    .sort((a, b) => (asc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)))
+    .map((b) => ({
+      workId: b.workId,
+      title: b.title,
+      primaryAuthor: b.primaryAuthor,
+      coverUrl: b.coverUrl ?? '',
+      status: b.status,
+      spice: b.spice,
+      spiceLevel: b.spiceLevel,
+      tropes: b.tropes,
+      primarySubgenre: b.primarySubgenre,
+      triggers: b.triggers,
+    }));
+}
+
 export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -49,10 +79,23 @@ export default function LibraryScreen() {
   const [sortAsc, setSortAsc] = useState(true);
   const [gridView, setGridView] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  const [guestView, setGuestView] = useState(false);
+  const guestBooksRef = useRef<GuestBook[]>([]);
+  const { requireAccount } = useGuest();
 
   useFocusEffect(useCallback(() => {
     async function load() {
       try {
+        if (!(await hasSession())) {
+          const books = await getGuestBooks();
+          guestBooksRef.current = books;
+          setGuestView(true);
+          setSnapshot(guestSnapshot(books));
+          setUserName(null);
+          setItems(guestItems(books, null, true));
+          return;
+        }
+        setGuestView(false);
         const [snapshotRes, libraryRes] = await Promise.all([
           apiGet<LibrarySnapshotResponse>('/library/snapshot'),
           apiGet<{ items: LibraryItem[] }>('/library?sort=title&order=asc'),
@@ -71,6 +114,10 @@ export default function LibraryScreen() {
 
   useEffect(() => {
     if (!loaded) return;
+    if (guestView) {
+      setItems(guestItems(guestBooksRef.current, statusFilter, sortAsc));
+      return;
+    }
     async function reload() {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
@@ -105,6 +152,15 @@ export default function LibraryScreen() {
           )}
           <Text style={styles.subtitle}>Your personal collection</Text>
         </View>
+
+        {guestView && (
+          <TouchableOpacity style={styles.guestBanner} onPress={() => requireAccount('library')}>
+            <Text style={styles.guestBannerText}>
+              Saved on this device only. Create a free account to keep your library.
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color="#B83255" />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.divider} />
 
@@ -285,6 +341,22 @@ function FilterPill({ label, count, active, onPress }: {
 }
 
 const styles = StyleSheet.create({
+  guestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#FBEFF2',
+  },
+  guestBannerText: {
+    flex: 1,
+    color: '#0F2A48',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   container: { flex: 1, backgroundColor: '#F0EDE4' },
   header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg },
   title: { fontSize: 38, color: '#B83255', fontFamily: 'DancingScript_700Bold' },

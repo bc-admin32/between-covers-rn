@@ -17,7 +17,7 @@ const TAB_SLUGS = new Set([
 ]);
 
 const AUTH_SLUGS = new Set([
-  'login', 'hard-paywall', 'redirect',
+  'login', 'hard-paywall', 'redirect', 'guest-paywall', 'age-gate',
 ]);
 
 export function normalizeRoute(apiRoute: string): string {

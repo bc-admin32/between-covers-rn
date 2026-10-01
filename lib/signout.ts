@@ -23,6 +23,8 @@ const USER_DATA_KEYS = [
   'bc_biometric_prompt_dismissed',
   'bc_event_buffer_v1',
   'bc_session_id_v1',
+  'bc_guest_return_to',
+  'bc_pending_iris_msg',
 ];
 
 // Biometric preference — only cleared on hard sign-out

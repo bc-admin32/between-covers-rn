@@ -9,7 +9,8 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
@@ -164,6 +165,7 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, thread
 
 export default function LoungeThreadScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Explicitly decode — Expo Router may leave %23 un-decoded, causing the
@@ -227,13 +229,18 @@ export default function LoungeThreadScreen() {
       .catch(() => setError("Couldn't load this thread right now."))
       .finally(() => setLoading(false));
 
-    apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
-      .then((res) => setBlockedUsers(res.blockedUsers ?? []))
-      .catch(() => {});
+    // Guests have no block list.
+    hasSession().then((signedIn) => {
+      if (!signedIn) return;
+      apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
+        .then((res) => setBlockedUsers(res.blockedUsers ?? []))
+        .catch(() => {});
+    });
   }, [threadId]);
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
     if (!threadId) return;
+    if (requireAccount('react')) return;
     setReplies((prev) => prev.map((r) => {
       if (r.replyId !== replyId) return r;
       const existing = r.reactions.find((rx) => rx.emoji === emoji);
@@ -243,20 +250,23 @@ export default function LoungeThreadScreen() {
       return { ...r, reactions: [...r.reactions, { emoji, count: 1, reactedByMe: true }] };
     }));
     try { await apiPost('/lounge/thread/react', { threadId, replyId, emoji }); } catch {}
-  }, [threadId]);
+  }, [threadId, requireAccount]);
 
   const handleReplyTo = useCallback((reply: Reply) => {
+    if (requireAccount('reply')) return;
     Haptics.selectionAsync();
     setReplyingTo(reply);
-  }, []);
+  }, [requireAccount]);
 
   const handleEdit = useCallback((reply: Reply) => {
+    if (requireAccount('reply')) return;
     setEditingReply(reply);
     setEditText(reply.body ?? '');
-  }, []);
+  }, [requireAccount]);
 
   const submitReply = async () => {
     if (submitting || !text.trim()) return;
+    if (requireAccount('reply')) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     setSubmitError(null);
@@ -296,6 +306,7 @@ export default function LoungeThreadScreen() {
 
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
+    if (requireAccount('reply')) return;
     setEditError(null);
     setEditSubmitting(true);
     try {

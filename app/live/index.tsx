@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../lib/api';
+import { useGuest } from '../../lib/useGuest';
 import { spacing, radius, colors } from '../../lib/theme';
 import type { LiveRoom } from '../../lib/types';
 import LobbyModal from '../../components/live/LobbyModal';
@@ -78,6 +79,7 @@ export default function LiveEventsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
   const [lobbyOpen, setLobbyOpen] = useState(false);
+  const { requireAccount } = useGuest();
 
   useEffect(() => {
     apiGet<{ events: LiveEvent[] }>('/live')
@@ -152,6 +154,7 @@ export default function LiveEventsScreen() {
                 <TouchableOpacity
                   style={styles.joinButton}
                   onPress={() => {
+                    if (requireAccount('live')) return;
                     if (activeEvent.eventType === 'IRIS_LIVE' && activeEvent.rooms?.length) {
                       setLobbyEventId(activeEvent.eventId);
                       setLobbyOpen(true);
@@ -198,7 +201,10 @@ export default function LiveEventsScreen() {
 
                     <TouchableOpacity
                       style={styles.rsvpButton}
-                      onPress={() => router.push(`/live/event?eventId=${event.eventId}` as any)}
+                      onPress={() => {
+                        if (requireAccount('live')) return;
+                        router.push(`/live/event?eventId=${event.eventId}` as any);
+                      }}
                     >
                       <Text style={styles.rsvpButtonText}>RSVP →</Text>
                     </TouchableOpacity>

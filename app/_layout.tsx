@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
-import { useRouter, useRootNavigationState } from 'expo-router';
+import { useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,8 @@ import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
 import { initAnalytics, track } from '../lib/analytics';
 import { captureFromUrl } from '../lib/attribution';
+import { hasSession } from '../lib/api';
+import { isAgeConfirmed, isGuestExpired } from '../lib/guest';
 
 // HeyCatch (product analytics, wraps posthog-react-native) — separate from
 // this app's own lib/analytics.ts track() calls below, not a replacement.
@@ -170,6 +172,34 @@ function RootLayout() {
       if (nextState === 'active') {
         Notifications.setBadgeCountAsync(0).catch(() => {});
       }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Guest day-7 lock on resume. Cold launch is handled by index.tsx; this
+  // catches a guest whose preview expires while the app is backgrounded. Lives
+  // here (not in (tabs)) so it also covers root-stack screens like Iris chat,
+  // book detail and live. Skipped on the splash, (auth) (mid sign-in, or
+  // already on a paywall) and (onboarding) screens.
+  const segments = useSegments();
+  const segmentsRef = useRef<string[]>(segments);
+  useEffect(() => { segmentsRef.current = segments; }, [segments]);
+
+  useEffect(() => {
+    const checkGuestExpiry = async () => {
+      if (!navReadyRef.current) return;
+      const top = segmentsRef.current[0];
+      if (!top || top === '(auth)' || top === '(onboarding)') return;
+      try {
+        if (await hasSession()) return;
+        if (!(await isAgeConfirmed())) return;
+        if (!(await isGuestExpired())) return;
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(auth)/guest-paywall' as any);
+      } catch {}
+    };
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') checkGuestExpiry();
     });
     return () => sub.remove();
   }, []);

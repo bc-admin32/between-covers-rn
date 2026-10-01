@@ -8,7 +8,9 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../lib/api';
+import { flushGuestLibrary } from '../../../lib/guest';
+import { useGuest } from '../../../lib/useGuest';
 import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -145,6 +147,7 @@ export default function HomeScreen() {
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [focusCount, setFocusCount] = useState(0);
+  const { isGuest, requireAccount } = useGuest();
 
   useFocusEffect(useCallback(() => {
     setFocusCount((c) => c + 1);
@@ -245,7 +248,12 @@ export default function HomeScreen() {
         if (json.background?.imageUrl) {
           setBgUrl(json.background.imageUrl);
         }
-        await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(json));
+        if (await hasSession()) {
+          await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(json));
+          // Signed in and on Home: push any books saved as a guest to the
+          // account. No-op when there are none; failures retry next launch.
+          flushGuestLibrary();
+        }
       } catch {
         setLoadError(true);
       }
@@ -280,7 +288,7 @@ export default function HomeScreen() {
   const showVideoMode = day6Active || (iris.mode === 'video' && !!iris.videoUrl);
 
   const markViewed = () => {
-    if (markedRef.current) return;
+    if (markedRef.current || isGuest !== false) return;
     markedRef.current = true;
     apiPost('/cozy/iris/daily/viewed', {
       isIntro: iris.context?.isIntro === true,
@@ -402,7 +410,7 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.trialBtn, styles.trialBtnSecondary]}
-                        onPress={() => setFeedbackOpen(true)}
+                        onPress={() => { if (!requireAccount('feedback')) setFeedbackOpen(true); }}
                       >
                         <Text style={[styles.trialBtnText, styles.trialBtnTextSecondary]} numberOfLines={1}>Share feedback</Text>
                       </TouchableOpacity>

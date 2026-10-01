@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../../components/AffiliateDisclosure';
@@ -128,6 +129,7 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
 
 export default function CozyItemsScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<LifestyleItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -274,7 +276,7 @@ export default function CozyItemsScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.submitCard}
-            onPress={() => router.push('/submissions/recipe' as any)}
+            onPress={() => { if (!requireAccount('submission')) router.push('/submissions/recipe' as any); }}
           >
             <Text style={styles.submitCardBody}>
               Have a recipe that pairs perfectly with your favorite read?

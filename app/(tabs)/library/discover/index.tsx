@@ -7,7 +7,8 @@ import { Image } from 'expo-image';
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../../lib/api';
+import { saveGuestBook } from '../../../../lib/guest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { PRIMARY_SUBGENRES, TROPES } from '../../../../lib/tagTaxonomy';
 import BookCardMeta from '../../../../components/cozy/BookCardMeta';
@@ -185,6 +186,24 @@ export default function LibraryDiscoverScreen() {
   async function addBook(book: DiscoverItem, status: StatusType) {
     if (added[book.workId]) return;
     try {
+      // Guests save on-device; flushed to the account after sign-up.
+      if (!(await hasSession())) {
+        await saveGuestBook({
+          workId: book.workId,
+          title: book.title,
+          primaryAuthor: book.primaryAuthor,
+          coverUrl: book.coverUrl ?? null,
+          status,
+          spice: book.spice,
+          spiceLevel: book.spiceLevel,
+          tropes: book.tropes,
+          primarySubgenre: book.primarySubgenre,
+          triggers: book.triggers,
+        });
+        setAdded((prev) => ({ ...prev, [book.workId]: true }));
+        setActiveMenu(null);
+        return;
+      }
       await apiPost('/library', {
         workId: book.workId,
         title: book.title,

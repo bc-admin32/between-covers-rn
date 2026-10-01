@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { apiGet } from '../../lib/api';
+import { useGuest } from '../../lib/useGuest';
 import { spacing } from '../../lib/theme';
 import LobbyModal from './LobbyModal';
 import LiveEventTermsModal, { shouldShowLiveEventTermsGate } from './LiveEventTermsModal';
@@ -81,6 +82,7 @@ export default function LiveEventBanner() {
   const [lobbyEventId, setLobbyEventId] = useState<string | null>(null);
   const [termsGateVisible, setTermsGateVisible] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
+  const { requireAccount } = useGuest();
 
   const refetch = useCallback(() => {
     apiGet<{ events: LiveEvent[] }>('/live?status=ACTIVE')
@@ -141,6 +143,7 @@ export default function LiveEventBanner() {
 
   const handlePress = async () => {
     if (!activeEvent) return;
+    if (requireAccount('live')) return;
     const entry: PendingEntry = activeEvent.eventType === 'IRIS_LIVE'
       && activeEvent.rooms && activeEvent.rooms.length > 0
       ? { kind: 'lobby', eventId: activeEvent.eventId }

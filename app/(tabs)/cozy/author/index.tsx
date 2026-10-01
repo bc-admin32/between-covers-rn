@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
 
 const CACHE_KEY = 'bc_cozy_cache';
@@ -80,6 +81,7 @@ function SitWithMeDivider() {
 
 export default function AuthorDetailScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   useLocalSearchParams<{ weekId?: string }>();
 
@@ -253,7 +255,7 @@ export default function AuthorDetailScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.submitCard}
-            onPress={() => router.push('/submissions/author' as never)}
+            onPress={() => { if (!requireAccount('submission')) router.push('/submissions/author' as never); }}
           >
             <Text style={styles.submitCardBody}>
               Know an author or narrator we should spotlight?

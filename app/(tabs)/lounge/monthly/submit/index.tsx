@@ -8,6 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { useGuest } from '../../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../../lib/theme';
 
 type Prompt = {
@@ -24,6 +25,7 @@ type Prompt = {
 
 export default function MonthlySubmitScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const { promptId } = useLocalSearchParams<{ promptId: string }>();
 
@@ -50,6 +52,7 @@ export default function MonthlySubmitScreen() {
 
   const handleSubmit = async () => {
     if (submitting || !text.trim() || !promptId) return;
+    if (requireAccount('submit')) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSubmitting(true);
     setSubmitError(null);

@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { getPlatform } from '../../../../lib/platforms';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
@@ -104,6 +105,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   const [userRating, setUserRating] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingRating, setSavingRating] = useState(false);
+  const { isGuest, requireAccount } = useGuest();
 
   useEffect(() => {
     if (!visible || !item.movieId) return;
@@ -126,6 +128,8 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
   async function handleVerdictSelect(verdictKey: string) {
     if (!item.movieId || savingRating) return;
+    // Close the sheet first — a native Modal would otherwise cover sign-in.
+    if (isGuest) { onClose(); requireAccount('rate'); return; }
     setSavingRating(true);
     try {
       const res: any = await apiPost(`/cozy/media/${item.movieId}/rate`, { verdict: verdictKey });

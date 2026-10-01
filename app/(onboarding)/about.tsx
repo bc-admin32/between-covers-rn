@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useEvent } from 'expo';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { apiPost } from '../../lib/api';
-import { normalizeRoute } from '../../lib/routes';
+import { ensureFirstLaunchAt, landAfterAuth } from '../../lib/guest';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,9 +50,12 @@ export default function AboutScreen() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await apiPost('/onboarding/submit', { step: 'L9Com', value: 'ACK' });
+      // firstLaunchAt lets the backend start the trial from the guest clock:
+      // trialEnd = min(firstLaunchAt + 7d, now + 7d).
+      const firstLaunchAt = await ensureFirstLaunchAt();
+      const res = await apiPost('/onboarding/submit', { step: 'L9Com', value: 'ACK', firstLaunchAt });
       if (res?.nextRoute) {
-        router.replace(normalizeRoute(res.nextRoute) as any);
+        await landAfterAuth(router, res.nextRoute);
         return;
       }
     } catch {}

@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { apiPost } from '../../lib/api';
+import { useGuest } from '../../lib/useGuest';
 import { spacing, radius } from '../../lib/theme';
 
 const REPORT_REASONS = [
@@ -32,6 +33,7 @@ export default function PostMenu({
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { requireAccount } = useGuest();
 
   if (isOwn) return null;
 
@@ -73,7 +75,12 @@ export default function PostMenu({
     <>
       <TouchableOpacity
         style={styles.trigger}
-        onPress={() => { Haptics.selectionAsync(); setMenuOpen(true); }}
+        onPress={() => {
+          // Every menu action (report, block) needs an account.
+          if (requireAccount('report')) return;
+          Haptics.selectionAsync();
+          setMenuOpen(true);
+        }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Text style={styles.triggerText}>···</Text>

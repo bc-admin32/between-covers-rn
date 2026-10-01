@@ -8,6 +8,8 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPost } from '../../../lib/api';
+import { setPendingIrisMessage, takePendingIrisMessage } from '../../../lib/guest';
+import { useGuest } from '../../../lib/useGuest';
 import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 
@@ -65,6 +67,8 @@ export default function IrisChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const { isGuest, requireAccount } = useGuest();
+  const pendingCheckedRef = useRef(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCopy = useCallback(async (id: string, text: string) => {
@@ -86,10 +90,33 @@ export default function IrisChatScreen() {
     }
   }, [messages, sending]);
 
+  // A message a guest typed before signing up: send it as soon as we're back
+  // here signed in (landAfterAuth returns the user to this screen).
+  useEffect(() => {
+    if (isGuest !== false || pendingCheckedRef.current) return;
+    pendingCheckedRef.current = true;
+    takePendingIrisMessage().then((text) => {
+      if (text) sendMessage(text);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest]);
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
 
+    // Guests can type; sending needs an account. Keep the message (in the
+    // input and in storage) and send it automatically after sign-up.
+    if (isGuest === true) {
+      await setPendingIrisMessage(text);
+      requireAccount('iris');
+      return;
+    }
+
+    await sendMessage(text);
+  }
+
+  async function sendMessage(text: string) {
     track('iris_chat_sent', {
       chars: text.length,
       hasBookContext: !!bookTitle,

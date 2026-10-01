@@ -7,6 +7,7 @@ import { CaretLeft } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
@@ -81,6 +82,7 @@ function ConfessionCard({ submission, onReact }: {
 
 export default function MonthlyWallScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const { promptId } = useLocalSearchParams<{ promptId: string }>();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -94,6 +96,7 @@ export default function MonthlyWallScreen() {
   }, [promptId]);
 
   const handleReact = useCallback(async (sk: string, emoji: string) => {
+    if (requireAccount('react')) return;
     setSubmissions((prev) => prev.map((s) => {
       if (s.sk !== sk) return s;
       const existing = s.reactions?.find((r) => r.emoji === emoji);
@@ -107,7 +110,7 @@ export default function MonthlyWallScreen() {
       return { ...s, reactions: [...(s.reactions ?? []), { emoji, count: 1, reactedByMe: true }] };
     }));
     try { await apiPost('/lounge/confession/react', { submissionSk: sk, emoji }); } catch {}
-  }, []);
+  }, [requireAccount]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

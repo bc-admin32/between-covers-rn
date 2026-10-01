@@ -10,7 +10,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../../lib/api';
+import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
@@ -128,6 +129,7 @@ function MessageBubble({ reply, onReact, threadId, onBlock, onToast }: {
 
 export default function IrisThoughtsScreen() {
   const router = useRouter();
+  const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
@@ -188,13 +190,18 @@ export default function IrisThoughtsScreen() {
       .catch(() => setRepliesError(true))
       .finally(() => setLoading(false));
 
-    apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
-      .then((res) => setBlockedUsers(res.blockedUsers ?? []))
-      .catch(() => {});
+    // Guests have no block list.
+    hasSession().then((signedIn) => {
+      if (!signedIn) return;
+      apiGet<{ blockedUsers: string[] }>('/lounge/blocked-users')
+        .then((res) => setBlockedUsers(res.blockedUsers ?? []))
+        .catch(() => {});
+    });
   }, [threadId]);
 
   const handleReact = useCallback(async (replyId: string, emoji: string) => {
     if (!threadId) return;
+    if (requireAccount('react')) return;
     setReplies((prev) => prev.map((r) => {
       if (r.replyId !== replyId) return r;
       const existing = r.reactions.find((rx) => rx.emoji === emoji);
@@ -204,10 +211,11 @@ export default function IrisThoughtsScreen() {
       return { ...r, reactions: [...r.reactions, { emoji, count: 1, reactedByMe: true }] };
     }));
     try { await apiPost('/lounge/thread/react', { threadId, replyId, emoji }); } catch {}
-  }, [threadId]);
+  }, [threadId, requireAccount]);
 
   const submitReply = async () => {
     if (submitting || !text.trim() || !threadId) return;
+    if (requireAccount('reply')) return;
     setSubmitting(true);
     setSubmitError(null);
     setShowEmojiTray(false);
