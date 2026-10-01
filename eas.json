@@ -34,12 +34,14 @@
     },
     "production-ios": {
       "extends": "production",
+      "node": "22.23.3",
       "env": {
         "RNIAP_VARIANT": "amazon"
       }
     },
     "production-google": {
       "extends": "production",
+      "node": "22.23.3",
       "env": {
         "RNIAP_VARIANT": "play"
       },
@@ -49,6 +51,7 @@
     },
     "production-amazon": {
       "extends": "production",
+      "node": "22.23.3",
       "env": {
         "RNIAP_VARIANT": "amazon"
       },

@@ -16,14 +16,18 @@
  *
  * LOCKFILE: EAS runs `npm ci` when package-lock.json is present, and `npm ci`
  * HARD-FAILS when package.json no longer matches the lock (we just edited it).
- * CHOICE: delete the lockfile here so EAS falls back to `npm install`, which
- * re-resolves from the edited package.json. Chosen over regenerating a matching
- * lock (`npm install --package-lock-only`) because a single committed lock can't
- * represent both variants anyway, so we gain no real determinism from keeping
- * `npm ci` — deletion is fewer moving parts and can't desync.
+ * So after editing package.json we regenerate the lock in place with
+ * `npm install --package-lock-only`: it prunes the removed IAP package (and any
+ * deps only it used) and keeps every other entry at its committed version.
+ *
+ * Do NOT delete the lockfile instead. With no lockfile EAS picks yarn (its
+ * default), not npm, and resolves every dependency fresh — that is how
+ * @heycatch/sdk floated to 0.7.1 (engines node >=22) and broke the build. It
+ * also drops .npmrc's legacy-peer-deps, which yarn doesn't read.
  */
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // IAP_VARIANT_ROOT lets tests point the script at a scratch copy; defaults to
 // the repo root (this file lives in scripts/).
@@ -58,7 +62,13 @@ if (variant === 'play') {
 
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
-if (fs.existsSync(lockPath)) {
-  fs.rmSync(lockPath);
-  log('deleted package-lock.json → EAS will use `npm install` (not `npm ci`)');
+if (!fs.existsSync(lockPath)) {
+  throw new Error('[iap-variant] package-lock.json missing — refusing to let EAS fall back to yarn');
 }
+// Throws (failing the build) if npm can't produce a matching lock — better than
+// silently building with unpinned dependencies.
+execSync('npm install --package-lock-only --ignore-scripts --no-audit --no-fund', {
+  cwd: ROOT,
+  stdio: 'inherit',
+});
+log('regenerated package-lock.json for this variant → EAS will use `npm ci` with existing pins');
