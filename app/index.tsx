@@ -120,9 +120,8 @@ export default function SplashScreen() {
           setTimeout(resolve, Math.max(0, MIN_SPLASH_TIME - elapsed()))
         );
 
-      // POST /auth/resolve. Throws on a network error (so the caller's outer
-      // catch goes to login WITHOUT wiping tokens). Returns { ok, status, data }
-      // where ok:false means the server explicitly rejected the token.
+      // POST /auth/resolve. Returns status 0 for network errors so they and 5xx
+      // responses can offer retry without being treated as rejected sessions.
       const resolveOnce = async (idToken: string): Promise<{ ok: boolean; status: number; data: any | null }> => {
         const res = await fetch(`${API_BASE}/auth/resolve`, {
           method: 'POST',
@@ -170,7 +169,12 @@ export default function SplashScreen() {
           // biometric gate so a dead token never triggers a Face ID prompt:
           // resolving only tells us where the token would route — nothing is
           // shown and the app isn't entered until the gate below passes.
-          let resolved = await resolveOnce(idToken);
+          let resolved: { ok: boolean; status: number; data: any | null };
+          try {
+            resolved = await resolveOnce(idToken);
+          } catch {
+            resolved = { ok: false, status: 0, data: null };
+          }
 
           // No valid session behind the stored token: expired, revoked, or a
           // stale token that survived an app reinstall in the iOS Keychain.
@@ -188,6 +192,10 @@ export default function SplashScreen() {
           if (sessionGone) {
             await signOut({ force: true });
             await waitForSplash();
+          } else if (!resolved.ok && (resolved.status === 0 || resolved.status >= 500)) {
+            await waitForSplash();
+            router.replace('/(auth)/login?resolveUnavailable=1' as any);
+            return;
           } else {
             // Biometric launch gate (cold launch only). If the user enabled
             // Face ID / Touch ID, the retained token must NOT be trusted until

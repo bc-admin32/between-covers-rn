@@ -48,6 +48,8 @@ export default function RedirectScreen() {
   const [status, setStatus] = useState('Signing you in…');
 
   useEffect(() => {
+    let resolveUnavailable = false;
+
     // FIX B: a sibling redirect instance may have already completed the
     // exchange and stored a valid session. Before showing any auth-failure
     // screen, look for stored tokens and, if a valid session exists, resolve
@@ -62,6 +64,7 @@ export default function RedirectScreen() {
               method: 'POST',
               headers: { Authorization: `Bearer ${idToken}` },
             });
+            if (!res.ok && res.status >= 500) resolveUnavailable = true;
             if (res.ok) {
               const result = await res.json();
               if (result?.nextRoute?.startsWith('/')) {
@@ -79,7 +82,9 @@ export default function RedirectScreen() {
                 return true;
               }
             }
-          } catch {}
+          } catch {
+            resolveUnavailable = true;
+          }
         }
         await new Promise((r) => setTimeout(r, 250));
       }
@@ -101,6 +106,10 @@ export default function RedirectScreen() {
         // for that exchange's session and route in instead.
         if (exchangedCodes.has(code)) {
           if (await resolveFromSession()) return;
+          if (resolveUnavailable) {
+            setErrorCode('AUTH_RESOLVE_UNAVAILABLE');
+            return;
+          }
           setErrorCode('REDIRECT_TOKEN_EXCHANGE_FAILED');
           return;
         }
@@ -123,6 +132,10 @@ export default function RedirectScreen() {
           // FIX B: never show the error if a valid session already exists
           // (e.g. a sibling instance won the exchange race) — route in instead.
           if (await resolveFromSession()) return;
+          if (resolveUnavailable) {
+            setErrorCode('AUTH_RESOLVE_UNAVAILABLE');
+            return;
+          }
           setErrorCode('REDIRECT_TOKEN_EXCHANGE_FAILED');
           return;
         }
@@ -172,6 +185,10 @@ export default function RedirectScreen() {
         });
 
         if (!resolveRes.ok) {
+          if (resolveRes.status >= 500) {
+            setErrorCode('AUTH_RESOLVE_UNAVAILABLE');
+            return;
+          }
           // Tokens were stored above — clear them now so index.tsx doesn't
           // enter a loop (find token → resolve fails → forceLogin → login →
           // user logs in → tokens stored → repeat). Force-hard wipe overrides
@@ -237,6 +254,10 @@ export default function RedirectScreen() {
         // FIX B: a transient error (e.g. the second, racing exchange throwing)
         // shouldn't surface if the user already has a valid session.
         if (await resolveFromSession()) return;
+        if (resolveUnavailable) {
+          setErrorCode('AUTH_RESOLVE_UNAVAILABLE');
+          return;
+        }
         setErrorCode(`REDIRECT_UNEXPECTED_ERROR: ${err?.message}`);
       }
     };
@@ -246,22 +267,34 @@ export default function RedirectScreen() {
 
   if (errorCode) {
     const isDeactivated = errorCode === 'ACCOUNT_DEACTIVATED';
+    const isResolveUnavailable = errorCode === 'AUTH_RESOLVE_UNAVAILABLE';
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>
-          {isDeactivated ? 'Account unavailable' : 'Hmm… something didn\'t go as expected.'}
+          {isDeactivated
+            ? 'Account unavailable'
+            : isResolveUnavailable
+              ? 'We can’t reach the service right now.'
+              : 'Hmm… something didn\'t go as expected.'}
         </Text>
         <Text style={styles.errorSubtitle}>
           {isDeactivated
             ? 'This account has been deactivated. Please contact support at support@betweencovers.app.'
+            : isResolveUnavailable
+              ? 'Your sign-in is saved. Check your connection and retry; you won’t need to sign in again.'
             : 'Please try signing in again.'}
         </Text>
-        {!isDeactivated && (
+        {!isDeactivated && !isResolveUnavailable && (
           <Text style={styles.errorCode}>Error code: {errorCode}</Text>
         )}
-        <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/(auth)/login')}>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => router.replace(isResolveUnavailable
+            ? '/(auth)/login?resolveUnavailable=1'
+            : '/(auth)/login')}
+        >
           <Text style={styles.retryButtonText}>
-            {isDeactivated ? 'Back to Sign In' : 'Try Again'}
+            {isDeactivated ? 'Back to Sign In' : isResolveUnavailable ? 'Retry Connection' : 'Try Again'}
           </Text>
         </TouchableOpacity>
       </View>

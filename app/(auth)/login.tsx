@@ -10,9 +10,11 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../lib/theme';
 import { track } from '../../lib/analytics';
-import { clearGuestIntent, guestEntryRoute } from '../../lib/guest';
+import { clearGuestIntent, guestEntryRoute, landAfterAuth } from '../../lib/guest';
+import { signOut } from '../../lib/signout';
 import { hasSession } from '../../lib/api';
 import { getFreshIdToken } from '../../lib/auth';
+import { carryGuestPreferencesToAccount } from '../../lib/guestPreferences';
 import type { GateReason } from '../../lib/useGuest';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
@@ -59,10 +61,11 @@ export default function LoginScreen() {
   const router = useRouter();
   // gate: a guest sent here by a gated action. from: a guest who chose
   // "Already a member? Sign in" on Home ('guest') or the age gate ('age-gate').
-  const { gate, from, source } = useLocalSearchParams<{
+  const { gate, from, source, resolveUnavailable } = useLocalSearchParams<{
     gate?: GateReason;
     from?: 'guest' | 'age-gate';
     source?: string;
+    resolveUnavailable?: string;
   }>();
   // signup_started.source: the gated action (passed by requireAccount), the
   // "Already a member?" links, the guest paywall, or 'login' when there's no
@@ -108,6 +111,8 @@ export default function LoginScreen() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [resolveRetrying, setResolveRetrying] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   useEffect(() => {
     hasSession().then(setHasToken).catch(() => setHasToken(false));
@@ -146,6 +151,10 @@ export default function LoginScreen() {
     // Well-formed stored id token, refreshed first if it's about to expire.
     const idToken = await getFreshIdToken();
     if (!idToken || !accessToken) return;
+    if (resolveUnavailable === '1') {
+      await retryAccountResolve(true);
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/auth/resolve`, {
@@ -157,6 +166,72 @@ export default function LoginScreen() {
         router.replace(normalizeRoute(data.nextRoute) as any);
       }
     } catch {}
+  }
+
+  async function retryAccountResolve(biometricAlreadyPassed = false) {
+    if (resolveRetrying) return;
+    setResolveRetrying(true);
+    setResolveError(null);
+    try {
+      if (
+        !biometricAlreadyPassed &&
+        (await SecureStore.getItemAsync('bc_biometric_enabled')) === 'true'
+      ) {
+        const auth = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Unlock Between Covers',
+          fallbackLabel: 'Use passcode',
+        });
+        if (!auth.success) return;
+      }
+
+      const idToken = await getFreshIdToken();
+      if (!idToken) {
+        router.replace('/(auth)/login');
+        return;
+      }
+      const res = await fetch(`${API_BASE}/auth/resolve`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + idToken },
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          await signOut({ force: true });
+          router.replace((await guestEntryRoute()) as any);
+          return;
+        }
+        if (res.status >= 500) {
+          setResolveError('We still can\'t connect. Check your connection and try again.');
+          return;
+        }
+        await signOut({ force: true });
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      const result = await res.json();
+      if (result?.authState === 'UNAUTHENTICATED') {
+        await signOut({ force: true });
+        router.replace((await guestEntryRoute()) as any);
+        return;
+      }
+      if (!result?.nextRoute?.startsWith('/')) {
+        await signOut({ force: true });
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      try {
+        await carryGuestPreferencesToAccount(idToken);
+      } catch (error) {
+        console.warn('[guest-preferences] account transfer failed', error);
+      }
+      await landAfterAuth(router, result.nextRoute);
+    } catch (error) {
+      console.warn('[auth] account resolve retry failed', error);
+      setResolveError('We still can\'t connect. Check your connection and try again.');
+    } finally {
+      setResolveRetrying(false);
+    }
   }
 
   async function handleSocialLogin(provider: 'Google' | 'LoginWithAmazon' | 'SignInWithApple') {
@@ -195,6 +270,25 @@ export default function LoginScreen() {
       <Text style={styles.tagline}>A cozy escape into romance</Text>
 
       {gateCopy && <Text style={styles.gateCopy}>{gateCopy}</Text>}
+
+      {resolveUnavailable === '1' && (
+        <View style={styles.resolveNotice}>
+          <Text style={styles.resolveNoticeTitle}>You’re still signed in</Text>
+          <Text style={styles.resolveNoticeText}>
+            We couldn’t reach the service to finish loading your account. Your sign-in is saved.
+          </Text>
+          {resolveError && <Text style={styles.resolveNoticeError}>{resolveError}</Text>}
+          <TouchableOpacity
+            style={styles.resolveRetryButton}
+            onPress={() => retryAccountResolve()}
+            disabled={resolveRetrying}
+          >
+            <Text style={styles.resolveRetryText}>
+              {resolveRetrying ? 'Retrying…' : 'Retry connection'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {biometricAvailable && hasSavedCredentials && (
         <View style={styles.biometricContainer}>
@@ -278,6 +372,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.md,
   },
+  resolveNotice: {
+    width: '100%',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  resolveNoticeTitle: { color: '#0F2A48', fontSize: 16, fontWeight: '700' },
+  resolveNoticeText: { color: '#6A5969', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  resolveNoticeError: { color: '#B83255', fontSize: 13, textAlign: 'center' },
+  resolveRetryButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 11,
+    marginTop: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: '#B83255',
+  },
+  resolveRetryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   notNow: {
     marginTop: spacing.lg,
     padding: spacing.sm,
