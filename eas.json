@@ -36,14 +36,16 @@
       "extends": "production",
       "node": "22.23.3",
       "env": {
-        "RNIAP_VARIANT": "amazon"
+        "RNIAP_VARIANT": "amazon",
+        "BC_ANALYTICS_PLATFORM": "ios"
       }
     },
     "production-google": {
       "extends": "production",
       "node": "22.23.3",
       "env": {
-        "RNIAP_VARIANT": "play"
+        "RNIAP_VARIANT": "play",
+        "BC_ANALYTICS_PLATFORM": "android"
       },
       "android": {
         "gradleCommand": ":app:bundleRelease"
@@ -53,7 +55,8 @@
       "extends": "production",
       "node": "22.23.3",
       "env": {
-        "RNIAP_VARIANT": "amazon"
+        "RNIAP_VARIANT": "amazon",
+        "BC_ANALYTICS_PLATFORM": "amazon"
       },
       "android": {
         "buildType": "apk",

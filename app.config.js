@@ -43,14 +43,22 @@ const isAmazonOnlyPlugin = (entry) => {
 };
 
 module.exports = ({ config }) => {
-  // amazon (default): identical to app.json — return untouched.
+  const configured = {
+    ...config,
+    extra: {
+      ...(config.extra ?? {}),
+      analyticsPlatform: process.env.BC_ANALYTICS_PLATFORM ?? null,
+    },
+  };
+
+  // amazon (default): keep the native plugin configuration from app.json.
   if (IAP_VARIANT !== 'play') {
-    return config;
+    return configured;
   }
 
   // play: rebuild the plugins array without the Amazon-only plugins and with
   // react-native-iap replaced by expo-iap.
-  const basePlugins = config.plugins ?? [];
+  const basePlugins = configured.plugins ?? [];
   const playPlugins = basePlugins
     .filter((entry) => !isAmazonOnlyPlugin(entry))
     .filter((entry) => !isReactNativeIapPlugin(entry));
@@ -67,7 +75,7 @@ module.exports = ({ config }) => {
   playPlugins.push('./plugins/withAdmPushFlavorFix');
 
   return {
-    ...config,
+    ...configured,
     plugins: playPlugins,
   };
 };

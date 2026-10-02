@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
-import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { apiPost } from './api';
 
@@ -65,13 +65,11 @@ function uuid(): string {
 }
 
 function detectPlatform(): 'ios' | 'android' | 'amazon' {
+  const buildPlatform = Constants.expoConfig?.extra?.analyticsPlatform;
+  if (buildPlatform === 'ios' || buildPlatform === 'android' || buildPlatform === 'amazon') {
+    return buildPlatform;
+  }
   if (Platform.OS === 'ios') return 'ios';
-  // Amazon Fire tablets report Platform.OS as 'android' but have a Fire-specific
-  // manufacturer. expo-application doesn't expose this directly; we use
-  // Application.applicationName as a hint, but the real detection happens
-  // in the IAP shim. For analytics, a runtime constant set by the app shell
-  // is more reliable.
-  // TODO: replace with a real Fire detection once iap-shim lands.
   return 'android';
 }
 
