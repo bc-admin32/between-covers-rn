@@ -89,6 +89,7 @@
       "./plugins/withAdmApiKey",
       "./plugins/withAmazonIapAuthKey",
       "./plugins/withAndroidReleaseOptimizations",
+      "./plugins/withExcludeDevClientInProduction",
       "./withNoCameraFeatures"
     ],
     "experiments": {
