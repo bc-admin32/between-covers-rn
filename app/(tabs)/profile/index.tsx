@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { signOut } from '../../../lib/signout';
 import { FeedbackModal } from '../../../components/FeedbackModal';
 import { OptimizedImage } from '../../../components/OptimizedImage';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost, apiPatch } from '../../../lib/api';
 import { spacing, colors } from '../../../lib/theme';

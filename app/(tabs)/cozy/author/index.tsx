@@ -6,7 +6,8 @@ import {
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';

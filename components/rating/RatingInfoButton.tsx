@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import RatingInfoSheet from './RatingInfoSheet';
 
 // Self-contained ⓘ trigger for the ratings legend. Owns its own open/close
