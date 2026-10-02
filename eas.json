@@ -60,7 +60,7 @@
       },
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleAmazonRelease"
+        "gradleCommand": ":app:assembleAmazonRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a"
       }
     }
   },
