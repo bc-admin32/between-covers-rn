@@ -11,7 +11,7 @@ import {
   Book,
   Chats,
   User,
-} from 'phosphor-react-native';
+} from '../../components/icons';
 
 const ACTIVE_COLOR = '#B83255';
 const INACTIVE_COLOR = '#8C7B8C';

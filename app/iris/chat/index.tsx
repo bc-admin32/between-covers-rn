@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable,
 } from 'react-native';
-import { CaretLeft, Copy, Check } from 'phosphor-react-native';
+import { CaretLeft, Copy, Check } from '../../../components/icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

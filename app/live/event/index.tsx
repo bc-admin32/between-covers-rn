@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { OptimizedImage } from '../../../components/OptimizedImage';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft } from '../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';

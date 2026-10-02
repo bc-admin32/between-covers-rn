@@ -3,7 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft } from '../../components/icons';
 import VerdictRating, { Verdict } from '../../components/rating/VerdictRating';
 import RatingInfoButton from '../../components/rating/RatingInfoButton';
 import TagBookModal from '../../components/tag/TagBookModal';

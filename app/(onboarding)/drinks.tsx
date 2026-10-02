@@ -5,7 +5,7 @@ import { normalizeRoute } from '../../lib/routes';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { CaretDown } from 'phosphor-react-native';
+import { CaretDown } from '../../components/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, spacing } from '../../lib/theme';
 

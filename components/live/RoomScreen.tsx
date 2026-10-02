@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { OptimizedImage } from '../OptimizedImage';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft } from '../icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Notifications from 'expo-notifications';

@@ -13,7 +13,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { X } from 'phosphor-react-native';
+import { X } from '../icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPatch } from '../../lib/api';
 import { track } from '../../lib/analytics';

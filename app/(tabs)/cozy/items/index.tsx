@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft } from '../../../../components/icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Warning, X } from 'phosphor-react-native';
+import { Warning, X } from '../icons';
 import { spacing } from '../../lib/theme';
 
 // Surfaces a bc:warning chat event to the target user only. The handler

@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CaretLeft } from 'phosphor-react-native';
+import { CaretLeft } from '../../../../components/icons';
 import { spacing } from '../../../../lib/theme';
 
 const LEGAL_LINKS = [
