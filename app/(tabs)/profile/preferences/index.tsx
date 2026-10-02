@@ -13,6 +13,7 @@ import {
   getFinishedBookPromptEnabled,
   setFinishedBookPromptEnabled,
 } from '../../../../lib/finishedBookPromptPreference';
+import { SPICE_OPTIONS, TRIGGER_OPTIONS } from '../../../../lib/guestPreferences';
 
 const READING_TIME_OPTIONS = [
   { key: 'Morning Light', label: 'Morning Light' },
@@ -29,25 +30,6 @@ const TROPE_OPTIONS = [
   { key: 'HISTORICAL_ROMANCE', label: '👑 Historical Romance' },
   { key: 'DARK_ROMANCE', label: '🖤 Dark Romance' },
   { key: 'SPICY_EROTIC_ROMANCE', label: '🔥 Spicy / Erotic Romance' },
-];
-
-const TRIGGER_OPTIONS = [
-  { key: 'cheating', label: '🚫 Cheating / Infidelity' },
-  { key: 'abuse', label: '🖤 Emotional or physical abuse' },
-  { key: 'mentalHealthTrauma', label: '🧠 Mental health trauma / self-harm' },
-  { key: 'violence', label: '🩸 Violence or graphic injury' },
-  { key: 'pregnancyLoss', label: '👶 Pregnancy loss / fertility struggle' },
-  { key: 'addiction', label: '🧪 Drug or addiction themes' },
-  { key: 'heavyHeartbreak', label: '😢 Heavy emotional heartbreak' },
-  { key: 'illness', label: '😰 Illness or injury' },
-];
-
-const SPICE_OPTIONS = [
-  { key: 'NONE', label: '🫖 Clean & cozy' },
-  { key: 'LIGHT', label: '😇 Keep it cute' },
-  { key: 'WARM', label: '🍹 A little kick' },
-  { key: 'HOT', label: "🥂 We're day drinking" },
-  { key: 'VERY_HOT', label: '🥵 Absolutely unhinged' },
 ];
 
 const SNACK_OPTIONS = [
@@ -94,7 +76,7 @@ function PrefCard({ label, children }: { label: string; children: React.ReactNod
 }
 
 function ChipGroup({ options, selected, onSelect }: {
-  options: { key: string; label: string }[];
+  options: readonly { key: string; label: string }[];
   selected: string | null;
   onSelect: (val: string) => void;
 }) {
@@ -116,7 +98,7 @@ function ChipGroup({ options, selected, onSelect }: {
 }
 
 function MultiChipGroup({ options, value, onChange, danger }: {
-  options: { key: string; label: string }[];
+  options: readonly { key: string; label: string }[];
   value: string[];
   onChange: (v: string[]) => void;
   danger?: boolean;

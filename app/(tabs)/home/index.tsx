@@ -15,6 +15,7 @@ import { normalizeRoute } from '../../../lib/routes';
 import { spacing, radius } from '../../../lib/theme';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { FeedbackModal } from '../../../components/FeedbackModal';
+import GuestPreferencesPrompt from '../../../components/GuestPreferencesPrompt';
 import LiveEventBanner from '../../../components/live/LiveEventBanner';
 import * as LocalAuthentication from 'expo-local-authentication';
 
@@ -379,14 +380,17 @@ export default function HomeScreen() {
         <Text style={styles.greeting}>{data.greeting.text}</Text>
 
         {isGuest === true && (
-          <TouchableOpacity
-            style={styles.memberSignIn}
-            onPress={() => router.push('/(auth)/login?from=guest' as any)}
-          >
-            <Text style={styles.memberSignInText}>
-              Already a member? <Text style={styles.memberSignInLink}>Sign in</Text>
-            </Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.memberSignIn}
+              onPress={() => router.push('/(auth)/login?from=guest' as any)}
+            >
+              <Text style={styles.memberSignInText}>
+                Already a member? <Text style={styles.memberSignInLink}>Sign in</Text>
+              </Text>
+            </TouchableOpacity>
+            <GuestPreferencesPrompt />
+          </>
         )}
 
         {/* CENTER CONTENT */}

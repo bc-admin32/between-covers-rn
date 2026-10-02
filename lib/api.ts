@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { ensureFresh, refreshSession, clearRefreshToken } from './auth';
+import { getGuestPreferencesHeader } from './guestPreferences';
 
 const API_BASE = 'https://api.betweencovers.app';
 
@@ -59,6 +60,13 @@ const GUEST_OPEN = new Set([
   'GET /taxonomy',
   'GET /legal',
   'POST /events/batch',
+]);
+const GUEST_PREFERENCE_PATHS = new Set([
+  '/catalog/filter',
+  '/cozy/home',
+  '/library/discover',
+  '/cozy/new-releases',
+  '/cozy/off-shelf',
 ]);
 
 function splitPath(path: string): [string, string] {
@@ -129,6 +137,11 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       throw new ApiError(401, { guestBlocked: true }, `Guest blocked: ${method} ${path}`);
     }
     url = rewritten;
+    const [pathname] = splitPath(path);
+    if (method === 'GET' && GUEST_PREFERENCE_PATHS.has(pathname)) {
+      const preferences = await getGuestPreferencesHeader();
+      if (preferences) headers['X-BC-Guest-Prefs'] = preferences;
+    }
   }
 
   let res = await fetch(`${API_BASE}${url}`, {

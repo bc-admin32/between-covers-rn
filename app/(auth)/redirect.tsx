@@ -11,6 +11,7 @@ import { getAttribution, clearAttribution } from '../../lib/attribution';
 import { landAfterAuth } from '../../lib/guest';
 import { saveRefreshToken } from '../../lib/auth';
 import { setSessionKnown } from '../../lib/useGuest';
+import { carryGuestPreferencesToAccount } from '../../lib/guestPreferences';
 
 const COGNITO_DOMAIN = 'https://auth.betweencovers.app';
 const CLIENT_ID = '4q0pjkqv3btdopk9n6q9ch776i';
@@ -64,6 +65,11 @@ export default function RedirectScreen() {
             if (res.ok) {
               const result = await res.json();
               if (result?.nextRoute?.startsWith('/')) {
+                try {
+                  await carryGuestPreferencesToAccount(idToken);
+                } catch (error) {
+                  console.warn('[guest-preferences] account transfer failed', error);
+                }
                 // Nav latch: enter the app at most once across instances.
                 if (!navigatedIntoApp) {
                   navigatedIntoApp = true;
@@ -189,6 +195,11 @@ export default function RedirectScreen() {
         setStatus(`Routing to ${result?.nextRoute}…`);
 
         if (result?.nextRoute?.startsWith('/')) {
+          try {
+            await carryGuestPreferencesToAccount(idToken);
+          } catch (error) {
+            console.warn('[guest-preferences] account transfer failed', error);
+          }
           // signup_completed fires exactly once per sign-in:
           //   existing account → here, now (accountType 'existing').
           //   new account (routed into onboarding) → held, and fired by
