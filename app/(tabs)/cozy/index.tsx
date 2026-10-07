@@ -15,6 +15,7 @@ import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
+import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
 
 const CACHE_KEY = 'bc_cozy_cache';
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
@@ -60,6 +61,8 @@ type CozyData = {
   theme: { title: string; tagline: string };
   sections: {
     spotlight?: { book: BookItem | null; alignment: any };
+    // The month's Book of the Month (also first in `books`), or absent.
+    bookOfMonth?: (BookOfMonth & { isBookOfMonth?: boolean }) | null;
     books?: BookItem[];
     visual?: VisualItem[];
     enhancements?: VisualItem[];
@@ -336,9 +339,13 @@ export default function CozyScreen() {
 
   const spotlightBook = data?.sections?.spotlight?.book ?? null;
   const books = data?.sections?.books ?? [];
+  const bookOfMonth = data?.sections?.bookOfMonth ?? null;
+  // The Book of the Month renders as its own featured card, so it's removed
+  // from the shelf row BEFORE the daily slice — the slice can never drop it.
+  const shelfBooks = bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books;
   const visual = data?.sections?.visual ?? [];
   const lifestyle = data?.sections ? resolveLifestyleItems(data.sections) : [];
-  const displayBooks = getDailyBookSlice(books);
+  const displayBooks = getDailyBookSlice(shelfBooks);
   const authorSpotlight = data?.sections?.authorSpotlight ?? null;
 
   return (
@@ -488,21 +495,24 @@ export default function CozyScreen() {
         )}
 
         {/* IRIS PICKS */}
-        {displayBooks.length > 0 && (
+        {(bookOfMonth || displayBooks.length > 0) && (
           <View style={styles.section}>
             <SectionHeader
               title="On Iris's Shelf"
               onViewAll={() => router.push('/(tabs)/cozy/books' as any)}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-              {displayBooks.map((book, i) => (
-                <SmallBookCard
-                  key={book?.workId ?? i}
-                  book={book}
-                  onPress={() => router.push(`/book?workId=${book.workId}` as any)}
-                />
-              ))}
-            </ScrollView>
+            {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
+            {displayBooks.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+                {displayBooks.map((book, i) => (
+                  <SmallBookCard
+                    key={book?.workId ?? i}
+                    book={book}
+                    onPress={() => router.push(`/book?workId=${book.workId}` as any)}
+                  />
+                ))}
+              </ScrollView>
+            )}
           </View>
         )}
 

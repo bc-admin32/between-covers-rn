@@ -10,6 +10,7 @@ import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
+import BookOfMonthCard, { type BookOfMonth } from '../../../../components/cozy/BookOfMonthCard';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -23,6 +24,7 @@ type BookItem = {
   tropes?: string[];
   primarySubgenre?: string | null;
   triggers?: string[];
+  isBookOfMonth?: boolean;
 };
 
 // Books are grouped under genre headers on this screen, so primarySubgenre is
@@ -45,16 +47,21 @@ export default function CozyBooksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [books, setBooks] = useState<BookItem[]>([]);
+  const [bookOfMonth, setBookOfMonth] = useState<BookOfMonth | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
-        const data =
+        const data: BookItem[] =
           response?.active?.sections?.BOOKS ??
           response?.active?.sections?.books ?? [];
         setBooks(data);
+        setBookOfMonth(
+          response?.active?.sections?.bookOfMonth ??
+          data.find((b) => b.isBookOfMonth) ?? null
+        );
       } catch {} finally {
         setLoading(false);
       }
@@ -64,7 +71,11 @@ export default function CozyBooksScreen() {
 
   // Group by primarySubgenre, ordered by the shared taxonomy so this screen's
   // genre order matches New Releases. Untagged books fall into "Other", last.
-  const sections = useMemo(() => groupBooksBySubgenre(books), [books]);
+  // The Book of the Month is featured above the groups, so it's left out of them.
+  const sections = useMemo(
+    () => groupBooksBySubgenre(bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books),
+    [books, bookOfMonth],
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -134,23 +145,26 @@ export default function CozyBooksScreen() {
             </Text>
           </View>
         ) : (
-          sections.map((section) => (
-            <View key={section.key} style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{section.label}</Text>
-                <Text style={styles.sectionCount}>{section.books.length}</Text>
+          <>
+            {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
+            {sections.map((section) => (
+              <View key={section.key} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{section.label}</Text>
+                  <Text style={styles.sectionCount}>{section.books.length}</Text>
+                </View>
+                <View style={styles.gridInner}>
+                  {section.books.map((book, i) => (
+                    <BookCard
+                      key={book.workId ?? i}
+                      book={toCard(book)}
+                      style={styles.bookCard}
+                    />
+                  ))}
+                </View>
               </View>
-              <View style={styles.gridInner}>
-                {section.books.map((book, i) => (
-                  <BookCard
-                    key={book.workId ?? i}
-                    book={toCard(book)}
-                    style={styles.bookCard}
-                  />
-                ))}
-              </View>
-            </View>
-          ))
+            ))}
+          </>
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
