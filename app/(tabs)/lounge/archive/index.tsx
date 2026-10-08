@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator,
+  StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
 import { useRouter } from 'expo-router';
@@ -12,7 +12,7 @@ import { parseLocalDate } from '../../../../lib/dateUtils';
 
 type ArchiveThread = {
   threadId: string;
-  sectionType: 'PRIMARY' | 'SECONDARY' | 'IRIS_THOUGHT' | 'MONTHLY_PROMPT';
+  sectionType: 'PRIMARY' | 'SECONDARY' | 'IRIS_THOUGHT' | 'MONTHLY_PROMPT' | 'BOOK_CLUB';
   label: string;
   body: string | null;
   replyCount: number;
@@ -24,7 +24,34 @@ type ArchiveWeek = {
   endDate: string;
   publishedAt: string | null;
   threads: ArchiveThread[];
+  bookClub?: ArchiveBookClub | null;
 };
+
+// A month's Book Club discussion. One per month, shown once above that
+// month's weeks. The response may carry it at the top level and/or on weeks;
+// both are read and de-duplicated by threadId.
+type ArchiveBookClub = {
+  type: 'BOOK_CLUB';
+  threadId: string;
+  month: string; // YYYY-MM
+  book: { workId: string; title: string; author: string; coverUrl: string | null };
+  body: string | null;
+  replyCount: number;
+  closed: boolean;
+};
+
+type ArchiveResponse = { weeks?: ArchiveWeek[]; bookClub?: ArchiveBookClub | null };
+
+function collectBookClubs(res: ArchiveResponse): ArchiveBookClub[] {
+  const seen = new Set<string>();
+  const out: ArchiveBookClub[] = [];
+  for (const club of [res.bookClub, ...(res.weeks ?? []).map((w) => w.bookClub)]) {
+    if (!club?.threadId || !club.book || seen.has(club.threadId)) continue;
+    seen.add(club.threadId);
+    out.push(club);
+  }
+  return out;
+}
 
 function formatWeekRange(startDate: string, endDate: string): string {
   const start = parseLocalDate(startDate);
@@ -38,6 +65,7 @@ function getThreadStyle(type: ArchiveThread['sectionType']) {
     case 'SECONDARY': return { color: '#5B5FC7', bg: '#E8E6FF' };
     case 'IRIS_THOUGHT': return { color: '#9B6B9B', bg: '#F1E8FF' };
     case 'MONTHLY_PROMPT': return { color: '#2E7D5C', bg: '#E0F4EC' };
+    case 'BOOK_CLUB': return { color: '#9A4A12', bg: '#FCEBDC' };
     default: return { color: '#6A5550', bg: '#F5F0EB' };
   }
 }
@@ -48,6 +76,7 @@ function getThreadTypeLabel(type: ArchiveThread['sectionType']): string {
     case 'SECONDARY': return 'Reading';
     case 'IRIS_THOUGHT': return 'Iris Has Thoughts';
     case 'MONTHLY_PROMPT': return 'Monthly Prompt';
+    case 'BOOK_CLUB': return 'Book Club';
     default: return 'Thread';
   }
 }
@@ -106,17 +135,68 @@ function WeekRow({ week, onThreadClick }: { week: ArchiveWeek; onThreadClick: (t
   );
 }
 
+function BookClubCard({ club, onPress }: { club: ArchiveBookClub; onPress: () => void }) {
+  const style = getThreadStyle('BOOK_CLUB');
+  return (
+    <TouchableOpacity style={[styles.threadCard, styles.clubCard]} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.threadCardHeader}>
+        <View style={[styles.tag, { backgroundColor: style.bg }]}>
+          <Text style={[styles.tagText, { color: style.color }]}>{getThreadTypeLabel('BOOK_CLUB')}</Text>
+        </View>
+        <Text style={styles.threadReplies}>{club.replyCount} {club.replyCount === 1 ? 'reply' : 'replies'}</Text>
+      </View>
+      <View style={styles.clubBook}>
+        {club.book.coverUrl ? (
+          <Image source={{ uri: club.book.coverUrl }} style={styles.clubCover} />
+        ) : (
+          <View style={[styles.clubCover, styles.clubCoverEmpty]}><Text>📖</Text></View>
+        )}
+        <View style={styles.clubBookText}>
+          <Text style={styles.clubEyebrow}>Book of the Month</Text>
+          <Text style={styles.clubTitle} numberOfLines={2}>{club.book.title}</Text>
+          <Text style={styles.clubAuthor} numberOfLines={1}>by {club.book.author}</Text>
+        </View>
+      </View>
+      <Text style={[styles.threadCta, { color: style.color }]}>Read the discussion →</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function LoungeArchiveScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [weeks, setWeeks] = useState<ArchiveWeek[]>([]);
+  const [bookClubs, setBookClubs] = useState<ArchiveBookClub[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiGet<{ weeks: ArchiveWeek[] }>('/lounge/archive')
-      .then((res) => setWeeks(res.weeks ?? []))
+    apiGet<ArchiveResponse>('/lounge/archive')
+      .then((res) => {
+        setWeeks(res.weeks ?? []);
+        setBookClubs(collectBookClubs(res));
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  // Each Book Club goes once, above the first listed week of its month.
+  // A club whose month has no archived week is shown at the very top.
+  const { clubBeforeWeek, unplacedClubs } = useMemo(() => {
+    const byMonth = new Map(bookClubs.map((c) => [c.month, c]));
+    const before = new Map<string, ArchiveBookClub>();
+    for (const w of weeks) {
+      const club = byMonth.get(w.startDate.slice(0, 7));
+      if (club) { before.set(w.weekId, club); byMonth.delete(club.month); }
+    }
+    return { clubBeforeWeek: before, unplacedClubs: [...byMonth.values()] };
+  }, [weeks, bookClubs]);
+
+  const openBookClub = (club: ArchiveBookClub) => router.push(
+    `/(tabs)/lounge/thread?id=${encodeURIComponent(club.threadId)}&kind=book_club` +
+    `&bookWorkId=${encodeURIComponent(club.book.workId)}` +
+    `&bookTitle=${encodeURIComponent(club.book.title)}` +
+    `&bookAuthor=${encodeURIComponent(club.book.author)}` +
+    `&bookCover=${encodeURIComponent(club.book.coverUrl ?? '')}` as any
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -134,13 +214,21 @@ export default function LoungeArchiveScreen() {
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : (
           <View style={styles.weeksList}>
-            {weeks.map((week) => (
-              <WeekRow
-                key={week.weekId}
-                week={week}
-                onThreadClick={(threadId) => router.push(`/(tabs)/lounge/thread?id=${encodeURIComponent(threadId)}` as any)}
-              />
+            {unplacedClubs.map((club) => (
+              <BookClubCard key={club.threadId} club={club} onPress={() => openBookClub(club)} />
             ))}
+            {weeks.map((week) => {
+              const club = clubBeforeWeek.get(week.weekId);
+              return (
+                <View key={week.weekId} style={styles.weekGroup}>
+                  {club && <BookClubCard club={club} onPress={() => openBookClub(club)} />}
+                  <WeekRow
+                    week={week}
+                    onThreadClick={(threadId) => router.push(`/(tabs)/lounge/thread?id=${encodeURIComponent(threadId)}` as any)}
+                  />
+                </View>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -173,4 +261,13 @@ const styles = StyleSheet.create({
   threadLabel: { fontSize: 18, color: '#1A1A2E', lineHeight: 24, marginBottom: spacing.xs },
   threadBody: { fontSize: 12, color: '#6A5550', lineHeight: 18, marginBottom: spacing.sm },
   threadCta: { fontSize: 11, fontWeight: '600' },
+  weekGroup: { gap: spacing.sm },
+  clubCard: { borderColor: '#F3D3B8' },
+  clubBook: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
+  clubCover: { width: 48, height: 72, borderRadius: 6, backgroundColor: '#E6EAF0' },
+  clubCoverEmpty: { alignItems: 'center', justifyContent: 'center' },
+  clubBookText: { flex: 1, justifyContent: 'center' },
+  clubEyebrow: { fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: '#9A4A12', fontWeight: '700', marginBottom: 2 },
+  clubTitle: { fontSize: 16, color: '#1A1A2E', lineHeight: 21 },
+  clubAuthor: { fontSize: 12, color: '#6A5550', marginTop: 1 },
 });
