@@ -28,12 +28,18 @@ type Reply = {
   isOwn: boolean; canEdit: boolean;
 };
 type Thread = {
-  threadId: string; type: 'THREAD' | 'IRIS_CHAT'; topicLabel: string | null;
+  threadId: string; type: 'THREAD' | 'IRIS_CHAT' | 'BOOK_CLUB'; topicLabel: string | null;
+  // Book Club threads only, if the backend includes it (the Lounge card also
+  // passes the book in the route params).
+  book?: ThreadBook | null;
   body: string | null; authorId: string; authorName: string;
   authorAvatar: string | null; weekId: string | null; replyCount: number;
   createdAt: string; expiresAt: string | null; isOwn: boolean; status?: string;
 };
 type ThreadResponse = { thread: Thread; replies: Reply[]; count: number; nextKey: string | null };
+type ThreadBook = { workId: string; title: string; author: string; coverUrl: string | null };
+
+const firstParam = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -167,13 +173,30 @@ export default function LoungeThreadScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, kind, bookWorkId, bookTitle, bookAuthor, bookCover } = useLocalSearchParams<{
+    id: string; kind?: string; bookWorkId?: string; bookTitle?: string; bookAuthor?: string; bookCover?: string;
+  }>();
   // Explicitly decode — Expo Router may leave %23 un-decoded, causing the
   // Lambda's startsWith("THREAD#") check to fail and build a broken pk.
   const rawId = Array.isArray(id) ? id[0] : id;
   const threadId = rawId ? decodeURIComponent(rawId) : null;
 
   const [thread, setThread] = useState<Thread | null>(null);
+
+  // Book Club: flagged by the Lounge card's route (kind=book_club) or by the
+  // thread itself. The book comes from the thread if the backend sends it,
+  // else from the route params.
+  const routeBook: ThreadBook | null = firstParam(bookWorkId) && firstParam(bookTitle)
+    ? {
+        workId: firstParam(bookWorkId)!,
+        title: firstParam(bookTitle)!,
+        author: firstParam(bookAuthor) ?? '',
+        coverUrl: firstParam(bookCover) || null,
+      }
+    : null;
+  const isBookClub = firstParam(kind) === 'book_club' || thread?.type === 'BOOK_CLUB';
+  const clubBook = isBookClub ? (thread?.book ?? routeBook) : null;
+  const replySource = isBookClub ? 'book_club' : 'lounge_reply';
   const [replies, setReplies] = useState<Reply[]>([]);
   const [nextKey, setNextKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -253,20 +276,20 @@ export default function LoungeThreadScreen() {
   }, [threadId, requireAccount]);
 
   const handleReplyTo = useCallback((reply: Reply) => {
-    if (requireAccount('reply', { source: 'lounge_reply' })) return;
+    if (requireAccount('reply', { source: replySource })) return;
     Haptics.selectionAsync();
     setReplyingTo(reply);
-  }, [requireAccount]);
+  }, [requireAccount, replySource]);
 
   const handleEdit = useCallback((reply: Reply) => {
-    if (requireAccount('reply', { source: 'lounge_reply' })) return;
+    if (requireAccount('reply', { source: replySource })) return;
     setEditingReply(reply);
     setEditText(reply.body ?? '');
-  }, [requireAccount]);
+  }, [requireAccount, replySource]);
 
   const submitReply = async () => {
     if (submitting || !text.trim()) return;
-    if (requireAccount('reply', { source: 'lounge_reply' })) return;
+    if (requireAccount('reply', { source: replySource })) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     setSubmitError(null);
@@ -306,7 +329,7 @@ export default function LoungeThreadScreen() {
 
   const submitEdit = async () => {
     if (!editingReply || !editText.trim() || editSubmitting) return;
-    if (requireAccount('reply', { source: 'lounge_reply' })) return;
+    if (requireAccount('reply', { source: replySource })) return;
     setEditError(null);
     setEditSubmitting(true);
     try {
@@ -373,10 +396,28 @@ export default function LoungeThreadScreen() {
               <CaretLeft size={16} color={isIrisChat ? '#9B6B9B' : '#B09A7E'} weight="bold" />
             </TouchableOpacity>
             <Text style={[styles.threadCardLabel, isIrisChat && styles.threadCardLabelIris]}>
-              {isIrisChat ? 'Iris Has Thoughts' : thread.topicLabel ?? 'Discussion'}
+              {isIrisChat ? 'Iris Has Thoughts' : isBookClub ? 'Book Club' : thread.topicLabel ?? 'Discussion'}
             </Text>
             <Text style={styles.threadCardReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
           </View>
+          {clubBook && (
+            <TouchableOpacity
+              style={styles.clubBook}
+              activeOpacity={0.85}
+              onPress={() => router.push(`/book?workId=${encodeURIComponent(clubBook.workId)}` as any)}
+            >
+              {clubBook.coverUrl ? (
+                <Image source={{ uri: clubBook.coverUrl }} style={styles.clubBookCover} contentFit="cover" />
+              ) : (
+                <View style={[styles.clubBookCover, styles.clubBookCoverEmpty]}><Text>📖</Text></View>
+              )}
+              <View style={styles.clubBookText}>
+                <Text style={styles.clubBookEyebrow}>Book of the Month</Text>
+                <Text style={styles.clubBookTitle} numberOfLines={2}>{clubBook.title}</Text>
+                {!!clubBook.author && <Text style={styles.clubBookAuthor} numberOfLines={1}>by {clubBook.author}</Text>}
+              </View>
+            </TouchableOpacity>
+          )}
           <View style={styles.threadCardAuthor}>
             <Avatar url={thread.authorAvatar} name={thread.authorName} size={34} isIris={isIrisChat} />
             <View>
@@ -498,6 +539,13 @@ const styles = StyleSheet.create({
   threadCard: { backgroundColor: '#FDFAF6', borderRadius: 20, padding: spacing.md, borderWidth: 1, borderColor: '#DDD5C4', marginBottom: spacing.sm },
   threadDivider: { height: 1, backgroundColor: 'rgba(196,168,130,0.25)', marginBottom: spacing.sm },
   threadCardIris: { borderColor: '#E8D5E5' },
+  clubBook: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm, padding: spacing.sm, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#F0E2E6' },
+  clubBookCover: { width: 44, height: 66, borderRadius: 6, backgroundColor: '#E6EAF0' },
+  clubBookCoverEmpty: { alignItems: 'center', justifyContent: 'center' },
+  clubBookText: { flex: 1 },
+  clubBookEyebrow: { fontSize: 9, letterSpacing: 1.4, textTransform: 'uppercase', color: '#B83255', fontFamily: 'Nunito_700Bold', marginBottom: 2 },
+  clubBookTitle: { fontSize: 14, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 18 },
+  clubBookAuthor: { fontSize: 11, color: '#6A5550', marginTop: 1 },
   threadCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   threadCardLabel: { flex: 1, fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold' },
   threadCardLabelIris: { color: '#9B6B9B' },

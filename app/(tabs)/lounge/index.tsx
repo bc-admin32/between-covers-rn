@@ -23,7 +23,11 @@ type Section =
   | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
   | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null; replyCount?: number }
   | { type: 'POLL'; sk: string; pollId: string; question: string; options: PollOption[]; totalVotes: number; hasVoted: boolean; selectedOptionId: string | null; isHot: boolean }
-  | { type: 'MONTHLY_PROMPT'; promptId: string; title: string; body: string; submissionsOpen: boolean; closesAt: string | null; submissionCount: number; userHasSubmitted: boolean; userSubmission: string | null; isHot: boolean; anonymous?: boolean };
+  | { type: 'MONTHLY_PROMPT'; promptId: string; title: string; body: string; submissionsOpen: boolean; closesAt: string | null; submissionCount: number; userHasSubmitted: boolean; userSubmission: string | null; isHot: boolean; anonymous?: boolean }
+  // Month-long discussion of the Cozy Book of the Month, opened by Iris.
+  | { type: 'BOOK_CLUB'; threadId: string; month: string; book: { workId: string; title: string; author: string; coverUrl: string | null }; body: string | null; authorName: string | null; replyCount: number; isOpen: boolean };
+// Sections are always looked up by type (sections.find), so a type this build
+// doesn't know about is simply never rendered.
 
 type LoungeData = {
   active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
@@ -205,6 +209,7 @@ export default function LoungeScreen() {
   const iris = active.sections.find((s) => s.type === 'IRIS_THOUGHT') as Extract<Section, { type: 'IRIS_THOUGHT' }> | undefined;
   const poll = active.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
   const monthly = active.sections.find((s) => s.type === 'MONTHLY_PROMPT') as Extract<Section, { type: 'MONTHLY_PROMPT' }> | undefined;
+  const bookClub = active.sections.find((s) => s.type === 'BOOK_CLUB') as Extract<Section, { type: 'BOOK_CLUB' }> | undefined;
 
   const hasVoted = poll?.hasVoted || !!pollResult;
   const pollOptions = pollResult?.options ?? poll?.options ?? [];
@@ -269,6 +274,56 @@ export default function LoungeScreen() {
         </View>
 
         <Divider />
+
+        {/* BOOK CLUB — month-long discussion of the Book of the Month. The
+            book rides along in the route so the thread screen can show it.
+            Guests see it too; replying goes through the thread screen's
+            sign-up gate. */}
+        {bookClub?.threadId && bookClub.book && (
+          <View style={[styles.card, styles.bookClubCard]}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>Book Club</Text>
+              {!bookClub.isOpen && <Text style={styles.cardFooterNote}>Discussion closed</Text>}
+            </View>
+            <View style={styles.bookClubBook}>
+              {bookClub.book.coverUrl ? (
+                <Image source={{ uri: bookClub.book.coverUrl }} style={styles.bookClubCover} />
+              ) : (
+                <View style={[styles.bookClubCover, styles.bookClubCoverEmpty]}><Text>📖</Text></View>
+              )}
+              <View style={styles.bookClubBookText}>
+                <Text style={styles.bookClubEyebrow}>Book of the Month</Text>
+                <Text style={styles.bookClubTitle} numberOfLines={2}>{bookClub.book.title}</Text>
+                <Text style={styles.bookClubAuthor} numberOfLines={1}>by {bookClub.book.author}</Text>
+              </View>
+            </View>
+            {!!bookClub.body && (
+              <Text style={styles.cardDescription} numberOfLines={4}>
+                <Text style={styles.bookClubOpenerBy}>{bookClub.authorName ?? 'Iris'}: </Text>
+                {bookClub.body}
+              </Text>
+            )}
+            <View style={styles.cardFooter}>
+              <Text style={styles.cardFooterNote}>
+                {bookClub.replyCount > 0
+                  ? `💬 ${bookClub.replyCount} ${bookClub.replyCount === 1 ? 'reply' : 'replies'}`
+                  : '💬 No replies yet'}
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => router.push(
+                  `/lounge/thread?id=${encodeURIComponent(bookClub.threadId)}&kind=book_club` +
+                  `&bookWorkId=${encodeURIComponent(bookClub.book.workId)}` +
+                  `&bookTitle=${encodeURIComponent(bookClub.book.title)}` +
+                  `&bookAuthor=${encodeURIComponent(bookClub.book.author)}` +
+                  `&bookCover=${encodeURIComponent(bookClub.book.coverUrl ?? '')}` as any
+                )}
+              >
+                <Text style={styles.primaryButtonText}>{bookClub.isOpen ? 'Join the discussion' : 'Read the discussion'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* PRIMARY THREAD */}
         {primary && (
@@ -501,6 +556,15 @@ const styles = StyleSheet.create({
   dividerStar: { marginHorizontal: spacing.sm, color: '#C4A882', fontSize: 12 },
   card: { marginHorizontal: spacing.md, marginBottom: spacing.sm, backgroundColor: '#FDFAF6', borderRadius: 20, padding: spacing.lg, borderWidth: 1, borderColor: '#DDD5C4' },
   irisCard: { backgroundColor: '#FDFAF6', borderColor: '#E8D5E5' },
+  bookClubCard: { borderColor: '#E8B4C3' },
+  bookClubBook: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
+  bookClubCover: { width: 64, height: 96, borderRadius: 8, backgroundColor: '#E6EAF0' },
+  bookClubCoverEmpty: { alignItems: 'center', justifyContent: 'center' },
+  bookClubBookText: { flex: 1, justifyContent: 'center' },
+  bookClubEyebrow: { fontSize: 9, letterSpacing: 1.4, textTransform: 'uppercase', color: '#B83255', fontFamily: 'Nunito_700Bold', marginBottom: 4 },
+  bookClubTitle: { fontSize: 18, color: '#1A1A2E', fontFamily: 'Nunito_700Bold_Italic', lineHeight: 23 },
+  bookClubAuthor: { fontSize: 12, color: '#6A5550', marginTop: 2 },
+  bookClubOpenerBy: { fontFamily: 'Nunito_700Bold', color: '#9B6B9B' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   cardLabel: { fontSize: 9, letterSpacing: 1.8, textTransform: 'uppercase', color: '#B09A7E', fontFamily: 'Nunito_700Bold' },
   hotBadge: { backgroundColor: '#FFE5E5', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },

@@ -15,7 +15,8 @@ export type GateReason =
 export type SignupSource =
   | 'lounge_react' | 'lounge_reply' | 'poll_vote' | 'confession' | 'monthly_submit'
   | 'lounge_report' | 'iris_send' | 'live_watch' | 'live_rsvp' | 'cozy_rate'
-  | 'book_rate' | 'cozy_event' | 'profile' | 'submissions' | 'feedback' | 'library';
+  | 'book_rate' | 'cozy_event' | 'profile' | 'submissions' | 'feedback' | 'library'
+  | 'book_club';
 
 // Last known session state, shared across hook instances so a newly mounted
 // screen doesn't start from "unknown". Refreshed on every mount.
