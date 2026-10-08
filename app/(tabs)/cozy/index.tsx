@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
   StyleSheet, ActivityIndicator, Image, Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight } from '../../../components/icons';
 import * as SecureStore from 'expo-secure-store';
@@ -254,6 +254,14 @@ export default function CozyScreen() {
   const [activeMovie, setActiveMovie] = useState<VisualItem | null>(null);
   const [movieSheetOpen, setMovieSheetOpen] = useState(false);
 
+  // Last /cozy/home body we rendered, so a focus refetch that returns the
+  // same payload doesn't re-render (or re-fire section analytics).
+  const lastBodyRef = useRef<string | null>(null);
+  // Set while applying a focus refetch so cozy_section_viewed isn't re-sent
+  // for what is the same screen visit.
+  const skipSectionTrackRef = useRef(false);
+  const hasFocusedRef = useRef(false);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -264,14 +272,39 @@ export default function CozyScreen() {
           setLoading(false);
         }
         const response = await apiGet('/cozy/home');
+        const body = JSON.stringify(response);
+        lastBodyRef.current = body;
         setData(response?.active ?? null);
-        await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(response));
+        await SecureStore.setItemAsync(CACHE_KEY, body);
       } catch {} finally {
         setLoading(false);
       }
     };
     load();
   }, []);
+
+  // Refetch whenever the Cozy tab regains focus (tabs stay mounted), so a
+  // change on Profile → Preferences — e.g. the personalized "I Saw This Book
+  // and Thought of You" pick — shows right away. The first focus is the
+  // mount, which the effect above already loads.
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedRef.current) { hasFocusedRef.current = true; return; }
+      let cancelled = false;
+      apiGet('/cozy/home')
+        .then(async (response) => {
+          if (cancelled) return;
+          const body = JSON.stringify(response);
+          if (body === lastBodyRef.current) return;
+          lastBodyRef.current = body;
+          skipSectionTrackRef.current = true;
+          setData(response?.active ?? null);
+          await SecureStore.setItemAsync(CACHE_KEY, body);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   // Off Shelf is a standalone endpoint (see plan). Kept in its own effect so it
   // can be folded into /cozy/home later in one spot if the backend prefers a
@@ -288,8 +321,10 @@ export default function CozyScreen() {
 
   // Fire one cozy_section_viewed per section that actually renders for this user.
   // Only fires once per data load (the data identity is the dep), so it's not
-  // re-firing on every re-render.
+  // re-firing on every re-render. A focus refetch (see above) is not a new
+  // visit, so it doesn't re-fire.
   useEffect(() => {
+    if (skipSectionTrackRef.current) { skipSectionTrackRef.current = false; return; }
     if (!data?.sections) return;
     const sections = data.sections;
     if (sections.spotlight?.book) track('cozy_section_viewed', { section: 'spotlight' });

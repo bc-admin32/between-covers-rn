@@ -7,7 +7,8 @@ import { CaretLeft } from '../../../../components/icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { apiGet, apiPatch } from '../../../../lib/api';
+import { apiGet, apiPatch, ApiError } from '../../../../lib/api';
+import { TROPES, prettifyEnum } from '../../../../lib/tagTaxonomy';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import {
   getFinishedBookPromptEnabled,
@@ -30,6 +31,20 @@ const TROPE_OPTIONS = [
   { key: 'HISTORICAL_ROMANCE', label: '👑 Historical Romance' },
   { key: 'DARK_ROMANCE', label: '🖤 Dark Romance' },
   { key: 'SPICY_EROTIC_ROMANCE', label: '🔥 Spicy / Erotic Romance' },
+];
+
+// Favorite Tropes (saved as `tropes`) — NOT the subgenre list above, which is
+// historically named TROPE_OPTIONS. Options come from GET /taxonomy?type=TROPE,
+// the same vocabulary books are tagged with; this curated set is the fallback
+// if that fetch fails.
+const MAX_FAVORITE_TROPES = 5;
+const FAVORITE_TROPE_FALLBACK = TROPES.map((t) => ({ key: t.key as string, label: t.label }));
+
+// LGBTQ+ romance (saved as `lgbtqPreference`; nothing selected = null).
+const LGBTQ_PREFERENCE_OPTIONS = [
+  { key: 'LOVE', label: 'Love it' },
+  { key: 'OPEN', label: 'Open to it' },
+  { key: 'NOT_FOR_ME', label: 'Not for me' },
 ];
 
 const SNACK_OPTIONS = [
@@ -97,20 +112,26 @@ function ChipGroup({ options, selected, onSelect }: {
   );
 }
 
-function MultiChipGroup({ options, value, onChange, danger }: {
+function MultiChipGroup({ options, value, onChange, danger, max }: {
   options: readonly { key: string; label: string }[];
   value: string[];
   onChange: (v: string[]) => void;
   danger?: boolean;
+  // Once `max` are selected, unselected chips are disabled (selected ones
+  // stay tappable so they can be removed).
+  max?: number;
 }) {
+  const atMax = max != null && value.length >= max;
   return (
     <View style={styles.chipGroup}>
       {options.map(({ key, label }) => {
         const active = value.includes(key);
+        const disabled = !active && atMax;
         return (
           <TouchableOpacity
             key={key}
-            style={[styles.chip, active && (danger ? styles.chipDanger : styles.chipSelected)]}
+            disabled={disabled}
+            style={[styles.chip, active && (danger ? styles.chipDanger : styles.chipSelected), disabled && styles.chipDisabled]}
             onPress={() => onChange(active ? value.filter((v) => v !== key) : [...value, key])}
           >
             <Text style={[styles.chipText, active && styles.chipTextSelected]}>
@@ -137,6 +158,10 @@ export default function ReadingPreferencesScreen() {
   const [snacks, setSnacks] = useState<string[]>([]);
   const [drinks, setDrinks] = useState<string[]>([]);
   const [readingLocation, setReadingLocation] = useState<string | null>(null);
+  const [favoriteTropes, setFavoriteTropes] = useState<string[]>([]);
+  const [lgbtqPreference, setLgbtqPreference] = useState<string | null>(null);
+  const [tropeOptions, setTropeOptions] = useState<{ key: string; label: string }[]>(FAVORITE_TROPE_FALLBACK);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Local-only (SecureStore, not /profile) — unlike the fields above, this
   // writes immediately on toggle rather than batching into "Save
@@ -153,12 +178,31 @@ export default function ReadingPreferencesScreen() {
       setSnacks(data.snacks ?? []);
       setDrinks(data.drinks ?? []);
       setReadingLocation(data.readingLocation ?? null);
+      setFavoriteTropes(Array.isArray(data.tropes) ? data.tropes : []);
+      setLgbtqPreference(data.lgbtqPreference ?? null);
       setFinishedBookPromptEnabledState(await getFinishedBookPromptEnabled());
       setSaved(true);
       setLoading(false);
     };
     load();
+
+    // Trope vocabulary; keeps the fallback list if this fails.
+    apiGet<{ items?: { sk: string; label: string }[] }>('/taxonomy?type=TROPE')
+      .then((res) => {
+        const items = (res?.items ?? []).filter((i) => i?.sk && i?.label);
+        if (items.length) setTropeOptions(items.map((i) => ({ key: i.sk, label: i.label })));
+      })
+      .catch(() => {});
   }, []);
+
+  // Saved tropes missing from the current option list (e.g. the fallback
+  // list is showing) still appear, so they can be seen and removed.
+  const favoriteTropeChips = [
+    ...tropeOptions,
+    ...favoriteTropes
+      .filter((k) => !tropeOptions.some((o) => o.key === k))
+      .map((k) => ({ key: k, label: prettifyEnum(k) })),
+  ];
 
   const handleFinishedBookPromptToggle = async (v: boolean) => {
     Haptics.selectionAsync();
@@ -169,19 +213,31 @@ export default function ReadingPreferencesScreen() {
   const save = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSaving(true);
+    setSaveError(null);
     const comfortMap: Record<string, boolean> = {};
     comfortBoundaries.forEach((k) => (comfortMap[k] = true));
-    await apiPatch('/profile', {
-      readingTime: readingTime ? { preferredWindow: readingTime } : null,
-      genres,
-      comfortBoundaries: comfortMap,
-      spiceLevel,
-      snacks,
-      drinks,
-      readingLocation,
-    });
-    setSaved(true);
-    setSaving(false);
+    try {
+      await apiPatch('/profile', {
+        readingTime: readingTime ? { preferredWindow: readingTime } : null,
+        genres,
+        comfortBoundaries: comfortMap,
+        spiceLevel,
+        snacks,
+        drinks,
+        readingLocation,
+        tropes: favoriteTropes,
+        lgbtqPreference,
+      });
+      setSaved(true);
+    } catch (err) {
+      const body = err instanceof ApiError ? (err.body ?? {}) as { message?: unknown; error?: unknown } : {};
+      const msg = typeof body.message === 'string' ? body.message
+        : typeof body.error === 'string' ? body.error
+        : "Couldn't save your preferences. Please try again.";
+      setSaveError(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const markUnsaved = () => setSaved(false);
@@ -217,6 +273,27 @@ export default function ReadingPreferencesScreen() {
 
           <PrefCard label="Favorite Genres">
             <MultiChipGroup options={TROPE_OPTIONS} value={genres} onChange={(v) => { Haptics.selectionAsync(); setGenres(v); markUnsaved(); }} />
+          </PrefCard>
+
+          <PrefCard label="Favorite Tropes">
+            <Text style={styles.tropeCount}>{favoriteTropes.length} of {MAX_FAVORITE_TROPES}</Text>
+            <MultiChipGroup
+              options={favoriteTropeChips}
+              value={favoriteTropes}
+              max={MAX_FAVORITE_TROPES}
+              onChange={(v) => { Haptics.selectionAsync(); setFavoriteTropes(v); markUnsaved(); }}
+            />
+          </PrefCard>
+
+          <PrefCard label="LGBTQ+ Romance">
+            <ChipGroup
+              options={LGBTQ_PREFERENCE_OPTIONS}
+              selected={lgbtqPreference}
+              onSelect={(v) => { Haptics.selectionAsync(); setLgbtqPreference((prev) => (prev === v ? null : v)); markUnsaved(); }}
+            />
+            <Text style={styles.prefNote}>
+              {"This only shapes Iris's personal pick for you — you'll still see every book."}
+            </Text>
           </PrefCard>
 
           <PrefCard label="Comfort Boundaries">
@@ -263,6 +340,7 @@ export default function ReadingPreferencesScreen() {
               {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Preferences'}
             </Text>
           </TouchableOpacity>
+          {saveError && <Text style={styles.saveError}>{saveError}</Text>}
         </View>
 
         <View style={{ height: 100 }} />
@@ -292,6 +370,10 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff' },
   chipSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
   chipDanger: { backgroundColor: '#B83255', borderColor: '#B83255' },
+  chipDisabled: { opacity: 0.4 },
+  tropeCount: { fontSize: 11, color: '#A9C0D4', fontFamily: 'Lato_700Bold', marginBottom: spacing.sm, textAlign: 'right' },
+  prefNote: { fontSize: 12, color: '#A9C0D4', lineHeight: 18, marginTop: spacing.md },
+  saveError: { fontSize: 12, color: '#B83255', textAlign: 'center', marginTop: spacing.sm },
   chipText: { fontSize: 12, color: '#0F2A48' },
   chipTextSelected: { color: '#fff', fontWeight: '700' },
   saveButton: { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
