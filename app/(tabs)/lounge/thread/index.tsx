@@ -14,18 +14,22 @@ import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
+import {
+  SpoilerCover, SpoilerTag, SpoilerToggle, useSpoilerReveal, isThreadClosedError, THREAD_CLOSED_MESSAGE,
+} from '../../../../components/lounge/Spoiler';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
 type Reaction = { emoji: string; count: number; reactedByMe: boolean };
-type ReplyTo = { replyId: string; displayName: string; bodySnippet: string | null };
+// spoiler: the quoted reply is a spoiler — bodySnippet is never sent or shown.
+type ReplyTo = { replyId: string; displayName: string; bodySnippet: string | null; spoiler?: boolean };
 type Reply = {
   replyId: string; sk: string; threadId: string; userId: string;
   displayName: string; avatarUrl: string | null; body: string | null;
   mediaUrl: string | null; gifUrl: string | null; replyTo: ReplyTo | null;
   reactions: Reaction[]; createdAt: string; editedAt: string | null;
-  isOwn: boolean; canEdit: boolean;
+  isOwn: boolean; canEdit: boolean; spoiler?: boolean;
 };
 type Thread = {
   threadId: string; type: 'THREAD' | 'IRIS_CHAT' | 'BOOK_CLUB'; topicLabel: string | null;
@@ -35,6 +39,8 @@ type Thread = {
   body: string | null; authorId: string; authorName: string;
   authorAvatar: string | null; weekId: string | null; replyCount: number;
   createdAt: string; expiresAt: string | null; isOwn: boolean; status?: string;
+  // Set once the discussion is closed (e.g. the Book Club at month end).
+  closed?: boolean;
 };
 type ThreadResponse = { thread: Thread; replies: Reply[]; count: number; nextKey: string | null };
 type ThreadBook = { workId: string; title: string; author: string; coverUrl: string | null };
@@ -85,14 +91,16 @@ function ReactionBar({ replyId, reactions, onReact }: { replyId: string; reactio
   );
 }
 
-function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, threadId }: {
+function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, threadId, revealed, onReveal }: {
   reply: Reply; onReact: (replyId: string, emoji: string) => void;
   onReplyTo: (reply: Reply) => void; onEdit: (reply: Reply) => void;
   onBlock: (userId: string) => void; onToast: (msg: string) => void;
-  threadId: string;
+  threadId: string; revealed: boolean; onReveal: (replyId: string) => void;
 }) {
   const isIris = reply.userId === 'IRIS';
   const [showEmojiTray, setShowEmojiTray] = useState(false);
+  // Others' spoilers stay covered (text + image) until tapped; own ones never are.
+  const covered = !!reply.spoiler && !reply.isOwn && !revealed;
 
   return (
     <View style={styles.replyRow}>
@@ -101,10 +109,16 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, thread
         {reply.replyTo && (
           <View style={styles.replyToBar}>
             <View style={styles.replyToLine} />
-            <Text style={styles.replyToText}>
-              <Text style={styles.replyToName}>↩ @{reply.replyTo.displayName}</Text>
-              {reply.replyTo.bodySnippet && ` ${reply.replyTo.bodySnippet}`}
-            </Text>
+            {reply.replyTo.spoiler ? (
+              <Text style={styles.replyToText}>
+                ↩ Replying to <Text style={styles.replyToName}>@{reply.replyTo.displayName}</Text> · spoiler
+              </Text>
+            ) : (
+              <Text style={styles.replyToText}>
+                <Text style={styles.replyToName}>↩ @{reply.replyTo.displayName}</Text>
+                {reply.replyTo.bodySnippet && ` ${reply.replyTo.bodySnippet}`}
+              </Text>
+            )}
           </View>
         )}
         <View style={[styles.bubble, isIris ? styles.irisBubble : styles.userBubble]}>
@@ -116,8 +130,15 @@ function ReplyCard({ reply, onReact, onReplyTo, onEdit, onBlock, onToast, thread
             <Text style={styles.bubbleTime}>{timeAgo(reply.createdAt)}</Text>
             {reply.editedAt && <Text style={styles.editedLabel}> · edited</Text>}
           </View>
-          {reply.body && <Text style={styles.bubbleBody}>{reply.body}</Text>}
-          {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+          {!!reply.spoiler && !covered && <SpoilerTag />}
+          {covered ? (
+            <SpoilerCover onReveal={() => onReveal(reply.replyId)} />
+          ) : (
+            <>
+              {reply.body && <Text style={styles.bubbleBody}>{reply.body}</Text>}
+              {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+            </>
+          )}
         </View>
 
         <View style={styles.replyActions}>
@@ -194,7 +215,7 @@ export default function LoungeThreadScreen() {
         coverUrl: firstParam(bookCover) || null,
       }
     : null;
-  const isBookClub = firstParam(kind) === 'book_club' || thread?.type === 'BOOK_CLUB';
+  const isBookClub = firstParam(kind) === 'book_club' || thread?.type === 'BOOK_CLUB' || !!thread?.book;
   const clubBook = isBookClub ? (thread?.book ?? routeBook) : null;
   const replySource = isBookClub ? 'book_club' : 'lounge_reply';
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -210,6 +231,10 @@ export default function LoungeThreadScreen() {
   const [editText, setEditText] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  // Spoiler flag for the composer and for the reply being edited.
+  const [spoiler, setSpoiler] = useState(false);
+  const [editSpoiler, setEditSpoiler] = useState(false);
+  const { isRevealed, reveal } = useSpoilerReveal();
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -285,7 +310,15 @@ export default function LoungeThreadScreen() {
     if (requireAccount('reply', { source: replySource })) return;
     setEditingReply(reply);
     setEditText(reply.body ?? '');
+    setEditSpoiler(!!reply.spoiler);
   }, [requireAccount, replySource]);
+
+  // A 403 "This discussion is closed." means the thread closed while open
+  // here — flip to the closed state so the composer goes away.
+  const markClosed = useCallback(() => {
+    setThread((t) => (t ? { ...t, closed: true } : t));
+    setEditingReply(null);
+  }, []);
 
   const submitReply = async () => {
     if (submitting || !text.trim()) return;
@@ -294,20 +327,26 @@ export default function LoungeThreadScreen() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const replyToPayload = replyingTo ? {
+      // Never quote a spoiler's text — flag the quote instead.
+      const replyToPayload = replyingTo ? (replyingTo.spoiler ? {
+        replyId: replyingTo.replyId,
+        displayName: replyingTo.displayName,
+        spoiler: true,
+      } : {
         replyId: replyingTo.replyId,
         displayName: replyingTo.displayName,
         bodySnippet: replyingTo.body ? replyingTo.body.slice(0, 120) : null,
-      } : null;
+      }) : null;
 
       const res = await apiPost<{ result: string; message: string; reply?: Reply }>(
         '/lounge/thread/reply',
-        { threadId, content: text.trim(), replyTo: replyToPayload }
+        { threadId, content: text.trim(), replyTo: replyToPayload, ...(spoiler ? { spoiler: true } : {}) }
       );
 
       if (res.result === 'published' && res.reply) {
-        setReplies((prev) => [...prev, { ...res.reply!, reactions: [], editedAt: null, canEdit: true, sk: res.reply!.sk ?? '' }]);
+        setReplies((prev) => [...prev, { ...res.reply!, spoiler: res.reply!.spoiler ?? spoiler, reactions: [], editedAt: null, canEdit: true, sk: res.reply!.sk ?? '' }]);
         setText('');
+        setSpoiler(false);
         setReplyingTo(null);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         // Refresh in background to populate sk on newly posted replies (required for edits)
@@ -320,8 +359,9 @@ export default function LoungeThreadScreen() {
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That reply didn't quite fit the vibe — give it another go! 💛");
       }
-    } catch {
-      setSubmitError('Something went wrong. Try again in a moment.');
+    } catch (err) {
+      if (isThreadClosedError(err)) markClosed();
+      else setSubmitError('Something went wrong. Try again in a moment.');
     } finally {
       setSubmitting(false);
     }
@@ -333,19 +373,20 @@ export default function LoungeThreadScreen() {
     setEditError(null);
     setEditSubmitting(true);
     try {
-      const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean } }>(
+      const res = await apiPost<{ result: string; reply?: { replyId: string; body: string; editedAt: string; canEdit: boolean; spoiler?: boolean } }>(
         '/lounge/thread/edit',
-        { threadId, replyId: editingReply.replyId, sk: editingReply.sk, content: editText.trim() }
+        { threadId, replyId: editingReply.replyId, sk: editingReply.sk, content: editText.trim(), spoiler: editSpoiler }
       );
       if (res.result === 'updated' && res.reply) {
-        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit } : r));
+        setReplies((prev) => prev.map((r) => r.replyId === editingReply.replyId ? { ...r, body: res.reply!.body, editedAt: res.reply!.editedAt, canEdit: res.reply!.canEdit, spoiler: res.reply!.spoiler ?? editSpoiler } : r));
         setEditingReply(null);
         setEditText('');
       } else {
         setEditError("Couldn't save your edit. Please try again.");
       }
-    } catch {
-      setEditError("Couldn't save your edit. Please try again.");
+    } catch (err) {
+      if (isThreadClosedError(err)) markClosed();
+      else setEditError("Couldn't save your edit. Please try again.");
     } finally {
       setEditSubmitting(false);
     }
@@ -372,7 +413,7 @@ export default function LoungeThreadScreen() {
   }
 
   const isIrisChat = thread.type === 'IRIS_CHAT';
-  const isClosed = thread.status === 'closed';
+  const isClosed = thread.status === 'closed' || thread.closed === true;
 
   const visibleReplies = replies.filter((r) => !blockedUsers.includes(r.userId));
 
@@ -446,6 +487,9 @@ export default function LoungeThreadScreen() {
                   style={styles.editInput}
                   autoFocus
                 />
+                <View style={styles.editSpoilerRow}>
+                  <SpoilerToggle value={editSpoiler} onChange={setEditSpoiler} disabled={editSubmitting} />
+                </View>
                 <View style={styles.editActions}>
                   <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); setEditError(null); }} style={styles.editCancelButton} disabled={editSubmitting}>
                     <Text style={styles.editCancelText}>Cancel</Text>
@@ -459,7 +503,8 @@ export default function LoungeThreadScreen() {
                 ) : null}
               </View>
             ) : (
-              <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} onBlock={handleBlock} onToast={showToast} threadId={threadId!} />
+              <ReplyCard key={reply.replyId} reply={reply} onReact={handleReact} onReplyTo={handleReplyTo} onEdit={handleEdit} onBlock={handleBlock} onToast={showToast} threadId={threadId!}
+                revealed={isRevealed(reply.replyId)} onReveal={reveal} />
             )
           ))
         )}
@@ -471,7 +516,7 @@ export default function LoungeThreadScreen() {
         <View style={[styles.closedBar, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
           <View style={styles.closedPill}>
             <Text style={styles.closedEmoji}>🔒</Text>
-            <Text style={styles.closedText}>This conversation has closed</Text>
+            <Text style={styles.closedText}>{thread.closed ? THREAD_CLOSED_MESSAGE : 'This conversation has closed'}</Text>
           </View>
           <Text style={styles.closedSubtext}>Thanks for being part of it ✦</Text>
         </View>
@@ -479,7 +524,9 @@ export default function LoungeThreadScreen() {
         <View style={[styles.composer, { paddingBottom: keyboardVisible ? Math.max(insets.bottom, 0) + 8 : Math.max(insets.bottom, 0) + 64 }]}>
           {replyingTo && (
             <View style={styles.replyingToBar}>
-              <Text style={styles.replyingToText}>↩ Replying to <Text style={styles.replyingToName}>@{replyingTo.displayName}</Text></Text>
+              <Text style={styles.replyingToText}>
+                ↩ Replying to <Text style={styles.replyingToName}>@{replyingTo.displayName}</Text>{replyingTo.spoiler ? ' · spoiler' : ''}
+              </Text>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
                 <Text style={styles.replyingToClose}>✕</Text>
               </TouchableOpacity>
@@ -501,6 +548,13 @@ export default function LoungeThreadScreen() {
           )}
 
           {submitError && <Text style={styles.submitError}>{submitError}</Text>}
+
+          <View style={styles.composerMeta}>
+            <SpoilerToggle value={spoiler} onChange={setSpoiler} disabled={submitting} />
+            {isBookClub && (
+              <Text style={styles.composerHint}>Mark spoilers so everyone can read at their own pace.</Text>
+            )}
+          </View>
 
           <View style={styles.composerRow}>
             <TouchableOpacity
@@ -591,6 +645,9 @@ const styles = StyleSheet.create({
   reactionCountActive: { color: '#B83255' },
   editContainer: { marginHorizontal: spacing.md, marginBottom: spacing.md },
   editInput: { backgroundColor: '#FDFAF6', borderRadius: radius.md, borderWidth: 1, borderColor: '#B83255', padding: spacing.md, fontSize: 14, color: '#3A2C28', minHeight: 80 },
+  editSpoilerRow: { marginTop: spacing.sm },
+  composerMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  composerHint: { flex: 1, minWidth: 160, fontSize: 11, color: '#B09A7E', fontFamily: 'Nunito_400Regular_Italic' },
   editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.sm },
   editCancelButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F5F0EB' },
   editCancelText: { fontSize: 11, fontWeight: '600', color: '#6A5550' },

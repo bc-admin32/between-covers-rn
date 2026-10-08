@@ -15,6 +15,9 @@ import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
+import {
+  SpoilerCover, SpoilerTag, SpoilerToggle, useSpoilerReveal, isThreadClosedError, THREAD_CLOSED_MESSAGE,
+} from '../../../../components/lounge/Spoiler';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
@@ -24,11 +27,14 @@ type Reply = {
   replyId: string; threadId: string; userId: string;
   displayName: string; avatarUrl: string | null; body: string | null;
   mediaUrl: string | null; reactions: Reaction[]; createdAt: string; isOwn: boolean;
+  spoiler?: boolean;
 };
 type Thread = {
   threadId: string; topicLabel: string | null; body: string | null;
   authorId: string; authorName: string; authorAvatar: string | null;
   replyCount: number; createdAt: string;
+  // Set once the discussion is closed.
+  closed?: boolean;
 };
 type ThreadResponse = { thread: Thread; replies: Reply[]; count: number; nextKey: string | null };
 
@@ -76,19 +82,29 @@ function ReactionBar({ replyId, reactions, onReact }: { replyId: string; reactio
   );
 }
 
-function MessageBubble({ reply, onReact, threadId, onBlock, onToast }: {
+function MessageBubble({ reply, onReact, threadId, onBlock, onToast, revealed, onReveal }: {
   reply: Reply; onReact: (replyId: string, emoji: string) => void;
   threadId: string; onBlock: (userId: string) => void; onToast: (msg: string) => void;
+  revealed: boolean; onReveal: (replyId: string) => void;
 }) {
   const isIris = reply.userId === 'IRIS';
+  // Others' spoilers stay covered (text + image) until tapped; own ones never are.
+  const covered = !!reply.spoiler && !reply.isOwn && !revealed;
 
   if (isIris) {
     return (
       <View style={styles.irisBubbleRow}>
         <View style={styles.irisBubbleContent}>
           <View style={styles.irisBubble}>
-            {reply.body && <Text style={styles.irisBubbleText}>{reply.body}</Text>}
-            {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+            {!!reply.spoiler && !covered && <SpoilerTag />}
+            {covered ? (
+              <SpoilerCover onReveal={() => onReveal(reply.replyId)} />
+            ) : (
+              <>
+                {reply.body && <Text style={styles.irisBubbleText}>{reply.body}</Text>}
+                {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+              </>
+            )}
           </View>
           <Text style={styles.irisBubbleTime}>Iris · {timeAgo(reply.createdAt)}</Text>
           <ReactionBar replyId={reply.replyId} reactions={reply.reactions} onReact={onReact} />
@@ -104,8 +120,15 @@ function MessageBubble({ reply, onReact, threadId, onBlock, onToast }: {
       <View style={styles.userBubbleContent}>
         <View style={[styles.userBubble, reply.isOwn && styles.userBubbleOwn]}>
           <Text style={styles.userBubbleName}>{reply.isOwn ? 'you' : reply.displayName}</Text>
-          {reply.body && <Text style={styles.userBubbleText}>{reply.body}</Text>}
-          {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+          {!!reply.spoiler && !covered && <SpoilerTag tone="dark" />}
+          {covered ? (
+            <SpoilerCover tone="dark" onReveal={() => onReveal(reply.replyId)} />
+          ) : (
+            <>
+              {reply.body && <Text style={styles.userBubbleText}>{reply.body}</Text>}
+              {reply.mediaUrl && <OptimizedImage uri={reply.mediaUrl} style={styles.bubbleMedia} contentFit="cover" />}
+            </>
+          )}
         </View>
         <View style={styles.userBubbleFooter}>
           <Text style={styles.userBubbleTime}>{timeAgo(reply.createdAt)}</Text>
@@ -153,6 +176,10 @@ export default function IrisThoughtsScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [spoiler, setSpoiler] = useState(false);
+  // Set by a 403 "This discussion is closed." on post, or by thread.closed.
+  const [closedNow, setClosedNow] = useState(false);
+  const { isRevealed, reveal } = useSpoilerReveal();
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
@@ -222,19 +249,21 @@ export default function IrisThoughtsScreen() {
     try {
       const res = await apiPost<{ result: string; reply?: Reply }>(
         '/lounge/thread/reply',
-        { threadId, content: text.trim() }
+        { threadId, content: text.trim(), ...(spoiler ? { spoiler: true } : {}) }
       );
       if (res.result === 'published' && res.reply) {
-        setReplies((prev) => [...prev, { ...res.reply!, reactions: res.reply!.reactions ?? [] }]);
+        setReplies((prev) => [...prev, { ...res.reply!, spoiler: res.reply!.spoiler ?? spoiler, reactions: res.reply!.reactions ?? [] }]);
         setText('');
+        setSpoiler(false);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
       } else {
         setSubmitError("Something went wrong. Please try again.");
       }
-    } catch {
-      setSubmitError("Couldn't post your reply. Please try again.");
+    } catch (err) {
+      if (isThreadClosedError(err)) setClosedNow(true);
+      else setSubmitError("Couldn't post your reply. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -250,6 +279,7 @@ export default function IrisThoughtsScreen() {
   }
 
   const visibleReplies = replies.filter((r) => !blockedUsers.includes(r.userId));
+  const isClosed = closedNow || thread?.closed === true;
 
   return (
     <KeyboardAvoidingView
@@ -292,15 +322,23 @@ export default function IrisThoughtsScreen() {
             </View>
           ) : (
             visibleReplies.map((reply) => (
-              <MessageBubble key={reply.replyId} reply={reply} onReact={handleReact} threadId={threadId!} onBlock={handleBlock} onToast={showToast} />
+              <MessageBubble key={reply.replyId} reply={reply} onReact={handleReact} threadId={threadId!} onBlock={handleBlock} onToast={showToast}
+                revealed={isRevealed(reply.replyId)} onReveal={reveal} />
             ))
           )}
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       )}
 
+      {/* CLOSED — replaces the composer once the discussion has closed */}
+      {threadId && isClosed && (
+        <View style={[styles.closedBar, { paddingBottom: insets.bottom + 65 }]}>
+          <Text style={styles.closedText}>🔒 {THREAD_CLOSED_MESSAGE}</Text>
+        </View>
+      )}
+
       {/* COMPOSER — show if threadId is available, even on replies error */}
-      {threadId && (
+      {threadId && !isClosed && (
         <View style={[styles.composer, { paddingBottom: keyboardVisible ? insets.bottom + 8 : insets.bottom + 65 }]}>
           {showEmojiTray && (
             <View style={styles.emojiTray}>
@@ -317,6 +355,10 @@ export default function IrisThoughtsScreen() {
           )}
 
           {submitError && <Text style={styles.submitError}>{submitError}</Text>}
+
+          <View style={styles.composerMeta}>
+            <SpoilerToggle value={spoiler} onChange={setSpoiler} disabled={submitting} />
+          </View>
 
           <View style={styles.composerRow}>
             <TouchableOpacity
@@ -399,6 +441,9 @@ const styles = StyleSheet.create({
   emojiTray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
   emojiButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center' },
   emojiText: { fontSize: 18 },
+  composerMeta: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  closedBar: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4', paddingTop: spacing.md, alignItems: 'center' },
+  closedText: { fontSize: 13, color: '#B09A7E', fontFamily: 'Nunito_600SemiBold' },
   submitError: { fontSize: 12, color: '#B83255', paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.sm },
   composerButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center' },
