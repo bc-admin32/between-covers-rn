@@ -13,7 +13,8 @@ import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
 
-const CACHE_KEY = 'bc_cozy_cache';
+// Same key Cozy home writes (cozy/index.tsx) — read here for first paint.
+const CACHE_KEY = 'bc_cozy_cache_v2';
 
 type FeaturedBook = { workId: string; title: string; author: string; coverUrl: string };
 

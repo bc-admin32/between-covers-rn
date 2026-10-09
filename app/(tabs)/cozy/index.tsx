@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, Modal,
-  StyleSheet, ActivityIndicator, Image, Linking,
+  View, Text, TouchableOpacity, ScrollView, Modal, FlatList,
+  StyleSheet, ActivityIndicator, Image, Linking, useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,21 @@ import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
 
-const CACHE_KEY = 'bc_cozy_cache';
+// Home payload cache (also read by cozy/author for its first paint). Bumped
+// for the scroll-row payload (?rows=scroll) so an old 3-item response is
+// never shown; the previous key is deleted on load.
+const CACHE_KEY = 'bc_cozy_cache_v2';
+const LEGACY_CACHE_KEY = 'bc_cozy_cache';
+// Server-ordered, server-capped rows for Iris's Shelf / Visual Escapes /
+// Cozy Extras. The full pages keep using ?view=full.
+const COZY_HOME_PATH = '/cozy/home?rows=scroll';
+
+// Home rows show ~2.5 cards so the cut-off third hints there's more.
+const ROW_SIDE_PADDING = 16; // styles.scrollContent paddingHorizontal (spacing.md)
+const ROW_GAP = 14;
+const ROW_VISIBLE_CARDS = 2.5;
+// Off The Shelf isn't capped server-side (unlike the ?rows=scroll rows).
+const OFF_SHELF_HOME_CAP = 12;
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
 /* ─── TYPES ─── */
@@ -75,16 +89,6 @@ type CozyData = {
 };
 
 /* ─── HELPERS ─── */
-
-function getDailyBookSlice(books: BookItem[]): BookItem[] {
-  if (!books || books.length === 0) return [];
-  const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
-  const totalGroups = Math.ceil(books.length / 3);
-  const groupIndex = dayOfYear % totalGroups;
-  return books.slice(groupIndex * 3, groupIndex * 3 + 3);
-}
 
 function resolveLifestyleItems(sections: CozyData['sections']): VisualItem[] {
   const candidates = [
@@ -214,9 +218,31 @@ function SectionHeader({ title, onViewAll }: { title: string; onViewAll?: () => 
   );
 }
 
-function SmallBookCard({ book, onPress }: { book: BookItem; onPress: () => void }) {
+// Horizontal home row: renders `data` in the order given (no client-side
+// re-sorting), with no scroll indicator.
+function ScrollRow<T>({ data, keyFor, render }: {
+  data: T[]; keyFor: (item: T, index: number) => string; render: (item: T) => React.ReactElement;
+}) {
   return (
-    <TouchableOpacity style={styles.smallBookCard} onPress={onPress}>
+    <FlatList
+      horizontal
+      data={data}
+      keyExtractor={keyFor}
+      renderItem={({ item }) => render(item)}
+      showsHorizontalScrollIndicator={false}
+      ItemSeparatorComponent={RowGap}
+      contentContainerStyle={styles.rowContent}
+    />
+  );
+}
+
+function RowGap() {
+  return <View style={{ width: ROW_GAP }} />;
+}
+
+function SmallBookCard({ book, onPress, width }: { book: BookItem; onPress: () => void; width?: number }) {
+  return (
+    <TouchableOpacity style={[styles.smallBookCard, width != null && { width }]} onPress={onPress}>
       <View style={styles.smallBookCover}>
         <Image source={{ uri: book.coverUrl }} style={styles.smallBookCoverImage} />
       </View>
@@ -228,9 +254,9 @@ function SmallBookCard({ book, onPress }: { book: BookItem; onPress: () => void 
 
 // Unified card — same layout for both Visual Escapes and Cozy Lifestyle Picks.
 // Category label + title only; no platform logos, no streaming badges.
-function ItemCard({ item, onPress }: { item: VisualItem; onPress: () => void }) {
+function ItemCard({ item, onPress, width }: { item: VisualItem; onPress: () => void; width?: number }) {
   return (
-    <TouchableOpacity style={styles.itemCard} onPress={onPress}>
+    <TouchableOpacity style={[styles.itemCard, width != null && { width }]} onPress={onPress}>
       <View style={styles.itemCover}>
         <Image source={{ uri: item.imageUrl }} style={styles.itemCoverImage} />
       </View>
@@ -247,6 +273,7 @@ function ItemCard({ item, onPress }: { item: VisualItem; onPress: () => void }) 
 export default function CozyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const [data, setData] = useState<CozyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [offShelf, setOffShelf] = useState<OffShelfData | null>(null);
@@ -265,13 +292,14 @@ export default function CozyScreen() {
   useEffect(() => {
     const load = async () => {
       try {
+        SecureStore.deleteItemAsync(LEGACY_CACHE_KEY).catch(() => {});
         const cached = await SecureStore.getItemAsync(CACHE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
           setData(parsed?.active ?? null);
           setLoading(false);
         }
-        const response = await apiGet('/cozy/home');
+        const response = await apiGet(COZY_HOME_PATH);
         const body = JSON.stringify(response);
         lastBodyRef.current = body;
         setData(response?.active ?? null);
@@ -291,7 +319,7 @@ export default function CozyScreen() {
     useCallback(() => {
       if (!hasFocusedRef.current) { hasFocusedRef.current = true; return; }
       let cancelled = false;
-      apiGet('/cozy/home')
+      apiGet(COZY_HOME_PATH)
         .then(async (response) => {
           if (cancelled) return;
           const body = JSON.stringify(response);
@@ -380,7 +408,9 @@ export default function CozyScreen() {
   const shelfBooks = bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books;
   const visual = data?.sections?.visual ?? [];
   const lifestyle = data?.sections ? resolveLifestyleItems(data.sections) : [];
-  const displayBooks = getDailyBookSlice(shelfBooks);
+  // The server orders and caps the shelf row; no client-side slicing.
+  const displayBooks = shelfBooks;
+  const rowCardWidth = Math.floor((windowWidth - ROW_SIDE_PADDING * 2 - ROW_GAP * 2) / ROW_VISIBLE_CARDS);
   const authorSpotlight = data?.sections?.authorSpotlight ?? null;
 
   return (
@@ -538,15 +568,17 @@ export default function CozyScreen() {
             />
             {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
             {displayBooks.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-                {displayBooks.map((book, i) => (
+              <ScrollRow
+                data={displayBooks}
+                keyFor={(book, i) => book?.workId ?? String(i)}
+                render={(book) => (
                   <SmallBookCard
-                    key={book?.workId ?? i}
                     book={book}
+                    width={rowCardWidth}
                     onPress={() => router.push(`/book?workId=${book.workId}` as any)}
                   />
-                ))}
-              </ScrollView>
+                )}
+              />
             )}
           </View>
         )}
@@ -558,15 +590,12 @@ export default function CozyScreen() {
               title="Visual Escapes"
               onViewAll={() => router.push('/(tabs)/cozy/media' as any)}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-              {visual.map((item, i) => (
-                <ItemCard
-                  key={item?.sk ?? i}
-                  item={item}
-                  onPress={() => handleItemClick(item)}
-                />
-              ))}
-            </ScrollView>
+            {/* Server order is kept, so an event listed first stays first. */}
+            <ScrollRow
+              data={visual}
+              keyFor={(item, i) => item?.sk ?? String(i)}
+              render={(item) => <ItemCard item={item} width={rowCardWidth} onPress={() => handleItemClick(item)} />}
+            />
           </View>
         )}
 
@@ -577,15 +606,11 @@ export default function CozyScreen() {
               title="Cozy Extras"
               onViewAll={() => router.push('/(tabs)/cozy/items' as any)}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-              {lifestyle.map((item, i) => (
-                <ItemCard
-                  key={item?.sk ?? i}
-                  item={item}
-                  onPress={() => handleItemClick(item)}
-                />
-              ))}
-            </ScrollView>
+            <ScrollRow
+              data={lifestyle}
+              keyFor={(item, i) => item?.sk ?? String(i)}
+              render={(item) => <ItemCard item={item} width={rowCardWidth} onPress={() => handleItemClick(item)} />}
+            />
           </View>
         )}
 
@@ -596,11 +621,13 @@ export default function CozyScreen() {
               title="Off The Shelf"
               onViewAll={() => router.push('/(tabs)/cozy/off-shelf' as any)}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-              {offShelf.books.map((book, i) => (
-                <BookCard key={book?.bookId ?? i} book={book} />
-              ))}
-            </ScrollView>
+            {/* /cozy/off-shelf returns every book (newest first); the home row
+                shows the first OFF_SHELF_HOME_CAP and "View all" has the rest. */}
+            <ScrollRow
+              data={offShelf.books.slice(0, OFF_SHELF_HOME_CAP)}
+              keyFor={(book, i) => book?.bookId ?? String(i)}
+              render={(book) => <BookCard book={book} style={{ width: rowCardWidth }} />}
+            />
           </View>
         )}
 
@@ -655,7 +682,7 @@ const styles = StyleSheet.create({
   genreTagText: { fontSize: 9, fontWeight: '700', color: '#6A5969', textTransform: 'uppercase', letterSpacing: 0.6 },
   spotlightTitle: { fontSize: 15, fontWeight: '500', color: '#0F2A48', lineHeight: 20, marginBottom: 4 },
   spotlightAuthor: { fontSize: 12, color: '#6A5969', fontWeight: '300' },
-  scrollRow: { gap: 14, paddingBottom: 4 },
+  rowContent: { paddingBottom: 4 }, // ScrollRow spaces cards with RowGap (ROW_GAP), not `gap`
   smallBookCard: { width: 120, flexShrink: 0, backgroundColor: '#fff', borderRadius: 16, padding: 12, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#f0ede4' },
   smallBookCover: { width: '100%', height: 100, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E6EAF0' },
   smallBookCoverImage: { width: '100%', height: '100%' },
