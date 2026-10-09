@@ -34,11 +34,33 @@ const TROPE_OPTIONS = [
 ];
 
 // Favorite Tropes (saved as `tropes`) — NOT the subgenre list above, which is
-// historically named TROPE_OPTIONS. Options come from GET /taxonomy?type=TROPE,
-// the same vocabulary books are tagged with; this curated set is the fallback
-// if that fetch fails.
+// historically named TROPE_OPTIONS. A fixed, curated set of 10 (keys match
+// the book trope taxonomy); shown in this order.
 const MAX_FAVORITE_TROPES = 5;
-const FAVORITE_TROPE_FALLBACK = TROPES.map((t) => ({ key: t.key as string, label: t.label }));
+const FAVORITE_TROPE_OPTIONS = [
+  { key: 'ENEMIES_TO_LOVERS', label: 'Enemies to Lovers' },
+  { key: 'FRIENDS_TO_LOVERS', label: 'Friends to Lovers' },
+  { key: 'SECOND_CHANCE', label: 'Second Chance' },
+  { key: 'FAKE_DATING', label: 'Fake Dating' },
+  { key: 'FORCED_PROXIMITY', label: 'Forced Proximity' },
+  { key: 'MARRIAGE_OF_CONVENIENCE', label: 'Marriage of Convenience' },
+  { key: 'GRUMPY_SUNSHINE', label: 'Grumpy / Sunshine' },
+  { key: 'FORBIDDEN_LOVE', label: 'Forbidden Love' },
+  { key: 'SLOW_BURN', label: 'Slow Burn' },
+  { key: 'FATED_MATES', label: 'Fated Mates' },
+];
+const FAVORITE_TROPE_KEYS = new Set(FAVORITE_TROPE_OPTIONS.map((o) => o.key));
+
+type TropeOption = { key: string; label: string };
+
+// "Explore more" group: every other trope, A–Z by label, excluding the 10.
+function extraTropes(options: TropeOption[]): TropeOption[] {
+  return options
+    .filter((o) => !FAVORITE_TROPE_KEYS.has(o.key))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+// Used until GET /taxonomy?type=TROPE answers, and kept if it fails.
+const EXTRA_TROPE_FALLBACK = extraTropes(TROPES.map((t) => ({ key: t.key as string, label: t.label })));
 
 // LGBTQ+ romance (saved as `lgbtqPreference`; nothing selected = null).
 const LGBTQ_PREFERENCE_OPTIONS = [
@@ -159,8 +181,9 @@ export default function ReadingPreferencesScreen() {
   const [drinks, setDrinks] = useState<string[]>([]);
   const [readingLocation, setReadingLocation] = useState<string | null>(null);
   const [favoriteTropes, setFavoriteTropes] = useState<string[]>([]);
+  const [extraTropeOptions, setExtraTropeOptions] = useState<TropeOption[]>(EXTRA_TROPE_FALLBACK);
+  const [showMoreTropes, setShowMoreTropes] = useState(false);
   const [lgbtqPreference, setLgbtqPreference] = useState<string | null>(null);
-  const [tropeOptions, setTropeOptions] = useState<{ key: string; label: string }[]>(FAVORITE_TROPE_FALLBACK);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Local-only (SecureStore, not /profile) — unlike the fields above, this
@@ -178,7 +201,11 @@ export default function ReadingPreferencesScreen() {
       setSnacks(data.snacks ?? []);
       setDrinks(data.drinks ?? []);
       setReadingLocation(data.readingLocation ?? null);
-      setFavoriteTropes(Array.isArray(data.tropes) ? data.tropes : []);
+      const savedTropes: string[] = Array.isArray(data.tropes) ? data.tropes : [];
+      setFavoriteTropes(savedTropes);
+      // A saved pick outside the 10 starts the "Explore more" group open so
+      // it's visible.
+      if (savedTropes.some((k) => !FAVORITE_TROPE_KEYS.has(k))) setShowMoreTropes(true);
       setLgbtqPreference(data.lgbtqPreference ?? null);
       setFinishedBookPromptEnabledState(await getFinishedBookPromptEnabled());
       setSaved(true);
@@ -186,21 +213,22 @@ export default function ReadingPreferencesScreen() {
     };
     load();
 
-    // Trope vocabulary; keeps the fallback list if this fails.
+    // Full trope vocabulary for the "Explore more" group; on failure the
+    // lib/tagTaxonomy fallback stays.
     apiGet<{ items?: { sk: string; label: string }[] }>('/taxonomy?type=TROPE')
       .then((res) => {
         const items = (res?.items ?? []).filter((i) => i?.sk && i?.label);
-        if (items.length) setTropeOptions(items.map((i) => ({ key: i.sk, label: i.label })));
+        if (items.length) setExtraTropeOptions(extraTropes(items.map((i) => ({ key: i.sk, label: i.label }))));
       })
       .catch(() => {});
   }, []);
 
-  // Saved tropes missing from the current option list (e.g. the fallback
-  // list is showing) still appear, so they can be seen and removed.
-  const favoriteTropeChips = [
-    ...tropeOptions,
+  // Saved tropes that are in neither list still appear (at the end of the
+  // extra group), so they're never silently dropped and can be removed.
+  const extraTropeChips: TropeOption[] = [
+    ...extraTropeOptions,
     ...favoriteTropes
-      .filter((k) => !tropeOptions.some((o) => o.key === k))
+      .filter((k) => !FAVORITE_TROPE_KEYS.has(k) && !extraTropeOptions.some((o) => o.key === k))
       .map((k) => ({ key: k, label: prettifyEnum(k) })),
   ];
 
@@ -277,12 +305,27 @@ export default function ReadingPreferencesScreen() {
 
           <PrefCard label="Favorite Tropes">
             <Text style={styles.tropeCount}>{favoriteTropes.length} of {MAX_FAVORITE_TROPES}</Text>
+            {/* Both groups share one selection, so the max of 5 and the count
+                apply across them combined. */}
             <MultiChipGroup
-              options={favoriteTropeChips}
+              options={FAVORITE_TROPE_OPTIONS}
               value={favoriteTropes}
               max={MAX_FAVORITE_TROPES}
               onChange={(v) => { Haptics.selectionAsync(); setFavoriteTropes(v); markUnsaved(); }}
             />
+            <TouchableOpacity onPress={() => setShowMoreTropes((v) => !v)} style={styles.moreTropesLink} accessibilityRole="button">
+              <Text style={styles.moreTropesLinkText}>
+                {showMoreTropes ? 'Show fewer' : "Don't see your favorite trope? Explore more →"}
+              </Text>
+            </TouchableOpacity>
+            {showMoreTropes && (
+              <MultiChipGroup
+                options={extraTropeChips}
+                value={favoriteTropes}
+                max={MAX_FAVORITE_TROPES}
+                onChange={(v) => { Haptics.selectionAsync(); setFavoriteTropes(v); markUnsaved(); }}
+              />
+            )}
           </PrefCard>
 
           <PrefCard label="LGBTQ+ Romance">
@@ -371,6 +414,8 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
   chipDanger: { backgroundColor: '#B83255', borderColor: '#B83255' },
   chipDisabled: { opacity: 0.4 },
+  moreTropesLink: { alignSelf: 'flex-start', marginTop: spacing.md, marginBottom: spacing.sm },
+  moreTropesLinkText: { fontSize: 12, color: '#6B9AB8', fontFamily: 'Lato_700Bold' },
   tropeCount: { fontSize: 11, color: '#A9C0D4', fontFamily: 'Lato_700Bold', marginBottom: spacing.sm, textAlign: 'right' },
   prefNote: { fontSize: 12, color: '#A9C0D4', lineHeight: 18, marginTop: spacing.md },
   saveError: { fontSize: 12, color: '#B83255', textAlign: 'center', marginTop: spacing.sm },
