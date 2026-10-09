@@ -437,7 +437,7 @@ export default function LoungeThreadScreen() {
               <CaretLeft size={16} color={isIrisChat ? '#9B6B9B' : '#B09A7E'} weight="bold" />
             </TouchableOpacity>
             <Text style={[styles.threadCardLabel, isIrisChat && styles.threadCardLabelIris]}>
-              {isIrisChat ? 'Iris Has Thoughts' : isBookClub ? 'Book Club' : thread.topicLabel ?? 'Discussion'}
+              {isIrisChat ? 'Iris Has Thoughts' : isBookClub ? 'Community Read' : thread.topicLabel ?? 'Discussion'}
             </Text>
             <Text style={styles.threadCardReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
           </View>

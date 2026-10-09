@@ -76,7 +76,7 @@ function getThreadTypeLabel(type: ArchiveThread['sectionType']): string {
     case 'SECONDARY': return 'Reading';
     case 'IRIS_THOUGHT': return 'Iris Has Thoughts';
     case 'MONTHLY_PROMPT': return 'Monthly Prompt';
-    case 'BOOK_CLUB': return 'Book Club';
+    case 'BOOK_CLUB': return 'Community Read';
     default: return 'Thread';
   }
 }

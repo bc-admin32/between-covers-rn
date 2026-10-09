@@ -282,7 +282,7 @@ export default function LoungeScreen() {
         {bookClub?.threadId && bookClub.book && (
           <View style={[styles.card, styles.bookClubCard]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Book Club</Text>
+              <Text style={styles.cardLabel}>Community Read</Text>
               {!bookClub.isOpen && <Text style={styles.cardFooterNote}>Discussion closed</Text>}
             </View>
             <View style={styles.bookClubBook}>
