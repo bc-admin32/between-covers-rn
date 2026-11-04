@@ -14,7 +14,7 @@ export type GateReason =
 // defaults to the reason when a call site doesn't pass one.
 export type SignupSource =
   | 'lounge_react' | 'lounge_reply' | 'poll_vote' | 'confession' | 'monthly_submit'
-  | 'lounge_report' | 'iris_send' | 'live_watch' | 'live_rsvp' | 'cozy_rate'
+  | 'lounge_report' | 'iris_send' | 'iris_voice' | 'live_watch' | 'live_rsvp' | 'cozy_rate'
   | 'book_rate' | 'cozy_event' | 'profile' | 'submissions' | 'feedback' | 'library'
   | 'book_club';
 

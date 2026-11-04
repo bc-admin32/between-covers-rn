@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable,
+  StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable, Alert, AppState,
 } from 'react-native';
-import { CaretLeft, Copy, Check } from '../../../components/icons';
+import { CaretLeft, Copy, Check, Microphone, ChatCircleText } from '../../../components/icons';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPost } from '../../../lib/api';
 import { setPendingIrisMessage, takePendingIrisMessage } from '../../../lib/guest';
 import { useGuest } from '../../../lib/useGuest';
 import { track } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
+import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
+import IrisVoiceView from '../../../components/iris/IrisVoiceView';
+import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
+import { useIrisVoiceLoop } from '../../../components/iris/useIrisVoiceLoop';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
@@ -70,6 +74,90 @@ export default function IrisChatScreen() {
   const { isGuest, requireAccount } = useGuest();
   const pendingCheckedRef = useRef(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Voice mode ──
+  const [mode, setMode] = useState<'text' | 'voice'>('text');
+  const [voiceTermsVisible, setVoiceTermsVisible] = useState(false);
+  const [checkingVoice, setCheckingVoice] = useState(false);
+  const reopenVoiceTermsRef = useRef(false);
+
+  const voice = useIrisVoiceLoop({
+    active: mode === 'voice',
+    sessionId,
+    from,
+    openingMessage,
+    onSessionId: (id) => setSessionId((prev) => prev ?? id),
+    onTurn: ({ transcript, reply }) => {
+      const t = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        { id: `user-${t}`, role: 'user', text: transcript },
+        { id: `iris-${t}`, role: 'iris', text: reply },
+      ]);
+    },
+    onTermsRequired: () => {
+      setMode('text');
+      setVoiceTermsVisible(true);
+    },
+  });
+
+  // Back in text mode the message list remounts; jump to the newest bubbles.
+  useEffect(() => {
+    if (mode === 'text') setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+  }, [mode]);
+
+  // The mic only runs in the foreground: leaving the app leaves voice mode.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') setMode('text');
+    });
+    return () => sub.remove();
+  }, []);
+
+  // The terms sheet closes before a legal document opens (a native Modal would
+  // cover the pushed route); reopen it when the user comes back.
+  useFocusEffect(
+    useCallback(() => {
+      if (reopenVoiceTermsRef.current) {
+        reopenVoiceTermsRef.current = false;
+        setVoiceTermsVisible(true);
+      }
+    }, [])
+  );
+
+  // The one gate for voice mode, whatever screen the chat was opened from.
+  async function handleToggleMode() {
+    if (mode === 'voice') {
+      setMode('text');
+      return;
+    }
+    if (isGuest === null || checkingVoice) return;
+    if (isGuest) {
+      // No mic permission request for guests.
+      Alert.alert('Voice chat', 'Please sign in to use voice chat with Iris.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Sign In', onPress: () => requireAccount('iris', { source: 'iris_voice' }) },
+      ]);
+      return;
+    }
+    setCheckingVoice(true);
+    try {
+      if (await needsIrisVoiceTerms()) setVoiceTermsVisible(true);
+      else setMode('voice');
+    } catch {
+      // Couldn't read the profile: show the sheet; accepting works either way.
+      setVoiceTermsVisible(true);
+    } finally {
+      setCheckingVoice(false);
+    }
+  }
+
+  function openVoiceTermsDocument(doc: 'terms-of-use' | 'privacy-policy') {
+    setVoiceTermsVisible(false);
+    reopenVoiceTermsRef.current = true;
+    // Let the sheet finish closing first (same reason as the Lounge sheet).
+    setTimeout(() => router.push(`/legal/document?doc=${doc}` as any), 300);
+  }
 
   const handleCopy = useCallback(async (id: string, text: string) => {
     await Clipboard.setStringAsync(text);
@@ -178,8 +266,45 @@ export default function IrisChatScreen() {
           <View style={styles.onlineDot} />
           <Text style={styles.onlineText}>online</Text>
         </View>
+
+        <TouchableOpacity
+          style={[styles.modeToggle, mode === 'voice' && styles.modeToggleVoice]}
+          onPress={handleToggleMode}
+          disabled={sending || checkingVoice}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'voice' ? 'Switch to text chat' : 'Switch to voice chat'}
+        >
+          {mode === 'voice' ? (
+            <ChatCircleText size={18} color="#fff" weight="bold" />
+          ) : (
+            <Microphone size={18} color="#0F2A48" weight="bold" />
+          )}
+        </TouchableOpacity>
       </View>
 
+      <IrisVoiceTermsModal
+        visible={voiceTermsVisible}
+        onAccept={() => {
+          setVoiceTermsVisible(false);
+          setMode('voice');
+        }}
+        onCancel={() => setVoiceTermsVisible(false)}
+        onOpenDocument={openVoiceTermsDocument}
+      />
+
+      {mode === 'voice' ? (
+        <View style={[styles.voiceBody, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <IrisVoiceView
+            avatarUri={IRIS_AVATAR}
+            phase={voice.phase}
+            level={voice.level}
+            replyText={voice.replyText}
+            error={voice.error}
+            onPressCircle={voice.interrupt}
+          />
+        </View>
+      ) : (<>
       {/* MESSAGES */}
       <ScrollView
         ref={scrollRef}
@@ -261,6 +386,7 @@ export default function IrisChatScreen() {
           <Text style={styles.sendButtonText}>→</Text>
         </TouchableOpacity>
       </View>
+      </>)}
     </KeyboardAvoidingView>
   );
 }
@@ -283,6 +409,9 @@ const styles = StyleSheet.create({
   onlineIndicator: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   onlineDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#4CAF50' },
   onlineText: { fontSize: 11, color: '#B09A7E' },
+  modeToggle: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center', marginLeft: spacing.xs },
+  modeToggleVoice: { backgroundColor: '#B83255' },
+  voiceBody: { flex: 1 },
   messages: { flex: 1 },
   messagesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   dateSeparator: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.md },

@@ -29,6 +29,7 @@
         "NSPhotoLibraryUsageDescription": "Between Covers uses your photo library to update your profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Between Covers saves your photo to your library.",
         "NSFaceIDUsageDescription": "Between Covers uses Face ID to keep your account secure.",
+        "NSMicrophoneUsageDescription": "Between Covers uses your microphone so you can talk with Iris in voice mode.",
         "LSApplicationQueriesSchemes": ["spotify"],
         "UIBackgroundModes": ["remote-notification"],
         "UIRequiredDeviceCapabilities": ["arm64"]
@@ -43,7 +44,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#e5b2bf"
       },
-      "permissions": []
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -78,6 +82,25 @@
       ],
       "./plugins/withRNIapAmazonActivityListener",
       "expo-video",
+      [
+        "@siteed/audio-studio",
+        {
+          "enablePhoneStateHandling": false,
+          "enableNotifications": false,
+          "enableBackgroundAudio": false,
+          "enableDeviceDetection": false,
+          "iosConfig": {
+            "microphoneUsageDescription": "Between Covers uses your microphone so you can talk with Iris in voice mode."
+          }
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Between Covers uses your microphone so you can talk with Iris in voice mode.",
+          "enableBackgroundRecording": false
+        }
+      ],
       ["expo-image-picker", { "cameraPermission": false }],
       [
         "expo-notifications",

@@ -1,0 +1,42 @@
+diff --git a/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt b/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
+index 7d1e913..4e8e09f 100644
+--- a/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
++++ b/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
+@@ -680,7 +680,8 @@ class AudioRecorderManager(
+         }
+ 
+         val audioRecord = AudioRecord(
+-            MediaRecorder.AudioSource.MIC,
++            // BetweenCovers patch: voice-call source enables platform echo cancellation.
++            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+             sampleRate,
+             channelConfig,
+             format,
+@@ -976,13 +977,26 @@ class AudioRecorderManager(
+                 LogUtils.d(CLASS_NAME, "Initializing AudioRecord with format: $audioFormat, BufferSize: $bufferSizeInBytes")
+ 
+                 audioRecord = AudioRecord(
+-                    MediaRecorder.AudioSource.MIC,
++                    // BetweenCovers patch: voice-call source enables platform echo cancellation.
++                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                     recordingConfig.sampleRate,
+                     if (recordingConfig.channels == 1) AudioFormat.CHANNEL_IN_MONO else AudioFormat.CHANNEL_IN_STEREO,
+                     audioFormat,
+                     bufferSizeInBytes
+                 )
+ 
++                // BetweenCovers patch: also turn on the echo canceller explicitly where available.
++                audioRecord?.let { rec ->
++                    if (rec.state == AudioRecord.STATE_INITIALIZED &&
++                        android.media.audiofx.AcousticEchoCanceler.isAvailable()) {
++                        try {
++                            android.media.audiofx.AcousticEchoCanceler.create(rec.audioSessionId)?.enabled = true
++                        } catch (e: Exception) {
++                            LogUtils.w(CLASS_NAME, "AcousticEchoCanceler unavailable: ${e.message}")
++                        }
++                    }
++                }
++
+                 if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                     promise.reject(
+                         "INITIALIZATION_FAILED",
