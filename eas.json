@@ -45,7 +45,8 @@
       "node": "22.23.3",
       "env": {
         "RNIAP_VARIANT": "play",
-        "BC_ANALYTICS_PLATFORM": "android"
+        "BC_ANALYTICS_PLATFORM": "android",
+        "BC_EXCLUDE_DEV_CLIENT": "1"
       },
       "android": {
         "gradleCommand": ":app:bundleRelease"
@@ -56,7 +57,8 @@
       "node": "22.23.3",
       "env": {
         "RNIAP_VARIANT": "amazon",
-        "BC_ANALYTICS_PLATFORM": "amazon"
+        "BC_ANALYTICS_PLATFORM": "amazon",
+        "BC_EXCLUDE_DEV_CLIENT": "1"
       },
       "android": {
         "buildType": "apk",
