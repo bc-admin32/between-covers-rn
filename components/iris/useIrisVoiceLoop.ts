@@ -7,6 +7,7 @@ import { useAudioRecorder, AudioStudioModule, type AudioDataEvent } from '@sitee
 import { apiPost, ApiError } from '../../lib/api';
 import { markIrisVoiceTermsRequired } from '../../lib/irisVoiceTerms';
 import { TurnDetector, SAMPLE_RATE, base64ToBytes, buildWav, floatRms } from '../../lib/irisVoiceAudio';
+import { breadcrumb, currentTrail, endBreadcrumbs } from '../../lib/crashCapture';
 
 // Talking over Iris stops her. Fire tablets have had flaky echo
 // cancellation; set this to false to make Fire tap-to-interrupt only.
@@ -98,6 +99,7 @@ export function useIrisVoiceLoop(opts: Options) {
     const pb = playbackRef.current;
     playbackRef.current = null;
     if (!pb) return;
+    breadcrumb('voice: stopPlayback');
     pb.subs.forEach((s) => s.remove());
     pb.pulse?.stop();
     try { pb.player.pause(); } catch {}
@@ -109,6 +111,7 @@ export function useIrisVoiceLoop(opts: Options) {
 
   const listen = useCallback(() => {
     if (!activeRef.current) return;
+    breadcrumb('voice: listening');
     detectorRef.current.setMode('listening');
     setPhase('listening');
   }, [setPhase]);
@@ -119,11 +122,13 @@ export function useIrisVoiceLoop(opts: Options) {
 
     // Watch the mic for an interrupt from the moment playback starts.
     detectorRef.current.setMode('speaking');
+    breadcrumb('voice: createAudioPlayer');
     const player = createAudioPlayer({ uri: file.uri }, { updateInterval: 100, keepAudioSessionActive: true });
     const subs: { remove: () => void }[] = [];
     let pulse: Animated.CompositeAnimation | null = null;
 
     if (player.isAudioSamplingSupported) {
+      breadcrumb('voice: setAudioSamplingEnabled');
       player.setAudioSamplingEnabled(true);
       subs.push(player.addListener('audioSampleUpdate', (sample) => {
         const frames = sample.channels[0]?.frames ?? [];
@@ -142,12 +147,14 @@ export function useIrisVoiceLoop(opts: Options) {
 
     subs.push(player.addListener('playbackStatusUpdate', (status) => {
       if (status.didJustFinish && playbackRef.current?.player === player) {
+        breadcrumb('voice: playback finished');
         stopPlayback();
         listen();
       }
     }));
 
     playbackRef.current = { player, file, subs, pulse };
+    breadcrumb('voice: play');
     player.play();
     setPhase('speaking');
   }, [level, listen, setPhase, stopPlayback]);
@@ -160,6 +167,7 @@ export function useIrisVoiceLoop(opts: Options) {
 
     try {
       const audio = await bytesToBase64(buildWav(chunks));
+      breadcrumb('voice: sending turn');
       const res = await withTimeout(apiPost<VoiceResponse>('/iris/voice', {
         audio,
         sessionId,
@@ -168,6 +176,7 @@ export function useIrisVoiceLoop(opts: Options) {
         from: from || null,
       }), REQUEST_TIMEOUT_MS);
 
+      breadcrumb(`voice: reply received (audio: ${res.audio ? 'yes' : 'no'}, noSpeech: ${!!res.noSpeech})`);
       // The turn is part of the conversation even if the user has since left
       // voice mode (which unmounts this hook), so hand the session id and the
       // bubbles to the chat screen either way.
@@ -204,6 +213,7 @@ export function useIrisVoiceLoop(opts: Options) {
     if (!activeRef.current || typeof event.data !== 'string') return;
     const ev = detectorRef.current.push(base64ToBytes(event.data));
     if (!ev) return;
+    breadcrumb(`voice: ${ev.type}`);
     if (ev.type === 'speechStart') {
       setError(null);
       setReplyText(null);
@@ -226,13 +236,16 @@ export function useIrisVoiceLoop(opts: Options) {
 
     (async () => {
       try {
+        breadcrumb('voice: requestPermissionsAsync');
         const perm = await AudioStudioModule.requestPermissionsAsync();
+        breadcrumb(`voice: permission granted=${perm.granted}`);
         if (cancelled) return;
         if (!perm.granted) {
           setError('mic');
           setPhase('idle');
           return;
         }
+        breadcrumb('voice: startRecording');
         await startRecording({
           sampleRate: SAMPLE_RATE,
           channels: 1,
@@ -251,12 +264,14 @@ export function useIrisVoiceLoop(opts: Options) {
           android: { audioFocusStrategy: 'communication' },
           onAudioStream,
         });
+        breadcrumb('voice: startRecording resolved');
         if (cancelled) {
           stopRecording().catch(() => {});
           return;
         }
         listen();
-      } catch {
+      } catch (e) {
+        breadcrumb(`voice: start failed: ${e instanceof Error ? e.message : String(e)}`);
         if (!cancelled) {
           setError('failed');
           setPhase('idle');
@@ -270,7 +285,11 @@ export function useIrisVoiceLoop(opts: Options) {
       turnGenRef.current++; // drop playback for any request still in flight
       detectorRef.current.setMode('paused');
       stopPlayback();
-      stopRecording().catch(() => {});
+      // The trail is dropped only once the mic has stopped, so a crash while
+      // stopping is still reported.
+      const trail = currentTrail();
+      breadcrumb('voice: stopRecording');
+      stopRecording().catch(() => {}).finally(() => endBreadcrumbs(trail));
       setPhase('idle');
       setReplyText(null);
     };

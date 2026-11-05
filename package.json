@@ -1,7 +1,7 @@
 {
   "name": "betweencovers",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "entry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

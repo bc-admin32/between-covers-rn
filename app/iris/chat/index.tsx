@@ -11,6 +11,7 @@ import { apiPost } from '../../../lib/api';
 import { setPendingIrisMessage, takePendingIrisMessage } from '../../../lib/guest';
 import { useGuest } from '../../../lib/useGuest';
 import { track, reportClientError } from '../../../lib/analytics';
+import { startBreadcrumbs, breadcrumb } from '../../../lib/crashCapture';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
 import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
@@ -58,6 +59,7 @@ class VoiceErrorBoundary extends Component<{ onError: () => void; children: Reac
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    breadcrumb(`voice: error boundary: ${error.message}`);
     reportClientError('iris_voice', error, info.componentStack);
     Alert.alert('Voice chat', "Voice chat isn't working right now. You can keep chatting with Iris by text.");
     this.props.onError();
@@ -166,7 +168,10 @@ export default function IrisChatScreen() {
     setCheckingVoice(true);
     try {
       if (await needsIrisVoiceTerms()) setVoiceTermsVisible(true);
-      else setMode('voice');
+      else {
+        startBreadcrumbs('voice: toggle on');
+        setMode('voice');
+      }
     } catch {
       // Couldn't read the profile: show the sheet; accepting works either way.
       setVoiceTermsVisible(true);
@@ -310,6 +315,7 @@ export default function IrisChatScreen() {
         visible={voiceTermsVisible}
         onAccept={() => {
           setVoiceTermsVisible(false);
+          startBreadcrumbs('voice: terms accepted');
           setMode('voice');
         }}
         onCancel={() => setVoiceTermsVisible(false)}

@@ -3,6 +3,10 @@ import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { apiPost } from './api';
+import {
+  readPendingCrashReports, clearPendingCrashReports,
+  readUnfinishedBreadcrumbs, clearUnfinishedBreadcrumbs,
+} from './crashCapture';
 
 const STORAGE_KEY = 'bc_event_buffer_v1';
 const SESSION_KEY = 'bc_session_id_v1';
@@ -203,16 +207,18 @@ export async function track(
   }
 }
 
-// Reports a caught screen error right away, in its own batch: if the backend
-// rejects the event, only this report is lost, not the queued events.
+// Reports an error right away, in its own batch: if the backend rejects the
+// event, only this report is lost, not the queued events. Resolves true once
+// the backend has it; never throws.
 export async function reportClientError(
   where: string,
   error: unknown,
-  componentStack?: string | null
-): Promise<void> {
-  const err = error instanceof Error ? error : new Error(String(error));
-  console.error(`[${where}]`, err);
+  componentStack?: string | null,
+  extra: Record<string, unknown> = {}
+): Promise<boolean> {
   try {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error(`[${where}]`, err);
     const evt: AnalyticsEvent = {
       eventId: uuid(),
       eventName: 'client_error',
@@ -228,9 +234,50 @@ export async function reportClientError(
         appVersion: Constants.expoConfig?.version ?? 'unknown',
         os: Platform.OS,
         osVersion: String(Platform.Version),
+        ...extra,
       },
     };
     await apiPost('/events/batch', { events: [evt], guestId: await getGuestId() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Sends what lib/crashCapture saved during the previous launch: JS errors
+// caught by the global handler, and a voice breadcrumb trail if voice mode
+// never closed (a native crash leaves only that). Files are cleared only
+// after the backend has them, so a crash here doesn't lose them.
+export async function sendPendingCrashReports(): Promise<void> {
+  try {
+    const reports = readPendingCrashReports();
+    if (reports.length) {
+      let allSent = true;
+      for (const r of reports) {
+        const err = Object.assign(new Error(r.message), { name: r.name, stack: r.stack });
+        const sent = await reportClientError('previous_launch', err, null, {
+          isFatal: r.isFatal,
+          cause: r.cause,
+          breadcrumbs: r.breadcrumbs,
+          crashedAt: r.at,
+          crashAppVersion: r.appVersion,
+          crashBuildNumber: r.buildNumber,
+        });
+        allSent = allSent && sent;
+      }
+      if (allSent) clearPendingCrashReports();
+    }
+
+    const trail = readUnfinishedBreadcrumbs();
+    if (trail.length) {
+      const sent = await reportClientError(
+        'voice_unfinished',
+        new Error(`Voice session did not close. Last step: ${trail[trail.length - 1]}`),
+        null,
+        { breadcrumbs: trail }
+      );
+      if (sent) clearUnfinishedBreadcrumbs();
+    }
   } catch {
     // Best effort.
   }

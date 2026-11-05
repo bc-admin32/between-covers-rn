@@ -12,7 +12,7 @@ import { useFonts } from 'expo-font';
 import { analytics, HeyCatchProvider } from '@heycatch/sdk';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
-import { initAnalytics, track } from '../lib/analytics';
+import { initAnalytics, track, sendPendingCrashReports } from '../lib/analytics';
 import { captureFromUrl } from '../lib/attribution';
 import { hasSession } from '../lib/api';
 import { isAgeConfirmed, isGuestExpired } from '../lib/guest';
@@ -124,6 +124,9 @@ function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
+    // Send last launch's crash reports first, without waiting on anything:
+    // if this launch also dies early, they've already gone out.
+    sendPendingCrashReports();
     initAnalytics().then(() => {
       track('app_open', { coldStart: true });
     });

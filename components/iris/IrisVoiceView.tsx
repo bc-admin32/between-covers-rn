@@ -3,6 +3,7 @@ import {
   View, Text, Image, Pressable, Animated, Easing, StyleSheet, ScrollView, Linking, AccessibilityInfo,
 } from 'react-native';
 import { spacing } from '../../lib/theme';
+import { breadcrumb } from '../../lib/crashCapture';
 import type { VoiceErrorKind, VoicePhase } from './useIrisVoiceLoop';
 
 const CIRCLE = 168;
@@ -41,12 +42,16 @@ export default function IrisVoiceView({ avatarUri, phase, level, replyText, erro
       breath.setValue(0);
       return;
     }
+    breadcrumb('voice: thinking animation start (native driver)');
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(breath, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(breath, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     loop.start();
-    return () => loop.stop();
+    return () => {
+      breadcrumb('voice: thinking animation stop');
+      loop.stop();
+    };
   }, [phase, breath]);
 
   // Announce only when a screen reader is on: the native announce call is a
@@ -54,13 +59,19 @@ export default function IrisVoiceView({ avatarUri, phase, level, replyText, erro
   const screenReaderOnRef = useRef(false);
   useEffect(() => {
     let mounted = true;
+    breadcrumb('voice: isScreenReaderEnabled');
     AccessibilityInfo.isScreenReaderEnabled()
       .then((on) => { if (mounted) screenReaderOnRef.current = on; })
       .catch(() => {});
+    breadcrumb('voice: screenReaderChanged subscribe');
     const sub = AccessibilityInfo.addEventListener('screenReaderChanged', (on) => {
       screenReaderOnRef.current = on;
     });
-    return () => { mounted = false; sub.remove(); };
+    return () => {
+      mounted = false;
+      breadcrumb('voice: screenReaderChanged unsubscribe');
+      sub.remove();
+    };
   }, []);
 
   // Iris is speaking over the screen reader during playback, so only
@@ -68,6 +79,7 @@ export default function IrisVoiceView({ avatarUri, phase, level, replyText, erro
   useEffect(() => {
     if (!screenReaderOnRef.current) return;
     if (phase === 'listening' || phase === 'thinking') {
+      breadcrumb(`voice: announce ${phase}`);
       AccessibilityInfo.announceForAccessibility(A11Y_LABELS[phase]);
     }
   }, [phase]);
