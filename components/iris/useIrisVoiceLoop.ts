@@ -79,6 +79,9 @@ type VoiceStats = {
   minChunkBytes: number;
   maxChunkBytes: number;
   peakRms: number;
+  // Chunks where every sample is exactly 0: the system is blocking the mic,
+  // rather than a processing chain squashing it to a faint noise floor.
+  zeroChunks: number;
   rmsHistogram: number[];
   speechStarts: number;
   bargeIns: number;
@@ -104,6 +107,7 @@ function newStats(): VoiceStats {
     minChunkBytes: 0,
     maxChunkBytes: 0,
     peakRms: 0,
+    zeroChunks: 0,
     rmsHistogram: new Array(RMS_BUCKET_LIMITS.length + 1).fill(0),
     speechStarts: 0,
     bargeIns: 0,
@@ -125,6 +129,7 @@ function recordChunk(s: VoiceStats, bytes: Uint8Array): number {
   s.minChunkBytes = s.chunks === 1 ? bytes.length : Math.min(s.minChunkBytes, bytes.length);
   s.maxChunkBytes = Math.max(s.maxChunkBytes, bytes.length);
   s.peakRms = Math.max(s.peakRms, rms);
+  if (bytes.every((b) => b === 0)) s.zeroChunks++;
   const bucket = RMS_BUCKET_LIMITS.findIndex((limit) => rms < limit);
   s.rmsHistogram[bucket === -1 ? RMS_BUCKET_LIMITS.length : bucket]++;
   return rms;
@@ -152,6 +157,7 @@ function summarizeStats(s: VoiceStats) {
     // ~64,000 means float32 or stereo.
     bytesPerSecond: chunkSpanMs > 0 ? Math.round((s.bytes * 1000) / chunkSpanMs) : null,
     peakRms: Number(s.peakRms.toFixed(5)),
+    zeroChunks: s.zeroChunks,
     rmsHistogram: Object.fromEntries(
       s.rmsHistogram.map((n, i) => [i < RMS_BUCKET_LIMITS.length ? `<${RMS_BUCKET_LIMITS[i]}` : `>=${RMS_BUCKET_LIMITS[i - 1]}`, n])
     ),
@@ -468,7 +474,12 @@ export function useIrisVoiceLoop(opts: Options) {
             `peak: ${stats.peakRms.toFixed(4)}, speechStarts: ${stats.speechStarts})`
           ),
           null,
-          { ...summary, detector: detectorRef.current.getDiagnostics(), phaseAtEnd: phaseRef.current }
+          {
+            ...summary,
+            detector: detectorRef.current.getDiagnostics(),
+            phaseAtEnd: phaseRef.current,
+            device: { manufacturer: Device.manufacturer, model: Device.modelName },
+          }
         );
       }
       cancelled = true;

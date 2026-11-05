@@ -1,8 +1,96 @@
+diff --git a/node_modules/@siteed/audio-studio/android/build.gradle b/node_modules/@siteed/audio-studio/android/build.gradle
+index b065e2f..3c0199a 100644
+--- a/node_modules/@siteed/audio-studio/android/build.gradle
++++ b/node_modules/@siteed/audio-studio/android/build.gradle
+@@ -85,7 +85,7 @@ android {
+       cmake {
+         cppFlags "-frtti -fexceptions -Wall"
+         arguments "-DANDROID_STL=c++_shared"
+-        abiFilters "x86", "x86_64", "arm64-v8a"
++        abiFilters "armeabi-v7a", "x86", "x86_64", "arm64-v8a"
+       }
+     }
+   }
 diff --git a/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt b/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
-index 7d1e913..025b88c 100644
+index 7d1e913..da9a8fc 100644
 --- a/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
 +++ b/node_modules/@siteed/audio-studio/android/src/main/java/net/siteed/audiostudio/AudioRecorderManager.kt
-@@ -231,7 +231,7 @@ class AudioRecorderManager(
+@@ -120,6 +120,74 @@ class AudioRecorderManager(
+     private var compressedFile: File? = null
+ 
+     private var audioManager: AudioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
++
++    // BetweenCovers patch: voice-call mode for the recording session.
++    // Some phones (seen on a Samsung Galaxy A16) hand the VOICE_COMMUNICATION
++    // source near-silence unless the phone is in MODE_IN_COMMUNICATION. Fire
++    // tablets record fine without it, so they're left exactly as before.
++    private var savedAudioMode: Int? = null
++    private var savedSpeakerphoneOn: Boolean? = null
++    private var changedCommunicationDevice = false
++
++    private fun enterVoiceCallMode() {
++        if (Build.MANUFACTURER.equals("Amazon", ignoreCase = true)) return
++        if (savedAudioMode != null) return // already on (e.g. resume after pause)
++        try {
++            savedAudioMode = audioManager.mode
++            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
++
++            // Voice-call mode plays through the earpiece by default. Keep Iris on
++            // the loudspeaker unless headphones are connected.
++            val headphoneTypes = setOf(
++                AudioDeviceInfo.TYPE_WIRED_HEADSET,
++                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
++                AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
++                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
++                AudioDeviceInfo.TYPE_USB_HEADSET
++            )
++            val hasHeadphones = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
++                .any { it.type in headphoneTypes }
++            if (!hasHeadphones) {
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                    val speaker = audioManager.availableCommunicationDevices
++                        .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
++                    if (speaker != null) {
++                        changedCommunicationDevice = audioManager.setCommunicationDevice(speaker)
++                    }
++                } else {
++                    @Suppress("DEPRECATION")
++                    savedSpeakerphoneOn = audioManager.isSpeakerphoneOn
++                    @Suppress("DEPRECATION")
++                    audioManager.isSpeakerphoneOn = true
++                }
++            }
++            LogUtils.d(CLASS_NAME, "Voice-call mode on (was mode $savedAudioMode, headphones=$hasHeadphones)")
++        } catch (e: Exception) {
++            LogUtils.w(CLASS_NAME, "Could not enter voice-call mode: ${e.message}")
++        }
++    }
++
++    private fun exitVoiceCallMode() {
++        val mode = savedAudioMode ?: return
++        try {
++            if (changedCommunicationDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                audioManager.clearCommunicationDevice()
++            }
++            savedSpeakerphoneOn?.let {
++                @Suppress("DEPRECATION")
++                audioManager.isSpeakerphoneOn = it
++            }
++            audioManager.mode = mode
++            LogUtils.d(CLASS_NAME, "Voice-call mode off (restored mode $mode)")
++        } catch (e: Exception) {
++            LogUtils.w(CLASS_NAME, "Could not restore audio mode: ${e.message}")
++        } finally {
++            savedAudioMode = null
++            savedSpeakerphoneOn = null
++            changedCommunicationDevice = false
++        }
++    }
++
+     private var audioFocusChangeListener: AudioManager.OnAudioFocusChangeListener? = null
+     private var audioFocusRequest: Any? = null  // Type Any to handle both old and new APIs
+     private var phoneStateListener: PhoneStateListener? = null
+@@ -231,7 +299,7 @@ class AudioRecorderManager(
                  override fun resolve(value: Any?) {
                      LogUtils.d(CLASS_NAME, "🔄 Successfully reinitialized AudioRecord with new device")
                  }
@@ -11,7 +99,7 @@ index 7d1e913..025b88c 100644
                      LogUtils.e(CLASS_NAME, "🔄 Failed to reinitialize AudioRecord: $message")
                  }
              })) {
-@@ -243,7 +243,7 @@ class AudioRecorderManager(
+@@ -243,7 +311,7 @@ class AudioRecorderManager(
                              "isPaused" to true
                          ))
                      }
@@ -20,7 +108,7 @@ index 7d1e913..025b88c 100644
                  })
                  return
              }
-@@ -259,7 +259,7 @@ class AudioRecorderManager(
+@@ -259,7 +327,7 @@ class AudioRecorderManager(
                                  "isPaused" to true
                              ))
                          }
@@ -29,7 +117,7 @@ index 7d1e913..025b88c 100644
                      })
                      return
                  }
-@@ -303,7 +303,7 @@ class AudioRecorderManager(
+@@ -303,7 +371,7 @@ class AudioRecorderManager(
                          "error" to e.message
                      ))
                  }
@@ -38,7 +126,7 @@ index 7d1e913..025b88c 100644
              })
          }
      }
-@@ -423,7 +423,7 @@ class AudioRecorderManager(
+@@ -423,7 +491,7 @@ class AudioRecorderManager(
                                      "isPaused" to true
                                  ))
                              }
@@ -47,7 +135,7 @@ index 7d1e913..025b88c 100644
                                  LogUtils.e(CLASS_NAME, "Failed to pause recording on phone call", cause)
                              }
                          })
-@@ -450,7 +450,7 @@ class AudioRecorderManager(
+@@ -450,7 +518,7 @@ class AudioRecorderManager(
                                          "isPaused" to false
                                      ))
                                  }
@@ -56,7 +144,7 @@ index 7d1e913..025b88c 100644
                                      LogUtils.e(CLASS_NAME, "Failed to resume recording after phone call", cause)
                                  }
                              })
-@@ -680,7 +680,8 @@ class AudioRecorderManager(
+@@ -680,7 +748,8 @@ class AudioRecorderManager(
          }
  
          val audioRecord = AudioRecord(
@@ -66,7 +154,7 @@ index 7d1e913..025b88c 100644
              sampleRate,
              channelConfig,
              format,
-@@ -812,7 +813,7 @@ class AudioRecorderManager(
+@@ -812,7 +881,7 @@ class AudioRecorderManager(
                  override fun resolve(value: Any?) {
                      LogUtils.d(CLASS_NAME, "Auto-stopped recording after maxDurationMs")
                  }
@@ -75,9 +163,14 @@ index 7d1e913..025b88c 100644
                      LogUtils.e(CLASS_NAME, "Failed to auto-stop recording after maxDurationMs: $message")
                  }
              })
-@@ -976,13 +977,26 @@ class AudioRecorderManager(
+@@ -975,15 +1044,33 @@ class AudioRecorderManager(
+             if (audioRecord == null || !isPaused.get()) {
                  LogUtils.d(CLASS_NAME, "Initializing AudioRecord with format: $audioFormat, BufferSize: $bufferSizeInBytes")
  
++                // BetweenCovers patch: before creating the recorder, because some
++                // phones pick the recording path when it's created.
++                enterVoiceCallMode()
++
                  audioRecord = AudioRecord(
 -                    MediaRecorder.AudioSource.MIC,
 +                    // BetweenCovers patch: voice-call source enables platform echo cancellation.
@@ -101,9 +194,11 @@ index 7d1e913..025b88c 100644
 +                }
 +
                  if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
++                    exitVoiceCallMode() // BetweenCovers patch
                      promise.reject(
                          "INITIALIZATION_FAILED",
-@@ -1351,7 +1365,7 @@ class AudioRecorderManager(
+                         "Failed to initialize the audio recorder",
+@@ -1351,7 +1438,7 @@ class AudioRecorderManager(
                      override fun resolve(value: Any?) {
                          LogUtils.d(CLASS_NAME, "⏺️ Successfully reinitialized AudioRecord for resumption")
                      }
@@ -112,7 +207,17 @@ index 7d1e913..025b88c 100644
                          LogUtils.e(CLASS_NAME, "⏺️ Failed to reinitialize AudioRecord: $message")
                          // We'll let the main try-catch handle this error
                          throw IllegalStateException("Failed to reinitialize AudioRecord: $message")
-@@ -2066,7 +2080,7 @@ class AudioRecorderManager(
+@@ -1940,6 +2027,9 @@ class AudioRecorderManager(
+                 ))
+             } catch (e: Exception) {
+                 LogUtils.e(CLASS_NAME, "Error during cleanup", e)
++            } finally {
++                // BetweenCovers patch: always give the phone its audio mode back.
++                exitVoiceCallMode()
+             }
+         }
+     }
+@@ -2066,7 +2156,7 @@ class AudioRecorderManager(
                                          "isPaused" to true
                                      ))
                                  }
@@ -121,7 +226,7 @@ index 7d1e913..025b88c 100644
                                      LogUtils.e(CLASS_NAME, "Failed to pause recording on audio focus loss")
                                  }
                              })
-@@ -2089,7 +2103,7 @@ class AudioRecorderManager(
+@@ -2089,7 +2179,7 @@ class AudioRecorderManager(
                                          "isPaused" to false
                                      ))
                                  }
@@ -130,7 +235,7 @@ index 7d1e913..025b88c 100644
                                      LogUtils.e(CLASS_NAME, "Failed to resume recording on audio focus gain")
                                  }
                              })
-@@ -2136,7 +2150,7 @@ class AudioRecorderManager(
+@@ -2136,7 +2226,7 @@ class AudioRecorderManager(
                                          "isPaused" to true
                                      ))
                                  }
@@ -139,7 +244,7 @@ index 7d1e913..025b88c 100644
                                      LogUtils.e(CLASS_NAME, "Failed to pause recording on audio focus loss")
                                  }
                              })
-@@ -2163,7 +2177,7 @@ class AudioRecorderManager(
+@@ -2163,7 +2253,7 @@ class AudioRecorderManager(
                                          "isPaused" to false
                                      ))
                                  }
@@ -148,7 +253,7 @@ index 7d1e913..025b88c 100644
                                      LogUtils.e(CLASS_NAME, "Failed to resume recording on audio focus gain")
                                  }
                              })
-@@ -2269,7 +2283,7 @@ class AudioRecorderManager(
+@@ -2269,7 +2359,7 @@ class AudioRecorderManager(
              // Check permissions - create a dummy promise to avoid rejections
              val dummyPromise = object : Promise {
                  override fun resolve(value: Any?) {}
@@ -223,16 +328,3 @@ index e45b20a..eb871c5 100644
                      Log.e("RecordingActionReceiver", "$action failed: $message", cause)
                      isProcessingAction.set(false)
                  }
-diff --git a/node_modules/@siteed/audio-studio/android/build.gradle b/node_modules/@siteed/audio-studio/android/build.gradle
-index b065e2f..3c0199a 100644
---- a/node_modules/@siteed/audio-studio/android/build.gradle
-+++ b/node_modules/@siteed/audio-studio/android/build.gradle
-@@ -85,7 +85,7 @@ android {
-       cmake {
-         cppFlags "-frtti -fexceptions -Wall"
-         arguments "-DANDROID_STL=c++_shared"
--        abiFilters "x86", "x86_64", "arm64-v8a"
-+        abiFilters "armeabi-v7a", "x86", "x86_64", "arm64-v8a"
-       }
-     }
-   }
