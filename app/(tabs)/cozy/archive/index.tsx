@@ -37,8 +37,6 @@ type CozyData = {
     books?: BookItem[];
     visual?: VisualItem[];
     enhancements?: VisualItem[];
-    // Only in ?view=full, which leaves events out of `visual`.
-    events?: VisualItem[];
   };
 };
 
@@ -77,9 +75,8 @@ export default function CozyArchiveScreen() {
   }, []);
 
   const books = data?.sections?.books ?? [];
-  // The full view returns events separately; the preview mixed them into
-  // `visual`, so add them back to keep showing them in Visual Escapes.
-  const visual = [...(data?.sections?.visual ?? []), ...(data?.sections?.events ?? [])];
+  // Past events are left out on purpose (?view=full returns them separately).
+  const visual = data?.sections?.visual ?? [];
   const lifestyle = data?.sections?.enhancements ?? [];
   const spotlightBook = data?.sections?.spotlight?.book ?? null;
 
