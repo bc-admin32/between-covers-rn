@@ -81,6 +81,14 @@
         }
       ],
       "./plugins/withRNIapAmazonActivityListener",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
       "expo-video",
       [
         "@siteed/audio-studio",
