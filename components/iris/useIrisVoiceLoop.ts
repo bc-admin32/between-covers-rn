@@ -13,9 +13,10 @@ import {
 import { breadcrumb, currentTrail, endBreadcrumbs } from '../../lib/crashCapture';
 import { reportClientError } from '../../lib/analytics';
 
-// Talking over Iris stops her. Fire tablets have had flaky echo
-// cancellation; set this to false to make Fire tap-to-interrupt only.
-const VOICE_INTERRUPT_ON_FIRE = true;
+// Talking over Iris stops her. Off on Fire: its echo cancellation lets her
+// own voice through the mic, which interrupted her mid-sentence. Fire users
+// tap the circle to interrupt instead.
+const VOICE_INTERRUPT_ON_FIRE = false;
 const IS_FIRE = Platform.OS === 'android' && Device.manufacturer === 'Amazon';
 const VOICE_INTERRUPT_ENABLED = !IS_FIRE || VOICE_INTERRUPT_ON_FIRE;
 
