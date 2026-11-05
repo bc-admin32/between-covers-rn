@@ -8,7 +8,6 @@ import { useIrisVoiceLoop } from './useIrisVoiceLoop';
 // the mic; unmounting it stops everything.
 
 type Props = {
-  avatarUri: string;
   paddingBottom: number;
   sessionId: string | null;
   from: string;
@@ -18,13 +17,12 @@ type Props = {
   onTermsRequired: () => void;
 };
 
-export default function IrisVoiceSession({ avatarUri, paddingBottom, ...loopOpts }: Props) {
+export default function IrisVoiceSession({ paddingBottom, ...loopOpts }: Props) {
   const voice = useIrisVoiceLoop({ ...loopOpts, active: true });
 
   return (
     <View style={[styles.body, { paddingBottom }]}>
       <IrisVoiceView
-        avatarUri={avatarUri}
         phase={voice.phase}
         level={voice.level}
         replyText={voice.replyText}

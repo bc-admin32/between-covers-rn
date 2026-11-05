@@ -330,7 +330,6 @@ export default function IrisChatScreen() {
         <VoiceErrorBoundary onError={() => setMode('text')}>
           <Suspense fallback={<View style={styles.voiceBody} />}>
             <IrisVoiceSession
-              avatarUri={IRIS_AVATAR}
               paddingBottom={Math.max(insets.bottom, spacing.md)}
               sessionId={sessionId}
               from={from}

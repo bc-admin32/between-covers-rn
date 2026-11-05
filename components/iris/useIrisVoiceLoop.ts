@@ -6,8 +6,12 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { useAudioRecorder, AudioStudioModule, type AudioDataEvent } from '@siteed/audio-studio';
 import { apiPost, ApiError } from '../../lib/api';
 import { markIrisVoiceTermsRequired } from '../../lib/irisVoiceTerms';
-import { TurnDetector, SAMPLE_RATE, base64ToBytes, buildWav, floatRms } from '../../lib/irisVoiceAudio';
+import {
+  TurnDetector, SAMPLE_RATE, base64ToBytes, buildWav, floatRms, pcm16Rms,
+  DEFAULT_SPEECH_TUNING, IOS_SPEECH_TUNING,
+} from '../../lib/irisVoiceAudio';
 import { breadcrumb, currentTrail, endBreadcrumbs } from '../../lib/crashCapture';
+import { reportClientError } from '../../lib/analytics';
 
 // Talking over Iris stops her. Fire tablets have had flaky echo
 // cancellation; set this to false to make Fire tap-to-interrupt only.
@@ -49,6 +53,115 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// ── Session diagnostics ──
+// Counted for every voice session. If the session closes without a single
+// turn, they're sent as a client_error ('voice_no_turns') so we can see where
+// the record → detect path stalled: start, chunks, levels or turn detection.
+
+const MIN_REPORT_SESSION_MS = 3000;
+// Upper bounds of the level histogram buckets; the last bucket is "≥ 0.05".
+const RMS_BUCKET_LIMITS = [0.002, 0.005, 0.01, 0.02, 0.05];
+
+type VoiceStats = {
+  startedAt: number;
+  permission: 'unknown' | 'granted' | 'denied';
+  startRecording: 'not_called' | 'pending' | 'resolved' | 'failed';
+  startError: string | null;
+  firstChunkAt: number | null;
+  lastChunkAt: number | null;
+  chunks: number;
+  nonStringChunks: number;
+  nonStringType: string | null;
+  bytes: number;
+  minChunkBytes: number;
+  maxChunkBytes: number;
+  peakRms: number;
+  rmsHistogram: number[];
+  speechStarts: number;
+  bargeIns: number;
+  turnEnds: number;
+  turnsSent: number;
+  repliesReceived: number;
+  sendFailures: number;
+  lastSendError: string | null;
+};
+
+function newStats(): VoiceStats {
+  return {
+    startedAt: Date.now(),
+    permission: 'unknown',
+    startRecording: 'not_called',
+    startError: null,
+    firstChunkAt: null,
+    lastChunkAt: null,
+    chunks: 0,
+    nonStringChunks: 0,
+    nonStringType: null,
+    bytes: 0,
+    minChunkBytes: 0,
+    maxChunkBytes: 0,
+    peakRms: 0,
+    rmsHistogram: new Array(RMS_BUCKET_LIMITS.length + 1).fill(0),
+    speechStarts: 0,
+    bargeIns: 0,
+    turnEnds: 0,
+    turnsSent: 0,
+    repliesReceived: 0,
+    sendFailures: 0,
+    lastSendError: null,
+  };
+}
+
+function recordChunk(s: VoiceStats, bytes: Uint8Array): number {
+  const now = Date.now();
+  const rms = pcm16Rms(bytes);
+  if (s.firstChunkAt === null) s.firstChunkAt = now;
+  s.lastChunkAt = now;
+  s.chunks++;
+  s.bytes += bytes.length;
+  s.minChunkBytes = s.chunks === 1 ? bytes.length : Math.min(s.minChunkBytes, bytes.length);
+  s.maxChunkBytes = Math.max(s.maxChunkBytes, bytes.length);
+  s.peakRms = Math.max(s.peakRms, rms);
+  const bucket = RMS_BUCKET_LIMITS.findIndex((limit) => rms < limit);
+  s.rmsHistogram[bucket === -1 ? RMS_BUCKET_LIMITS.length : bucket]++;
+  return rms;
+}
+
+function errorText(e: unknown): string {
+  return (e instanceof Error ? e.message : String(e)).slice(0, 300);
+}
+
+function summarizeStats(s: VoiceStats) {
+  const chunkSpanMs = s.firstChunkAt !== null && s.lastChunkAt !== null ? s.lastChunkAt - s.firstChunkAt : 0;
+  return {
+    sessionMs: Date.now() - s.startedAt,
+    permission: s.permission,
+    startRecording: s.startRecording,
+    startError: s.startError,
+    firstChunkAfterMs: s.firstChunkAt === null ? null : s.firstChunkAt - s.startedAt,
+    chunks: s.chunks,
+    nonStringChunks: s.nonStringChunks,
+    nonStringType: s.nonStringType,
+    bytes: s.bytes,
+    minChunkBytes: s.minChunkBytes,
+    maxChunkBytes: s.maxChunkBytes,
+    // 16 kHz mono 16-bit is 32,000 bytes/s. ~96,000 means 48 kHz arrived;
+    // ~64,000 means float32 or stereo.
+    bytesPerSecond: chunkSpanMs > 0 ? Math.round((s.bytes * 1000) / chunkSpanMs) : null,
+    peakRms: Number(s.peakRms.toFixed(5)),
+    rmsHistogram: Object.fromEntries(
+      s.rmsHistogram.map((n, i) => [i < RMS_BUCKET_LIMITS.length ? `<${RMS_BUCKET_LIMITS[i]}` : `>=${RMS_BUCKET_LIMITS[i - 1]}`, n])
+    ),
+    speechStarts: s.speechStarts,
+    bargeIns: s.bargeIns,
+    turnEnds: s.turnEnds,
+    turnsSent: s.turnsSent,
+    repliesReceived: s.repliesReceived,
+    sendFailures: s.sendFailures,
+    lastSendError: s.lastSendError,
+  };
+}
+
 // Base64 of a byte array, encoded natively via a temp file (a ~2 MB turn is
 // slow to encode in JS).
 async function bytesToBase64(bytes: Uint8Array): Promise<string> {
@@ -79,7 +192,11 @@ export function useIrisVoiceLoop(opts: Options) {
   const activeRef = useRef(false);
   const mountedRef = useRef(true);
   const turnGenRef = useRef(0);
-  const detectorRef = useRef(new TurnDetector(VOICE_INTERRUPT_ENABLED));
+  const detectorRef = useRef(new TurnDetector(
+    VOICE_INTERRUPT_ENABLED,
+    Platform.OS === 'ios' ? IOS_SPEECH_TUNING : DEFAULT_SPEECH_TUNING,
+  ));
+  const statsRef = useRef<VoiceStats>(newStats());
   const playbackRef = useRef<{
     player: AudioPlayer;
     file: File;
@@ -167,6 +284,7 @@ export function useIrisVoiceLoop(opts: Options) {
 
     try {
       const audio = await bytesToBase64(buildWav(chunks));
+      statsRef.current.turnsSent++;
       breadcrumb('voice: sending turn');
       const res = await withTimeout(apiPost<VoiceResponse>('/iris/voice', {
         audio,
@@ -176,6 +294,7 @@ export function useIrisVoiceLoop(opts: Options) {
         from: from || null,
       }), REQUEST_TIMEOUT_MS);
 
+      statsRef.current.repliesReceived++;
       breadcrumb(`voice: reply received (audio: ${res.audio ? 'yes' : 'no'}, noSpeech: ${!!res.noSpeech})`);
       // The turn is part of the conversation even if the user has since left
       // voice mode (which unmounts this hook), so hand the session id and the
@@ -198,6 +317,8 @@ export function useIrisVoiceLoop(opts: Options) {
         listen();
       }
     } catch (err) {
+      statsRef.current.sendFailures++;
+      statsRef.current.lastSendError = errorText(err);
       if (!mountedRef.current || gen !== turnGenRef.current) return;
       if (err instanceof ApiError && err.status === 403 && err.body?.error === 'VOICE_TERMS_REQUIRED') {
         markIrisVoiceTermsRequired();
@@ -210,10 +331,32 @@ export function useIrisVoiceLoop(opts: Options) {
   }, [listen, play, setPhase]);
 
   const onAudioStream = useCallback(async (event: AudioDataEvent) => {
-    if (!activeRef.current || typeof event.data !== 'string') return;
-    const ev = detectorRef.current.push(base64ToBytes(event.data));
+    const stats = statsRef.current;
+    if (typeof event.data !== 'string') {
+      // Only base64 PCM is handled; count anything else so a format change
+      // shows up in the diagnostics instead of as silence.
+      stats.nonStringChunks++;
+      stats.nonStringType = event.data?.constructor?.name ?? typeof event.data;
+      return;
+    }
+    if (!activeRef.current) return;
+    const bytes = base64ToBytes(event.data);
+    const rms = recordChunk(stats, bytes);
+    if (stats.chunks === 1) {
+      breadcrumb(`voice: first chunk (${bytes.length} bytes, rms ${rms.toFixed(4)})`);
+    } else if (stats.chunks % 100 === 0) {
+      const d = detectorRef.current.getDiagnostics();
+      breadcrumb(
+        `voice: ${stats.chunks} chunks, peak ${stats.peakRms.toFixed(4)}, ` +
+        `threshold ${d.speechThreshold.toFixed(4)}, floor ${d.noiseFloor.toFixed(4)}, mode ${d.mode}`
+      );
+    }
+    const ev = detectorRef.current.push(bytes);
     if (!ev) return;
     breadcrumb(`voice: ${ev.type}`);
+    if (ev.type === 'speechStart') stats.speechStarts++;
+    else if (ev.type === 'bargeIn') stats.bargeIns++;
+    else if (ev.type === 'turnEnd') stats.turnEnds++;
     if (ev.type === 'speechStart') {
       setError(null);
       setReplyText(null);
@@ -231,6 +374,8 @@ export function useIrisVoiceLoop(opts: Options) {
     if (!active) return;
     let cancelled = false;
     activeRef.current = true;
+    statsRef.current = newStats();
+    const stats = statsRef.current;
     setError(null);
     setReplyText(null);
 
@@ -238,6 +383,7 @@ export function useIrisVoiceLoop(opts: Options) {
       try {
         breadcrumb('voice: requestPermissionsAsync');
         const perm = await AudioStudioModule.requestPermissionsAsync();
+        stats.permission = perm.granted ? 'granted' : 'denied';
         breadcrumb(`voice: permission granted=${perm.granted}`);
         if (cancelled) return;
         if (!perm.granted) {
@@ -246,6 +392,7 @@ export function useIrisVoiceLoop(opts: Options) {
           return;
         }
         breadcrumb('voice: startRecording');
+        stats.startRecording = 'pending';
         await startRecording({
           sampleRate: SAMPLE_RATE,
           channels: 1,
@@ -264,6 +411,7 @@ export function useIrisVoiceLoop(opts: Options) {
           android: { audioFocusStrategy: 'communication' },
           onAudioStream,
         });
+        stats.startRecording = 'resolved';
         breadcrumb('voice: startRecording resolved');
         if (cancelled) {
           stopRecording().catch(() => {});
@@ -271,6 +419,10 @@ export function useIrisVoiceLoop(opts: Options) {
         }
         listen();
       } catch (e) {
+        if (stats.startRecording === 'pending') {
+          stats.startRecording = 'failed';
+          stats.startError = errorText(e);
+        }
         breadcrumb(`voice: start failed: ${e instanceof Error ? e.message : String(e)}`);
         if (!cancelled) {
           setError('failed');
@@ -280,6 +432,20 @@ export function useIrisVoiceLoop(opts: Options) {
     })();
 
     return () => {
+      // A session that heard no complete turn: report where it stalled.
+      // Read the detector before it's paused below.
+      const summary = summarizeStats(stats);
+      if (stats.turnEnds === 0 && summary.sessionMs >= MIN_REPORT_SESSION_MS) {
+        reportClientError(
+          'voice_no_turns',
+          new Error(
+            `Voice session ended with no turns (start: ${stats.startRecording}, chunks: ${stats.chunks}, ` +
+            `peak: ${stats.peakRms.toFixed(4)}, speechStarts: ${stats.speechStarts})`
+          ),
+          null,
+          { ...summary, detector: detectorRef.current.getDiagnostics(), phaseAtEnd: phaseRef.current }
+        );
+      }
       cancelled = true;
       activeRef.current = false;
       turnGenRef.current++; // drop playback for any request still in flight

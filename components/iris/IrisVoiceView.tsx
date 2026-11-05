@@ -7,6 +7,9 @@ import { breadcrumb } from '../../lib/crashCapture';
 import type { VoiceErrorKind, VoicePhase } from './useIrisVoiceLoop';
 
 const CIRCLE = 168;
+// 512×512, already framed for a circle (face centred, head and shoulders in).
+// White background, so the circle behind it is white too.
+const AVATAR = require('../../assets/images/iris-voice-avatar.png');
 
 const A11Y_LABELS: Record<VoicePhase, string> = {
   idle: 'Iris voice chat',
@@ -22,7 +25,6 @@ const ERROR_TEXT: Record<VoiceErrorKind, string> = {
 };
 
 type Props = {
-  avatarUri: string;
   phase: VoicePhase;
   level: Animated.Value; // 0–1, Iris's playback level
   replyText: string | null; // shown when a reply came back without audio
@@ -33,7 +35,7 @@ type Props = {
 // State is shown only by the circle: still while listening, a slow soft
 // breathing glow while thinking, and a glow that follows Iris's voice while
 // she speaks. No status words on screen; screen readers get labels instead.
-export default function IrisVoiceView({ avatarUri, phase, level, replyText, error, onPressCircle }: Props) {
+export default function IrisVoiceView({ phase, level, replyText, error, onPressCircle }: Props) {
   const breath = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function IrisVoiceView({ avatarUri, phase, level, replyText, erro
           accessibilityLabel={A11Y_LABELS[phase]}
           accessibilityState={{ busy: phase === 'thinking' }}
         >
-          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+          <Image source={AVATAR} style={styles.avatar} resizeMode="cover" accessibilityIgnoresInvertColors />
         </Pressable>
       </View>
 
@@ -137,12 +139,14 @@ const styles = StyleSheet.create({
     width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2,
     backgroundColor: '#E7AEB7',
   },
+  // The shadow lives on the circle and the round crop on the image, so the
+  // crop doesn't clip the shadow on iOS.
   circle: {
     width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2,
-    padding: 4, backgroundColor: 'rgba(169,192,212,0.5)',
+    backgroundColor: '#fff',
     shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4,
   },
-  avatar: { width: CIRCLE - 8, height: CIRCLE - 8, borderRadius: (CIRCLE - 8) / 2 },
+  avatar: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2 },
   below: { minHeight: 120, maxHeight: 200, width: '100%', marginTop: spacing.lg, alignItems: 'center' },
   errorBox: { alignItems: 'center', gap: spacing.xs },
   errorText: { textAlign: 'center', fontSize: 13, color: '#B09A7E', fontStyle: 'italic' },

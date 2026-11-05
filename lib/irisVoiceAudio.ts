@@ -81,6 +81,39 @@ export type DetectorEvent =
   | { type: 'turnEnd'; chunks: Uint8Array[] }
   | null;
 
+// What counts as talking: the louder of a fixed minimum and a multiple of the
+// measured room noise.
+export type SpeechThresholdTuning = {
+  minSpeechRms: number;
+  noiseFloorMultiplier: number;
+};
+
+// Android (and the default): tuned with the voice-call mic source, which
+// applies gain control.
+export const DEFAULT_SPEECH_TUNING: SpeechThresholdTuning = {
+  minSpeechRms: MIN_SPEECH_RMS,
+  noiseFloorMultiplier: NOISE_FLOOR_MULTIPLIER,
+};
+
+// iOS: the raw iPhone mic (no gain control) can stay under Android's 0.02 at
+// arm's length, so start lower and let the threshold follow the room noise.
+// Starts at 0.012 (the initial floor of 0.004 × 3) and settles at 3× the
+// measured floor, never below 0.006.
+export const IOS_SPEECH_TUNING: SpeechThresholdTuning = {
+  minSpeechRms: 0.006,
+  noiseFloorMultiplier: 3,
+};
+
+export type TurnDetectorDiagnostics = {
+  mode: DetectorMode;
+  noiseFloor: number;
+  speechThreshold: number;
+  minSpeechRms: number;
+  noiseFloorMultiplier: number;
+  longestLoudMs: number; // longest run above the threshold while listening
+  inTurn: boolean;
+};
+
 export class TurnDetector {
   private mode: DetectorMode = 'paused';
   private preroll: Uint8Array[] = [];
@@ -92,12 +125,32 @@ export class TurnDetector {
   private silenceMs = 0;
   private noiseFloor = 0.004;
   private bargeInEnabled: boolean;
+  private tuning: SpeechThresholdTuning;
+  private longestLoudMs = 0;
 
-  constructor(bargeInEnabled: boolean) {
+  constructor(bargeInEnabled: boolean, tuning: SpeechThresholdTuning = DEFAULT_SPEECH_TUNING) {
     this.bargeInEnabled = bargeInEnabled;
+    this.tuning = tuning;
   }
 
   getMode(): DetectorMode { return this.mode; }
+
+  private speechThreshold(): number {
+    return Math.max(this.tuning.minSpeechRms, this.noiseFloor * this.tuning.noiseFloorMultiplier);
+  }
+
+  // Read-only snapshot for voice-session diagnostics.
+  getDiagnostics(): TurnDetectorDiagnostics {
+    return {
+      mode: this.mode,
+      noiseFloor: this.noiseFloor,
+      speechThreshold: this.speechThreshold(),
+      minSpeechRms: this.tuning.minSpeechRms,
+      noiseFloorMultiplier: this.tuning.noiseFloorMultiplier,
+      longestLoudMs: this.longestLoudMs,
+      inTurn: this.speaking,
+    };
+  }
 
   // Every mode change drops buffered audio, so nothing recorded while Iris
   // was playing ends up in the next turn (except an interrupt's pre-roll).
@@ -116,7 +169,7 @@ export class TurnDetector {
     if (this.mode === 'paused') return null;
     const ms = bytes.length / BYTES_PER_MS;
     const rms = pcm16Rms(bytes);
-    const speechRms = Math.max(MIN_SPEECH_RMS, this.noiseFloor * NOISE_FLOOR_MULTIPLIER);
+    const speechRms = this.speechThreshold();
 
     if (this.mode === 'speaking') {
       this.addPreroll(bytes, ms);
@@ -137,6 +190,7 @@ export class TurnDetector {
       this.addPreroll(bytes, ms);
       if (rms >= speechRms) {
         this.loudMs += ms;
+        this.longestLoudMs = Math.max(this.longestLoudMs, this.loudMs);
         if (this.loudMs >= SPEECH_START_MS) {
           this.startTurn(this.preroll, this.prerollMs);
           return { type: 'speechStart' };
