@@ -8,7 +8,7 @@ import type { VoiceErrorKind, VoicePhase } from './useIrisVoiceLoop';
 
 const CIRCLE = 168;
 // 512×512, already framed for a circle (face centred, head and shoulders in).
-// White background, so the circle behind it is white too.
+// Transparent background, so the light blue circle shows behind her.
 const AVATAR = require('../../assets/images/iris-voice-avatar.png');
 
 const A11Y_LABELS: Record<VoicePhase, string> = {
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   // crop doesn't clip the shadow on iOS.
   circle: {
     width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2,
-    backgroundColor: '#fff',
+    backgroundColor: '#CFDFEE',
     shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4,
   },
   avatar: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2 },
