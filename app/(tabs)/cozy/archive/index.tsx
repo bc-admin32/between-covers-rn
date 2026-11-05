@@ -37,6 +37,8 @@ type CozyData = {
     books?: BookItem[];
     visual?: VisualItem[];
     enhancements?: VisualItem[];
+    // Only in ?view=full, which leaves events out of `visual`.
+    events?: VisualItem[];
   };
 };
 
@@ -63,7 +65,9 @@ export default function CozyArchiveScreen() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await apiGet('/cozy/home');
+        // ?view=full returns last month's sections in full; plain /cozy/home
+        // only has a 3-item preview of each.
+        const res = await apiGet('/cozy/home?view=full');
         setData(res.previous ?? null);
       } catch {} finally {
         setLoading(false);
@@ -73,7 +77,9 @@ export default function CozyArchiveScreen() {
   }, []);
 
   const books = data?.sections?.books ?? [];
-  const visual = data?.sections?.visual ?? [];
+  // The full view returns events separately; the preview mixed them into
+  // `visual`, so add them back to keep showing them in Visual Escapes.
+  const visual = [...(data?.sections?.visual ?? []), ...(data?.sections?.events ?? [])];
   const lifestyle = data?.sections?.enhancements ?? [];
   const spotlightBook = data?.sections?.spotlight?.book ?? null;
 
