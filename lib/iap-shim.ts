@@ -1,439 +1,99 @@
 /**
- * react-native-iap shim — three-way platform routing for Apple App Store,
- * Google Play, and Amazon Appstore, plus an Expo Go stub.
+ * IAP shim router — picks the in-app purchase library at RUNTIME, from the
+ * native modules this binary actually contains:
  *
- * ── Platform detection ────────────────────────────────────────────────────
- * Amazon Fire devices identify as `Platform.OS === 'android'`. To distinguish
- * Fire OS from generic Android we read `Device.manufacturer` from
- * `expo-device` and treat the value `'Amazon'` as Amazon. Otherwise
- * `Platform.OS` is the source of truth.
+ *   react-native-iap native module (iOS, Amazon build) → lib/iap-shim.rniap.ts
+ *   expo-iap native module (Google Play build)         → lib/iap-shim.play.ts
+ *   neither                                            → no-op stub (app still opens)
  *
- * Why expo-device.manufacturer over alternatives:
- *   - Build-time flavor flags (e.g. BuildConfig.FLAVOR) require splitting
- *     into product flavors AND wiring a JS bridge — react-native-iap's Expo
- *     plugin already creates flavors on the native side, but exposing the
- *     flavor name to JS would need a custom native module.
- *   - User-agent / package-name heuristics are unreliable on side-loaded
- *     APKs and emulators.
- *   - `Device.manufacturer === 'Amazon'` is what react-native-iap's own
- *     internals use to pick the Amazon path (see modules/amazon), so we
- *     mirror their detection to stay consistent.
+ * Why runtime: `eas update` builds ONE Android JS bundle for both the Play and
+ * Amazon binaries, and they embed different IAP native modules. When this was
+ * chosen at bundle time (Metro + RNIAP_VARIANT), an Android OTA bundled the
+ * react-native-iap shim, whose withIAPContext throws at launch on the Play
+ * binary (no RNIap native module) and crashed it.
  *
- * ── Three code paths ──────────────────────────────────────────────────────
- *   1. Expo Go: stubs, dev-only Alert. Lets paywall screens render so the
- *      route tree can be tested without crashing on missing native modules.
- *   2. Apple + Google (iOS / non-Amazon Android): real react-native-iap via
- *      `useIAP` and `requestSubscription` with platform-specific shapes.
- *      Android requires `subscriptionOffers: [{ sku, offerToken }]`.
- *   3. Amazon (Fire OS): real react-native-iap via `useIAP` and
- *      `requestSubscription({ sku })` per the Amazon path documented in
- *      react-native-iap v12 (RequestPurchaseAmazon = sku-only).
- *
- * The exported surface (`useIAP`, `restorePurchases`, `ensureConnection`,
- * `withIAPContext`, `getResolvedPlatform`) is stable across all three paths so
- * callers (`hard-paywall.tsx`, `subscription.ts`) don't need branching logic
- * of their own.
+ * Both shims export the same surface, so callers import from here unchanged.
+ * Each shim is only require()d after its native module is confirmed, so the
+ * other library's JS never runs. On EAS builds the unused package isn't
+ * installed; metro.config.js resolves it to an empty module.
  */
-
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import { useEffect, useState } from 'react';
-import { Alert, NativeModules, Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
+import { NativeModules, Platform } from 'react-native';
+import type * as Shim from './iap-shim.rniap';
+
+export type {
+  ResolvedPlatform,
+  ShimSubscription,
+  ShimPurchase,
+  IAPHookReturn,
+  UseIAP,
+  RestorePurchases,
+  EnsureConnection,
+  WithIAPContext,
+} from './iap-shim.rniap';
+
+type ShimModule = typeof Shim;
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
-export type ResolvedPlatform = 'ios' | 'android' | 'amazon';
+function hasReactNativeIap(): boolean {
+  const { RNIapIos, RNIapIosSk2, RNIapModule, RNIapAmazonModule } = NativeModules;
+  return !!(RNIapIos || RNIapIosSk2 || RNIapModule || RNIapAmazonModule);
+}
 
-let cachedPlatform: ResolvedPlatform | null = null;
-
-/**
- * Resolves the runtime platform with Amazon split out from generic Android.
- * Cached on first call — manufacturer doesn't change at runtime.
- */
-export function getResolvedPlatform(): ResolvedPlatform {
-  if (cachedPlatform) return cachedPlatform;
-  if (Platform.OS === 'android' && Device.manufacturer === 'Amazon') {
-    cachedPlatform = 'amazon';
-  } else if (Platform.OS === 'android') {
-    cachedPlatform = 'android';
-  } else {
-    cachedPlatform = 'ios';
+function hasExpoIap(): boolean {
+  try {
+    return requireOptionalNativeModule('ExpoIap') != null;
+  } catch {
+    return false;
   }
+}
+
+// No IAP native module at all: keep the app usable (no products, nothing to
+// restore) instead of crashing at launch.
+function useIAPUnavailable(): Shim.IAPHookReturn {
+  return {
+    connected: false,
+    subscriptions: [],
+    currentPurchase: null,
+    currentPurchaseError: null,
+    fetchProducts: async () => [],
+    requestPurchase: async () => {},
+    finishTransaction: async () => {},
+  };
+}
+
+function loadShim(): ShimModule | null {
+  // Expo Go: the react-native-iap shim has its own Expo Go stubs.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  if (isExpoGo || hasReactNativeIap()) return require('./iap-shim.rniap');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  if (hasExpoIap()) return require('./iap-shim.play');
+  console.warn('[iap-shim] No IAP native module found; purchases unavailable');
+  return null;
+}
+
+const shim = loadShim();
+
+// Store detection is the same in both shims (Amazon = Android device made by
+// Amazon); kept here too so it works when no shim loaded.
+let cachedPlatform: Shim.ResolvedPlatform | null = null;
+export function getResolvedPlatform(): Shim.ResolvedPlatform {
+  if (cachedPlatform) return cachedPlatform;
+  if (Platform.OS === 'android') cachedPlatform = Device.manufacturer === 'Amazon' ? 'amazon' : 'android';
+  else cachedPlatform = 'ios';
   return cachedPlatform;
 }
 
-/**
- * True only on the Google Play path (Android, non-Amazon).
- *
- * This is the store detector that ALL Play-only billing logic must gate on —
- * NOT `Platform.OS`. Amazon Fire reports `Platform.OS === 'android'`, so a
- * `Platform.OS === 'android'` gate would let Google-Play-only calls run on
- * Amazon, where they throw / are unsupported. Play-only surface includes:
- *   - `flushFailedPurchasesCachedAsPendingAndroid()` (Google Play Billing only;
- *     the Amazon native module implements it as a no-op, and nothing in this app
- *     calls it — but any future caller must still gate on this, not Platform.OS).
- *   - `getAvailablePurchases()`-based launch reconciliation
- *     (`reconcileAndroidPurchases` in lib/subscription.ts), which self-heals a
- *     Google subscription against the backend and has no Amazon analogue.
- *
- * Delegates to `getResolvedPlatform()` so the Amazon-vs-Google decision lives in
- * exactly one place (`Device.manufacturer === 'Amazon'`).
- */
+// True only on Google Play (Android, not Amazon). Gate all Play-only billing
+// logic on this, never on Platform.OS — Fire reports 'android' too.
 export function isGooglePlay(): boolean {
   return getResolvedPlatform() === 'android';
 }
 
-export type ShimSubscription = {
-  id: string;
-  displayPrice: string;
-  title?: string;
-};
-
-export type ShimPurchase = {
-  productId: string;
-  transactionId: string;
-  transactionDate?: number;
-  // Android (Google Play / Amazon) purchase token. Required by the backend to
-  // verify the purchase against Google (subscriptionWrite v4). Present on
-  // Android purchases from react-native-iap 12.16.4 as `purchase.purchaseToken`.
-  // On Amazon this carries the receiptId (the native maps receiptId →
-  // purchaseToken), which the backend needs for Amazon receipt verification.
-  purchaseToken?: string;
-  // Amazon-only: the Amazon userId and full receipt JSON. Amazon's Receipt
-  // Verification Service is addressed by (userId, receiptId), so the backend
-  // needs the userId alongside the receiptId to verify. Undefined off-Amazon.
-  amazonUserId?: string;
-  transactionReceipt?: string;
-};
-
-type FetchProductsOpts = { skus: string[]; type: string };
-
-type RequestPurchaseOpts = {
-  request: {
-    ios: { sku: string };
-    android: { skus: string[] };
-    amazon: { sku: string };
-  };
-  type: string;
-};
-
-type FinishTransactionOpts = { purchase: ShimPurchase; isConsumable: boolean };
-
-export type IAPHookReturn = {
-  connected: boolean;
-  subscriptions: ShimSubscription[];
-  currentPurchase: ShimPurchase | null;
-  currentPurchaseError: { code?: string } | null;
-  fetchProducts: (opts: FetchProductsOpts) => Promise<ShimSubscription[]>;
-  requestPurchase: (opts: RequestPurchaseOpts) => Promise<void>;
-  finishTransaction: (opts: FinishTransactionOpts) => Promise<void>;
-};
-
-export type UseIAP = () => IAPHookReturn;
-export type RestorePurchases = () => Promise<ShimPurchase[]>;
-export type EnsureConnection = () => Promise<void>;
-export type WithIAPContext = <P extends object>(
-  Component: React.ComponentType<P>,
-) => React.ComponentType<P>;
-
-// ── Expo Go stub ─────────────────────────────────────────────────────────
-function useIAPStub(): IAPHookReturn {
-  const stubSubs: ShimSubscription[] = [
-    { id: 'com.betweencovers.app.membership.monthly', displayPrice: '$9.99', title: 'Monthly (DEV STUB)' },
-    { id: 'com.betweencovers.app.membership.annual',  displayPrice: '$89.99', title: 'Annual (DEV STUB)' },
-  ];
-
-  return {
-    connected: true,
-    subscriptions: stubSubs,
-    currentPurchase: null,
-    currentPurchaseError: null,
-    fetchProducts: async (_opts: FetchProductsOpts) => stubSubs,
-    requestPurchase: async (_opts: RequestPurchaseOpts) => {
-      Alert.alert(
-        'Dev stub',
-        'react-native-iap is not available in Expo Go. Build an EAS dev build to test real purchases.\n\nFor now, you can advance through the flow by tapping "Not now" or by manually setting subscriptionStatus on your user record in DynamoDB.',
-      );
-    },
-    finishTransaction: async (_opts: FinishTransactionOpts) => {},
-  };
-}
-
-const restorePurchasesStub: RestorePurchases = async () => {
-  Alert.alert('Dev stub', 'Restore purchases is a no-op in Expo Go.');
-  return [];
-};
-
-const ensureConnectionStub: EnsureConnection = async () => {};
-
-const passthroughHOC: WithIAPContext = (Component) => Component;
-
-let resolvedUseIAP: UseIAP = useIAPStub;
-let resolvedRestorePurchases: RestorePurchases = restorePurchasesStub;
-let resolvedEnsureConnection: EnsureConnection = ensureConnectionStub;
-let resolvedWithIAPContext: WithIAPContext = passthroughHOC;
-
-// ── Real react-native-iap path (iOS / Android / Amazon) ──────────────────
-if (!isExpoGo) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const rniap = require('react-native-iap');
-
-    resolvedWithIAPContext = rniap.withIAPContext as WithIAPContext;
-
-    // Normalize a v12 Subscription (union of iOS/Android/Amazon shapes)
-    // into the narrow ShimSubscription our paywalls consume.
-    const toShimSubscription = (s: any): ShimSubscription => {
-      const id: string = s.productId ?? s.id ?? '';
-      const title: string | undefined = s.title ?? s.name;
-
-      // Android Billing v5: price lives inside subscriptionOfferDetails[].pricingPhases.
-      // We pick the LAST pricing phase, which is the recurring (post-trial) price —
-      // the first phase is typically the free-trial introductory phase.
-      const androidOffer = Array.isArray(s.subscriptionOfferDetails)
-        ? s.subscriptionOfferDetails[0]
-        : undefined;
-      const androidPhases = androidOffer?.pricingPhases?.pricingPhaseList;
-      const androidPrice =
-        Array.isArray(androidPhases) && androidPhases.length > 0
-          ? androidPhases[androidPhases.length - 1].formattedPrice
-          : undefined;
-
-      // iOS Sk1/Sk2 + Amazon both expose localizedPrice.
-      const localized = s.localizedPrice ?? s.displayPrice ?? androidPrice ?? s.price ?? '';
-
-      return { id, displayPrice: String(localized), title };
-    };
-
-    const useRealIAP: UseIAP = () => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const real = rniap.useIAP();
-      const platform = getResolvedPlatform();
-
-      // ── Connection readiness gate ──────────────────────────────────────────
-      // react-native-iap's own useIAP() sets the context `connected` flag to
-      // true on hook MOUNT (see hooks/useIAP.ts), independent of whether
-      // initConnection() has resolved. On Amazon, initConnection() is what
-      // registers the native PurchasingListener (PurchasingService.registerListener);
-      // any purchasing call (getSubscriptions/getProducts/getAvailablePurchases/
-      // requestSubscription) issued before it resolves throws "You must register
-      // a PurchasingListener before invoking this operation for Amazon".
-      //
-      // So we DON'T trust real.connected as the ready signal. We own a `ready`
-      // flag that flips true only after initConnection() resolves. initConnection
-      // is idempotent (returns the existing connection if the root provider
-      // already initialized it), so calling it here is safe on every platform.
-      // Apple/Google init resolves promptly — same observable behavior, minus the
-      // Amazon race.
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const [ready, setReady] = useState(false);
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      useEffect(() => {
-        let cancelled = false;
-        rniap
-          .initConnection()
-          .then(() => {
-            if (!cancelled) setReady(true);
-          })
-          .catch(() => {
-            // Stay not-ready: paywalls keep their fallback prices and the 8s
-            // loading timeout takes over, exactly as on any init failure today.
-          });
-        return () => {
-          cancelled = true;
-        };
-      }, []);
-
-      const shimSubs: ShimSubscription[] = (real.subscriptions ?? []).map(toShimSubscription);
-
-      const fetchProducts = async (opts: FetchProductsOpts): Promise<ShimSubscription[]> => {
-        if (opts.type === 'subs') {
-          await real.getSubscriptions({ skus: opts.skus });
-        } else {
-          await real.getProducts({ skus: opts.skus });
-        }
-        // Hook state updates asynchronously; return the latest snapshot we have.
-        return ((real.subscriptions ?? []) as any[]).map(toShimSubscription);
-      };
-
-      const requestPurchase = async (opts: RequestPurchaseOpts): Promise<void> => {
-        const isSubs = opts.type === 'subs';
-
-        if (platform === 'ios') {
-          const sku = opts.request.ios.sku;
-          if (isSubs) {
-            await real.requestSubscription({ sku });
-          } else {
-            await rniap.requestPurchase({ sku });
-          }
-          return;
-        }
-
-        if (platform === 'amazon') {
-          const sku = opts.request.amazon.sku;
-          if (isSubs) {
-            await real.requestSubscription({ sku });
-          } else {
-            await rniap.requestPurchase({ sku });
-          }
-          return;
-        }
-
-        // Google Play
-        const skus = opts.request.android.skus;
-        if (isSubs) {
-          // Android subs require an offerToken pulled from the fetched product.
-          const subscriptionOffers = skus.map((sku) => {
-            const product: any = (real.subscriptions ?? []).find(
-              (p: any) => p.productId === sku,
-            );
-
-            if (!product) {
-              console.warn('[iap-shim] No product found for sku', sku, 'in', (real.subscriptions ?? []).length, 'fetched subscriptions');
-              throw new Error(`Subscription product unavailable: ${sku}. Please try again or contact support.`);
-            }
-
-            const offers = product?.subscriptionOfferDetails;
-            if (!Array.isArray(offers) || offers.length === 0) {
-              console.warn('[iap-shim] No subscriptionOfferDetails for sku', sku, 'product:', JSON.stringify(product));
-              throw new Error(`Subscription offer unavailable: ${sku}. Please try again or contact support.`);
-            }
-
-            // Walk offers; pick first with non-empty offerToken
-            const usableOffer = offers.find((o: any) => typeof o?.offerToken === 'string' && o.offerToken.length > 0);
-            if (!usableOffer) {
-              console.warn('[iap-shim] No usable offerToken in', offers.length, 'offers for sku', sku, 'offers:', JSON.stringify(offers));
-              throw new Error(`Subscription offer token missing: ${sku}. Please try again or contact support.`);
-            }
-
-            return { sku, offerToken: usableOffer.offerToken };
-          });
-          await real.requestSubscription({ subscriptionOffers });
-        } else {
-          await rniap.requestPurchase({ skus });
-        }
-      };
-
-      const finishTransaction = async (opts: FinishTransactionOpts): Promise<void> => {
-        await real.finishTransaction({
-          purchase: opts.purchase as any,
-          isConsumable: opts.isConsumable,
-        });
-      };
-
-      return {
-        // Gate on our init-resolved flag, NOT real.connected (which useIAP sets
-        // true on mount before initConnection resolves). This is what keeps the
-        // paywalls from calling getSubscriptions before the Amazon listener is
-        // registered.
-        connected: ready,
-        subscriptions: shimSubs,
-        currentPurchase: (real.currentPurchase ?? null) as ShimPurchase | null,
-        currentPurchaseError: (real.currentPurchaseError ?? null) as { code?: string } | null,
-        fetchProducts,
-        requestPurchase,
-        finishTransaction,
-      };
-    };
-
-    const mapPurchases = (purchases: any[] | null | undefined): ShimPurchase[] =>
-      (purchases ?? []).map((p: any) => ({
-        productId: p.productId,
-        // Amazon receipts carry no transactionId; fall back to the receiptId
-        // (purchaseToken) so downstream never sees an empty id.
-        transactionId: p.transactionId ?? p.purchaseToken ?? '',
-        transactionDate: p.transactionDate,
-        // Preserve the Android/Amazon purchase token (on Amazon this is the
-        // receiptId) so callers can verify it server-side (backend verification
-        // + restore/launch write-back).
-        purchaseToken: p.purchaseToken,
-        // Amazon receipt verification also needs the userId + full receipt JSON.
-        // Undefined on Google/iOS — harmless passthrough.
-        amazonUserId: p.userIdAmazon ?? p.amazonUserId,
-        transactionReceipt: p.transactionReceipt,
-      }));
-
-    // Amazon requires the current user to be resolved (getUserData) before it
-    // will return entitlements. getUser() round-trips through the registered
-    // PurchasingListener, so it both identifies the user AND proves the listener
-    // is live. Non-fatal — proceed to the query even if it can't resolve.
-    const resolveAmazonUser = async (): Promise<void> => {
-      const amazonModule: any = NativeModules.RNIapAmazonModule;
-      if (!amazonModule?.getUser) return;
-      try {
-        await amazonModule.getUser();
-      } catch {
-        // Non-fatal — proceed to the query even if the user can't resolve.
-      }
-    };
-
-    const realRestorePurchases: RestorePurchases = async () => {
-      const platform = getResolvedPlatform();
-
-      // Apple / Google: unchanged — surface errors to the caller.
-      if (platform !== 'amazon') {
-        return mapPurchases(await rniap.getAvailablePurchases());
-      }
-
-      // ── Amazon path ────────────────────────────────────────────────────────
-      // getAvailableItems maps to Amazon's getPurchaseUpdates(true). Amazon
-      // returns a FAILED PurchaseUpdatesResponse — surfaced as E_UNKNOWN — when
-      // it's invoked before the PurchasingListener has registered AND the current
-      // user is resolved. Our reconcile can run at cold launch (before any
-      // paywall mounted useIAP()/getSubscriptions, so getUser was never called),
-      // which is exactly that race. So: register the listener (initConnection,
-      // idempotent) + resolve the user first, then query; retry once on a
-      // transient E_UNKNOWN; and degrade to an empty result rather than throwing.
-      try {
-        await rniap.initConnection();
-      } catch {
-        // best-effort — proceed to resolve/query regardless
-      }
-      await resolveAmazonUser();
-
-      try {
-        return mapPurchases(await rniap.getAvailablePurchases());
-      } catch (e) {
-        const code = (e as any)?.code;
-        if (code !== 'E_UNKNOWN') {
-          // Non-transient (e.g. service unavailable). Treat as "no purchases" so
-          // the reconcile never throws before the backend call.
-          return [];
-        }
-        // Transient E_UNKNOWN: the user/listener likely hadn't settled. Give
-        // Amazon a moment, re-resolve the user, and retry once.
-        await new Promise((r) => setTimeout(r, 600));
-        await resolveAmazonUser();
-        try {
-          return mapPurchases(await rniap.getAvailablePurchases());
-        } catch {
-          // Still failing — degrade gracefully to empty. The next launch /
-          // paywall-load reconcile will try again.
-          return [];
-        }
-      }
-    };
-
-    const realEnsureConnection: EnsureConnection = async () => {
-      // Idempotent: react-native-iap returns the existing connection if already
-      // initialized. Tolerant — best-effort so callers (launch reconcile) never
-      // throw on a connection hiccup.
-      try {
-        await rniap.initConnection();
-      } catch {
-        // ignore — caller treats a missing connection as "no purchases found"
-      }
-    };
-
-    resolvedUseIAP = useRealIAP;
-    resolvedRestorePurchases = realRestorePurchases;
-    resolvedEnsureConnection = realEnsureConnection;
-  } catch (err) {
-    console.warn('[iap-shim] Failed to load react-native-iap, falling back to stub:', err);
-  }
-}
-
-export const useIAP: UseIAP = resolvedUseIAP;
-export const restorePurchases: RestorePurchases = resolvedRestorePurchases;
-export const ensureConnection: EnsureConnection = resolvedEnsureConnection;
-export const withIAPContext: WithIAPContext = resolvedWithIAPContext;
+export const useIAP: Shim.UseIAP = shim?.useIAP ?? useIAPUnavailable;
+export const restorePurchases: Shim.RestorePurchases = shim?.restorePurchases ?? (async () => []);
+export const ensureConnection: Shim.EnsureConnection = shim?.ensureConnection ?? (async () => {});
+export const withIAPContext: Shim.WithIAPContext = shim?.withIAPContext ?? ((Component) => Component);

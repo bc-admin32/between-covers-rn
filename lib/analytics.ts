@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { apiPost } from './api';
 import {
@@ -70,13 +71,12 @@ function uuid(): string {
   });
 }
 
+// Decided on the device, not from the build's config: an OTA update carries
+// the config of the machine that published it, so a build-time value would be
+// wrong for one of the two Android stores. Fire tablets run the Amazon build.
 function detectPlatform(): 'ios' | 'android' | 'amazon' {
-  const buildPlatform = Constants.expoConfig?.extra?.analyticsPlatform;
-  if (buildPlatform === 'ios' || buildPlatform === 'android' || buildPlatform === 'amazon') {
-    return buildPlatform;
-  }
   if (Platform.OS === 'ios') return 'ios';
-  return 'android';
+  return Device.manufacturer === 'Amazon' ? 'amazon' : 'android';
 }
 
 async function getSessionId(): Promise<string> {

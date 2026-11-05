@@ -4,37 +4,27 @@ const gracefulFs = require('graceful-fs');
 gracefulFs.gracefulify(require('fs'));
 
 const { getDefaultConfig } = require('expo/metro-config');
-const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// ── IAP variant selection (SPIKE) ──────────────────────────────────────────
-// RNIAP_VARIANT is set per EAS profile: `play` (iOS + Google Play, expo-iap) or
-// `amazon` (Fire OS, react-native-iap@12.16.4). Defaults to amazon so a plain
-// `expo start` / amazon build resolves lib/iap-shim.ts unchanged.
-//
-// On the play build, redirect any import that resolves to lib/iap-shim.ts to
-// lib/iap-shim.play.ts. Because the amazon file is then unreachable, Metro never
-// resolves its `require('react-native-iap')` — and, symmetrically, the amazon
-// build never bundles iap-shim.play.ts, so it never resolves `expo-iap`.
-const IAP_VARIANT = process.env.RNIAP_VARIANT ?? 'amazon';
-const PLAY_SHIM = path.resolve(__dirname, 'lib/iap-shim.play.ts');
+// ── IAP packages ────────────────────────────────────────────────────────────
+// lib/iap-shim.ts picks react-native-iap or expo-iap at runtime, so the JS
+// bundle is the same for every store (one Android OTA works on both the Play
+// and Amazon binaries). EAS builds still install only their own IAP package
+// (scripts/eas-pre-install-iap-variant.js); the missing one resolves to an
+// empty module here. The router never loads it, because its native module
+// isn't in that binary either.
+const OPTIONAL_IAP_PACKAGES = new Set(['react-native-iap', 'expo-iap']);
 
 const baseResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const resolve = baseResolveRequest ?? context.resolveRequest;
-  const resolved = resolve(context, moduleName, platform);
-
-  if (
-    IAP_VARIANT === 'play' &&
-    resolved &&
-    resolved.type === 'sourceFile' &&
-    typeof resolved.filePath === 'string' &&
-    resolved.filePath.replace(/\\/g, '/').endsWith('/lib/iap-shim.ts')
-  ) {
-    return { type: 'sourceFile', filePath: PLAY_SHIM };
+  try {
+    return resolve(context, moduleName, platform);
+  } catch (err) {
+    if (OPTIONAL_IAP_PACKAGES.has(moduleName)) return { type: 'empty' };
+    throw err;
   }
-  return resolved;
 };
 
 module.exports = config;

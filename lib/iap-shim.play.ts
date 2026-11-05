@@ -1,18 +1,16 @@
 /**
  * iap-shim.play.ts — GOOGLE PLAY variant, backed by expo-iap (OpenIAP).
  *
- * ⚠️ SPIKE / UNVERIFIED. Selected at build time for RNIAP_VARIANT=play (the
- * production-google EAS profile ONLY) via the Metro resolver redirect in
- * metro.config.js. iOS and the Amazon build both keep the existing
- * lib/iap-shim.ts on react-native-iap@12.16.4 (RNIAP_VARIANT=amazon) — iOS is
- * out of scope for the Billing-8 migration (Aug 31 is Google Play only). A build
- * only ever bundles ONE shim, so the play build never resolves react-native-iap
- * and the amazon build never resolves expo-iap.
+ * ⚠️ SPIKE / UNVERIFIED. Loaded at runtime by the router in lib/iap-shim.ts
+ * when the binary contains expo-iap's native module, which only the Google Play
+ * build (RNIAP_VARIANT=play) does. iOS and the Amazon build use
+ * lib/iap-shim.rniap.ts on react-native-iap@12.16.4 (RNIAP_VARIANT=amazon) —
+ * iOS is out of scope for the Billing-8 migration (Aug 31 is Google Play only).
  *
  * The iOS branch in requestPurchase() below is retained (defensive/self-
- * contained) but is DEAD on this variant — iOS never resolves to this file.
+ * contained) but is DEAD on this variant — iOS never loads this file.
  *
- * Exported surface is byte-identical to lib/iap-shim.ts, so subscription.ts,
+ * Exported surface is byte-identical to lib/iap-shim.rniap.ts, so subscription.ts,
  * _layout.tsx, and the paywalls import the SAME symbols and need zero changes:
  *   getResolvedPlatform, isGooglePlay, useIAP, restorePurchases,
  *   ensureConnection, withIAPContext, ShimSubscription, ShimPurchase, ...
