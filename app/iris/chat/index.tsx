@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable, Alert, AppState,
@@ -10,12 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiPost } from '../../../lib/api';
 import { setPendingIrisMessage, takePendingIrisMessage } from '../../../lib/guest';
 import { useGuest } from '../../../lib/useGuest';
-import { track } from '../../../lib/analytics';
+import { track, reportClientError } from '../../../lib/analytics';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
-import IrisVoiceView from '../../../components/iris/IrisVoiceView';
 import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
-import { useIrisVoiceLoop } from '../../../components/iris/useIrisVoiceLoop';
+
+// Loaded on first switch to voice, so text chat never loads the audio libraries.
+const IrisVoiceSession = lazy(() => import('../../../components/iris/IrisVoiceSession'));
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
@@ -43,6 +44,48 @@ function TypingIndicator() {
         <Text style={styles.typingDots}>• • •</Text>
       </View>
       <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
+    </View>
+  );
+}
+
+// A voice-mode error sends the user back to text chat instead of taking down
+// the whole screen, and reports what happened.
+class VoiceErrorBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    reportClientError('iris_voice', error, info.componentStack);
+    Alert.alert('Voice chat', "Voice chat isn't working right now. You can keep chatting with Iris by text.");
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+// expo-router shows this in place of the screen when the chat screen throws
+// while rendering. It reports the error so we can see it without a device log.
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  const router = useRouter();
+  useEffect(() => {
+    reportClientError('iris_chat', error);
+  }, [error]);
+
+  return (
+    <View style={styles.crashBody}>
+      <Text style={styles.crashTitle}>Iris stepped away for a moment</Text>
+      <Text style={styles.crashText}>Something went wrong opening the chat.</Text>
+      <TouchableOpacity style={styles.crashButton} onPress={() => { retry(); }}>
+        <Text style={styles.crashButtonText}>Try again</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.back()}>
+        <Text style={styles.crashLink}>Go back</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -80,26 +123,6 @@ export default function IrisChatScreen() {
   const [voiceTermsVisible, setVoiceTermsVisible] = useState(false);
   const [checkingVoice, setCheckingVoice] = useState(false);
   const reopenVoiceTermsRef = useRef(false);
-
-  const voice = useIrisVoiceLoop({
-    active: mode === 'voice',
-    sessionId,
-    from,
-    openingMessage,
-    onSessionId: (id) => setSessionId((prev) => prev ?? id),
-    onTurn: ({ transcript, reply }) => {
-      const t = Date.now();
-      setMessages((prev) => [
-        ...prev,
-        { id: `user-${t}`, role: 'user', text: transcript },
-        { id: `iris-${t}`, role: 'iris', text: reply },
-      ]);
-    },
-    onTermsRequired: () => {
-      setMode('text');
-      setVoiceTermsVisible(true);
-    },
-  });
 
   // Back in text mode the message list remounts; jump to the newest bubbles.
   useEffect(() => {
@@ -294,16 +317,30 @@ export default function IrisChatScreen() {
       />
 
       {mode === 'voice' ? (
-        <View style={[styles.voiceBody, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <IrisVoiceView
-            avatarUri={IRIS_AVATAR}
-            phase={voice.phase}
-            level={voice.level}
-            replyText={voice.replyText}
-            error={voice.error}
-            onPressCircle={voice.interrupt}
-          />
-        </View>
+        <VoiceErrorBoundary onError={() => setMode('text')}>
+          <Suspense fallback={<View style={styles.voiceBody} />}>
+            <IrisVoiceSession
+              avatarUri={IRIS_AVATAR}
+              paddingBottom={Math.max(insets.bottom, spacing.md)}
+              sessionId={sessionId}
+              from={from}
+              openingMessage={openingMessage}
+              onSessionId={(id) => setSessionId((prev) => prev ?? id)}
+              onTurn={({ transcript, reply }) => {
+                const t = Date.now();
+                setMessages((prev) => [
+                  ...prev,
+                  { id: `user-${t}`, role: 'user', text: transcript },
+                  { id: `iris-${t}`, role: 'iris', text: reply },
+                ]);
+              }}
+              onTermsRequired={() => {
+                setMode('text');
+                setVoiceTermsVisible(true);
+              }}
+            />
+          </Suspense>
+        </VoiceErrorBoundary>
       ) : (<>
       {/* MESSAGES */}
       <ScrollView
@@ -393,6 +430,12 @@ export default function IrisChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F5F3' },
+  crashBody: { flex: 1, backgroundColor: '#F7F5F3', alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+  crashTitle: { fontSize: 20, fontWeight: '600', color: '#0F2A48', fontStyle: 'italic', textAlign: 'center' },
+  crashText: { fontSize: 15, color: '#0F2A48', textAlign: 'center' },
+  crashButton: { backgroundColor: '#B83255', borderRadius: radius.full, paddingVertical: spacing.sm + 4, paddingHorizontal: spacing.lg },
+  crashButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  crashLink: { color: '#B83255', fontSize: 15 },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     paddingHorizontal: spacing.lg, paddingBottom: spacing.md,

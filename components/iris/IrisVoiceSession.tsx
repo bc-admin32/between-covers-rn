@@ -1,0 +1,40 @@
+import { View, StyleSheet } from 'react-native';
+import IrisVoiceView from './IrisVoiceView';
+import { useIrisVoiceLoop } from './useIrisVoiceLoop';
+
+// Voice mode for the Iris chat screen. The screen loads this file only when
+// the user switches to voice, so the audio libraries (expo-audio,
+// @siteed/audio-studio) are never loaded for text chat. Mounting this starts
+// the mic; unmounting it stops everything.
+
+type Props = {
+  avatarUri: string;
+  paddingBottom: number;
+  sessionId: string | null;
+  from: string;
+  openingMessage: string;
+  onSessionId: (id: string) => void;
+  onTurn: (turn: { transcript: string; reply: string }) => void;
+  onTermsRequired: () => void;
+};
+
+export default function IrisVoiceSession({ avatarUri, paddingBottom, ...loopOpts }: Props) {
+  const voice = useIrisVoiceLoop({ ...loopOpts, active: true });
+
+  return (
+    <View style={[styles.body, { paddingBottom }]}>
+      <IrisVoiceView
+        avatarUri={avatarUri}
+        phase={voice.phase}
+        level={voice.level}
+        replyText={voice.replyText}
+        error={voice.error}
+        onPressCircle={voice.interrupt}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: { flex: 1 },
+});

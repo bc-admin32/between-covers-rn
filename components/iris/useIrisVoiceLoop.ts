@@ -168,18 +168,18 @@ export function useIrisVoiceLoop(opts: Options) {
         from: from || null,
       }), REQUEST_TIMEOUT_MS);
 
-      if (!mountedRef.current) return;
       // The turn is part of the conversation even if the user has since left
-      // voice mode, so keep the session id and the bubbles either way.
+      // voice mode (which unmounts this hook), so hand the session id and the
+      // bubbles to the chat screen either way.
       if (res.sessionId) optsRef.current.onSessionId(res.sessionId);
-      if (res.noSpeech) {
-        if (gen === turnGenRef.current) listen();
-        return;
-      }
-      if (res.transcript && res.reply) {
+      if (!res.noSpeech && res.transcript && res.reply) {
         optsRef.current.onTurn({ transcript: res.transcript, reply: res.reply });
       }
-      if (gen !== turnGenRef.current || !activeRef.current) return;
+      if (!mountedRef.current || gen !== turnGenRef.current || !activeRef.current) return;
+      if (res.noSpeech) {
+        listen();
+        return;
+      }
 
       setError(null);
       if (res.audio) {

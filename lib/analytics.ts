@@ -33,7 +33,8 @@ type EventName =
   | 'tag_modal_closed'
   | 'tag_modal_skipped'
   | 'tag_modal_auto_prompt_disabled'
-  | 'age_gate_confirmed';
+  | 'age_gate_confirmed'
+  | 'client_error';
 
 type AnalyticsEvent = {
   eventId: string;
@@ -199,6 +200,39 @@ export async function track(
     }
   } catch {
     // Never throw from track() — analytics must not break the app
+  }
+}
+
+// Reports a caught screen error right away, in its own batch: if the backend
+// rejects the event, only this report is lost, not the queued events.
+export async function reportClientError(
+  where: string,
+  error: unknown,
+  componentStack?: string | null
+): Promise<void> {
+  const err = error instanceof Error ? error : new Error(String(error));
+  console.error(`[${where}]`, err);
+  try {
+    const evt: AnalyticsEvent = {
+      eventId: uuid(),
+      eventName: 'client_error',
+      eventTimestamp: new Date().toISOString(),
+      sessionId: await getSessionId(),
+      platform: detectPlatform(),
+      properties: {
+        where,
+        name: err.name,
+        message: err.message.slice(0, 500),
+        stack: (err.stack ?? '').slice(0, 2000),
+        componentStack: (componentStack ?? '').slice(0, 2000),
+        appVersion: Constants.expoConfig?.version ?? 'unknown',
+        os: Platform.OS,
+        osVersion: String(Platform.Version),
+      },
+    };
+    await apiPost('/events/batch', { events: [evt], guestId: await getGuestId() });
+  } catch {
+    // Best effort.
   }
 }
 
