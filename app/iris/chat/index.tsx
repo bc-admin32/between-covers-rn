@@ -1,7 +1,7 @@
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable, Alert, AppState,
+  StyleSheet, KeyboardAvoidingView, Platform, Image, Pressable, Alert,
 } from 'react-native';
 import { CaretLeft, Copy, Check, Microphone, ChatCircleText } from '../../../components/icons';
 import * as Clipboard from 'expo-clipboard';
@@ -134,14 +134,6 @@ export default function IrisChatScreen() {
   useEffect(() => {
     if (mode === 'text') setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
   }, [mode]);
-
-  // The mic only runs in the foreground: leaving the app leaves voice mode.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') setMode('text');
-    });
-    return () => sub.remove();
-  }, []);
 
   // The terms sheet closes before a legal document opens (a native Modal would
   // cover the pushed route); reopen it when the user comes back.
@@ -347,6 +339,10 @@ export default function IrisChatScreen() {
                 setMode('text');
                 setVoiceTermsVisible(true);
               }}
+              // The mic only runs in the foreground: leaving the app leaves
+              // voice mode. The voice session decides what counts as leaving
+              // (Android's permission dialog doesn't).
+              onBackground={() => setMode('text')}
             />
           </Suspense>
         </VoiceErrorBoundary>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform } from 'react-native';
+import { Animated, AppState, Easing, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { File, Paths } from 'expo-file-system';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
@@ -42,6 +42,9 @@ type Options = {
   onSessionId: (id: string) => void;
   onTurn: (turn: { transcript: string; reply: string }) => void;
   onTermsRequired: () => void;
+  // The app went to the background while voice mode was on (not counting the
+  // mic permission dialog).
+  onBackground: () => void;
 };
 
 class TimeoutError extends Error {}
@@ -379,10 +382,31 @@ export function useIrisVoiceLoop(opts: Options) {
     setError(null);
     setReplyText(null);
 
+    // Leaving the app leaves voice mode, except for the mic permission dialog:
+    // on Android it pauses the app, which React Native reports as
+    // 'background' (Android has no 'inactive'). iOS reports its permission
+    // alert as 'inactive', which is ignored here anyway.
+    let permissionPending = false;
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state !== 'background') return;
+      if (permissionPending) {
+        breadcrumb('voice: background ignored (permission dialog)');
+        return;
+      }
+      breadcrumb('voice: app went to background');
+      optsRef.current.onBackground();
+    });
+
     (async () => {
       try {
         breadcrumb('voice: requestPermissionsAsync');
-        const perm = await AudioStudioModule.requestPermissionsAsync();
+        permissionPending = true;
+        let perm: Awaited<ReturnType<typeof AudioStudioModule.requestPermissionsAsync>>;
+        try {
+          perm = await AudioStudioModule.requestPermissionsAsync();
+        } finally {
+          permissionPending = false;
+        }
         stats.permission = perm.granted ? 'granted' : 'denied';
         breadcrumb(`voice: permission granted=${perm.granted}`);
         if (cancelled) return;
@@ -432,6 +456,7 @@ export function useIrisVoiceLoop(opts: Options) {
     })();
 
     return () => {
+      appStateSub.remove();
       // A session that heard no complete turn: report where it stalled.
       // Read the detector before it's paused below.
       const summary = summarizeStats(stats);
