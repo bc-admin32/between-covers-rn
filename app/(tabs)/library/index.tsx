@@ -12,6 +12,7 @@ import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate } from '../../../lib/dateUtils';
 import { groupBooksBySubgenre } from '../../../lib/tagTaxonomy';
+import type { LibraryStatus } from '../../../lib/libraryStatus';
 import BookCardMeta from '../../../components/cozy/BookCardMeta';
 
 type LibraryItem = {
@@ -19,7 +20,7 @@ type LibraryItem = {
   title: string;
   primaryAuthor: string;
   coverUrl: string;
-  status: 'CURRENTLY_READING' | 'WANT_TO_READ' | 'FINISHED';
+  status: LibraryStatus;
   currentPage?: number;
   totalPages?: number;
   finishedAt?: string;
@@ -34,6 +35,8 @@ type LibrarySnapshot = {
   reading: number;
   wishlist: number;
   finished: number;
+  // Optional until librarySnapshot returns it; the pill shows 0 meanwhile.
+  dnf?: number;
 };
 
 type LibrarySnapshotResponse = {
@@ -48,6 +51,7 @@ function guestSnapshot(books: GuestBook[]): LibrarySnapshot {
     reading: books.filter((b) => b.status === 'CURRENTLY_READING').length,
     wishlist: books.filter((b) => b.status === 'WANT_TO_READ').length,
     finished: books.filter((b) => b.status === 'FINISHED').length,
+    dnf: books.filter((b) => b.status === 'DNF').length,
   };
 }
 
@@ -185,6 +189,12 @@ export default function LibraryScreen() {
               active={statusFilter === 'FINISHED'}
               onPress={() => setStatusFilter(statusFilter === 'FINISHED' ? null : 'FINISHED')}
             />
+            <FilterPill
+              label="DNF"
+              count={snapshot.dnf ?? 0}
+              active={statusFilter === 'DNF'}
+              onPress={() => setStatusFilter(statusFilter === 'DNF' ? null : 'DNF')}
+            />
           </View>
         )}
 
@@ -262,6 +272,7 @@ export default function LibraryScreen() {
                     </View>
                     <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
                     <Text style={styles.bookAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                    {item.status === 'DNF' && <Text style={styles.dnfLabel}>DNF</Text>}
                     {/* Tighter 3-col card — keep it compact: peppers + 1 pill. */}
                     <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={1} />
                   </TouchableOpacity>
@@ -301,6 +312,7 @@ export default function LibraryScreen() {
                       <Text style={styles.listAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
                       <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={2} />
                     </View>
+                    {item.status === 'DNF' && <Text style={styles.listMeta}>DNF</Text>}
                     {item.status === 'CURRENTLY_READING' && item.currentPage && (
                       <Text style={styles.listMeta}>p. {item.currentPage}</Text>
                     )}
@@ -362,8 +374,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 38, color: '#B83255', fontFamily: 'DancingScript_700Bold' },
   subtitle: { fontSize: 11, color: 'rgba(106,89,105,0.7)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginVertical: spacing.sm },
-  filterRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: spacing.sm },
-  filterPill: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999, backgroundColor: '#D7E2E9' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#D7E2E9' },
   filterPillActive: { backgroundColor: '#0F2A48' },
   filterPillText: { fontSize: 12, fontWeight: '700', color: '#0F2A48' },
   filterPillTextActive: { color: '#fff' },
@@ -401,4 +413,5 @@ const styles = StyleSheet.create({
   listTitle: { fontSize: 13, fontWeight: '600', color: '#0F2A48', lineHeight: 18 },
   listAuthor: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', marginTop: 2 },
   listMeta: { fontSize: 10, fontWeight: '700', color: '#B83255', flexShrink: 0 },
+  dnfLabel: { fontSize: 10, fontWeight: '700', color: '#B83255', marginTop: 2 },
 });

@@ -16,6 +16,7 @@ import { apiGet, apiPost, apiPatch, apiDelete, hasSession } from '../../lib/api'
 import { getGuestBook, saveGuestBook, updateGuestBookStatus, removeGuestBook } from '../../lib/guest';
 import { useGuest } from '../../lib/useGuest';
 import { track } from '../../lib/analytics';
+import { LIBRARY_STATUSES, LIBRARY_STATUS_LABELS, type LibraryStatus } from '../../lib/libraryStatus';
 import { maybeRequestReview } from '../../lib/reviewPrompt';
 import { getFinishedBookPromptEnabled } from '../../lib/finishedBookPromptPreference';
 import { spacing, radius, colors } from '../../lib/theme';
@@ -57,7 +58,7 @@ type BookDetailResponse = {
     triggers?: string[] | null;
   } & RetailerCTAFields;
   libraryItem: {
-    status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
+    status: LibraryStatus;
     // Personal library rating, in the uppercase tag-taxonomy domain
     // (RatingKey). Distinct from the lowercase community Verdict used by
     // userCommunityRating / VerdictRating. Read/written only by TagBookModal.
@@ -148,7 +149,7 @@ export default function BookDetailsScreen() {
     else setLoaded(true);
   }, [workId]);
 
-  async function handleAddToLibrary(status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED') {
+  async function handleAddToLibrary(status: LibraryStatus) {
     if (!data?.work) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setAdding(true);
@@ -212,12 +213,15 @@ export default function BookDetailsScreen() {
     setAdding(false);
   }
 
-  async function updateStatus(status: 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED') {
-    const wasFinished = data?.libraryItem?.status === 'FINISHED';
+  async function updateStatus(status: LibraryStatus) {
+    const from = data?.libraryItem?.status ?? null;
+    if (from === status) return;
+    const wasFinished = from === 'FINISHED';
     try {
       const guest = !(await hasSession());
       if (guest) await updateGuestBookStatus(workId, status);
       else await apiPatch(`/library/${workId}`, { status });
+      track('book_status_changed', { workId, from, to: status });
       setData((prev) =>
         prev && prev.libraryItem ? { ...prev, libraryItem: { ...prev.libraryItem, status } } : prev
       );
@@ -397,14 +401,14 @@ export default function BookDetailsScreen() {
           {libraryItem ? (
             <View style={styles.statusSection}>
               <View style={styles.statusButtons}>
-                {(['WANT_TO_READ', 'CURRENTLY_READING', 'FINISHED'] as const).map((status) => (
+                {LIBRARY_STATUSES.map((status) => (
                   <TouchableOpacity
                     key={status}
                     style={[styles.statusButton, libraryItem.status === status && styles.statusButtonActive]}
                     onPress={() => updateStatus(status)}
                   >
                     <Text style={[styles.statusButtonText, libraryItem.status === status && styles.statusButtonTextActive]}>
-                      {status === 'WANT_TO_READ' ? 'Wishlist' : status === 'CURRENTLY_READING' ? 'Reading' : 'Finished'}
+                      {LIBRARY_STATUS_LABELS[status]}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -417,19 +421,15 @@ export default function BookDetailsScreen() {
             <View style={styles.addSection}>
               <Text style={styles.sectionLabel}>Add to Library</Text>
               <View style={styles.statusButtons}>
-                {([
-                  { value: 'WANT_TO_READ', label: 'Wishlist' },
-                  { value: 'CURRENTLY_READING', label: 'Reading' },
-                  { value: 'FINISHED', label: 'Finished' },
-                ] as const).map((opt) => (
+                {LIBRARY_STATUSES.map((status) => (
                   <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.statusButton, savedStatus === opt.value && styles.statusButtonActive]}
-                    onPress={() => handleAddToLibrary(opt.value)}
+                    key={status}
+                    style={[styles.statusButton, savedStatus === status && styles.statusButtonActive]}
+                    onPress={() => handleAddToLibrary(status)}
                     disabled={adding}
                   >
-                    <Text style={[styles.statusButtonText, savedStatus === opt.value && styles.statusButtonTextActive]}>
-                      {savedStatus === opt.value ? '✓ ' : ''}{opt.label}
+                    <Text style={[styles.statusButtonText, savedStatus === status && styles.statusButtonTextActive]}>
+                      {savedStatus === status ? '✓ ' : ''}{LIBRARY_STATUS_LABELS[status]}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -623,8 +623,8 @@ const styles = StyleSheet.create({
   author: { fontSize: 12, fontWeight: '300', color: '#9c8f7e', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 },
   statusSection: { marginBottom: spacing.lg },
   addSection: { marginBottom: spacing.lg },
-  statusButtons: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
-  statusButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(15,42,72,0.07)' },
+  statusButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 8 },
+  statusButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(15,42,72,0.07)' },
   statusButtonActive: { backgroundColor: '#B83255' },
   statusButtonText: { fontSize: 11, fontWeight: '700', color: '#0F2A48', letterSpacing: 0.5 },
   statusButtonTextActive: { color: '#fff' },

@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, hasSession } from '../../../../lib/api';
 import { saveGuestBook } from '../../../../lib/guest';
+import { LIBRARY_STATUSES, LIBRARY_STATUS_LABELS, type LibraryStatus } from '../../../../lib/libraryStatus';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { PRIMARY_SUBGENRES, TROPES } from '../../../../lib/tagTaxonomy';
 import BookCardMeta from '../../../../components/cozy/BookCardMeta';
@@ -34,7 +35,7 @@ type DiscoverSection = {
   items: DiscoverItem[];
 };
 
-type StatusType = 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
+type StatusType = LibraryStatus;
 
 type Mode = 'search' | 'filter';
 type TropeMode = 'any' | 'all';
@@ -522,14 +523,14 @@ function DiscoverBookCard({
           </TouchableOpacity>
           {isMenuOpen && (
             <View style={styles.addMenu}>
-              {(['WANT_TO_READ', 'CURRENTLY_READING', 'FINISHED'] as StatusType[]).map((status) => (
+              {LIBRARY_STATUSES.map((status) => (
                 <TouchableOpacity
                   key={status}
                   style={styles.addMenuItem}
                   onPress={() => onAdd(status)}
                 >
                   <Text style={styles.addMenuItemText}>
-                    {status === 'WANT_TO_READ' ? 'Wishlist' : status === 'CURRENTLY_READING' ? 'Reading' : 'Finished'}
+                    {LIBRARY_STATUS_LABELS[status]}
                   </Text>
                 </TouchableOpacity>
               ))}

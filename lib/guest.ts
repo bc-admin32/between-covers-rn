@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { useRouter } from 'expo-router';
 import { apiPost, ApiError } from './api';
 import { normalizeRoute } from './routes';
+import type { LibraryStatus } from './libraryStatus';
 
 type Router = ReturnType<typeof useRouter>;
 
@@ -135,7 +136,7 @@ export async function takePendingIrisMessage(): Promise<string | null> {
 
 // ── Guest library ──────────────────────────────────────────────────────────
 
-export type GuestBookStatus = 'WANT_TO_READ' | 'CURRENTLY_READING' | 'FINISHED';
+export type GuestBookStatus = LibraryStatus;
 
 export type GuestBook = {
   workId: string;
