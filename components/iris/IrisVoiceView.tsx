@@ -49,9 +49,24 @@ export default function IrisVoiceView({ avatarUri, phase, level, replyText, erro
     return () => loop.stop();
   }, [phase, breath]);
 
+  // Announce only when a screen reader is on: the native announce call is a
+  // suspect in the iOS 1.7.0 crash on mic tap, so most users never make it.
+  const screenReaderOnRef = useRef(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((on) => { if (mounted) screenReaderOnRef.current = on; })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', (on) => {
+      screenReaderOnRef.current = on;
+    });
+    return () => { mounted = false; sub.remove(); };
+  }, []);
+
   // Iris is speaking over the screen reader during playback, so only
   // announce the quiet states.
   useEffect(() => {
+    if (!screenReaderOnRef.current) return;
     if (phase === 'listening' || phase === 'thinking') {
       AccessibilityInfo.announceForAccessibility(A11Y_LABELS[phase]);
     }
