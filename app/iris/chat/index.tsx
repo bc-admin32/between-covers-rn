@@ -11,13 +11,17 @@ import { apiPost } from '../../../lib/api';
 import { setPendingIrisMessage, takePendingIrisMessage } from '../../../lib/guest';
 import { useGuest } from '../../../lib/useGuest';
 import { track, reportClientError } from '../../../lib/analytics';
-import { startBreadcrumbs, breadcrumb } from '../../../lib/crashCapture';
+import { startBreadcrumbs, breadcrumb, importWithoutFatal } from '../../../lib/crashCapture';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
 import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
 
 // Loaded on first switch to voice, so text chat never loads the audio libraries.
-const IrisVoiceSession = lazy(() => import('../../../components/iris/IrisVoiceSession'));
+// If loading throws, VoiceErrorBoundary gets the real error and drops back to
+// text chat instead of the app crashing (see importWithoutFatal).
+const IrisVoiceSession = lazy(() =>
+  importWithoutFatal(() => import('../../../components/iris/IrisVoiceSession'))
+);
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 

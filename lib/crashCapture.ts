@@ -75,10 +75,16 @@ function install(): void {
   if (!errorUtils) return;
   const previous = errorUtils.getGlobalHandler();
   errorUtils.setGlobalHandler((error, isFatal) => {
+    const capture = captureLoadError;
     try {
-      saveError(error, !!isFatal);
+      // A captured load error is handled by the caller, so it isn't fatal.
+      saveError(error, capture ? false : !!isFatal);
     } catch {
       // Never block the original handler.
+    }
+    if (capture) {
+      capture(error);
+      return;
     }
     previous?.(error, isFatal);
   });
@@ -89,7 +95,37 @@ type ErrorUtilsLike = {
   setGlobalHandler: (handler: (error: unknown, isFatal?: boolean) => void) => void;
 };
 
+let captureLoadError: ((error: unknown) => void) | null = null;
+
 install();
+
+// Runs a dynamic import() so that an error thrown while the module loads
+// rejects the import instead of crashing the app.
+//
+// Why: when a module throws while it first loads, Metro reports the error to
+// the global handler as fatal (which aborts a release build) and the import
+// resolves to a module with no exports. React.lazy then fails with
+// "resolves to: undefined", hiding the real error. In release builds Metro
+// loads the module synchronously inside import(), so the handler can catch
+// the error during that call and hand it back here. (In dev, bundles load
+// asynchronously and this has no effect.)
+export function importWithoutFatal<T extends { default?: unknown }>(load: () => Promise<T>): Promise<T> {
+  let loadError: unknown = null;
+  captureLoadError = (error) => {
+    if (loadError === null) loadError = error;
+  };
+  let pending: Promise<T>;
+  try {
+    pending = load();
+  } finally {
+    captureLoadError = null;
+  }
+  return pending.then((mod) => {
+    if (loadError !== null) throw loadError;
+    if (mod?.default === undefined) throw new Error('Module loaded without a default export');
+    return mod;
+  });
+}
 
 // ── Voice breadcrumbs ──
 
