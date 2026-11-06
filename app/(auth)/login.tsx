@@ -54,7 +54,6 @@ const GATE_COPY: Record<GateReason, string> = {
   submission: 'Create a free account to send a submission.',
   feedback: 'Create a free account to share feedback.',
   library: 'Create a free account to keep your library.',
-  expired: 'Create a free account or sign in to keep reading.',
 };
 
 export default function LoginScreen() {
@@ -68,24 +67,20 @@ export default function LoginScreen() {
     resolveUnavailable?: string;
   }>();
   // signup_started.source: the gated action (passed by requireAccount), the
-  // "Already a member?" links, the guest paywall, or 'login' when there's no
-  // guest context (after Log Out, a failed sign-in, an expired session).
+  // "Already a member?" links, or 'login' when there's no guest context
+  // (after Log Out, a failed sign-in, an expired session).
   const signupSource =
     source ??
     (from === 'guest' ? 'guest_home_signin'
       : from === 'age-gate' ? 'age_gate_signin'
-      : gate === 'expired' ? 'guest_paywall'
       : gate ?? 'login');
   const gateCopy = gate ? GATE_COPY[gate] : undefined;
-  // Guests sent here from guest mode can go back to it; guests whose preview
-  // expired cannot.
-  const canDismiss = (!!gate && gate !== 'expired') || !!from;
+  // Guests sent here from guest mode can go back to it.
+  const canDismiss = !!gate || !!from;
   const [hasToken, setHasToken] = useState(true);
   // Anyone else here without a session (after Log Out, a failed sign-in, an
-  // expired session) gets the same entry as launch: age gate -> guest mode ->
-  // guest paywall. Not offered once the preview has expired: that's the guest
-  // paywall they came from.
-  const showContinueAsGuest = !hasToken && !canDismiss && gate !== 'expired';
+  // expired session) gets the same entry as launch: age gate -> guest mode.
+  const showContinueAsGuest = !hasToken && !canDismiss;
 
   const handleContinueAsGuest = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

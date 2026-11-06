@@ -7,13 +7,11 @@ import type { LibraryStatus } from './libraryStatus';
 
 type Router = ReturnType<typeof useRouter>;
 
-// Guest mode: no stored token. Guests browse read-only for GUEST_DAYS from
-// first launch, then hit /(auth)/guest-paywall until they sign up.
-export const GUEST_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
+// Guest mode: no stored token. Guests browse read-only with no time limit;
+// gated actions prompt sign-up (lib/useGuest).
 
 // Device-scoped — survive sign-out on purpose (the 18+ confirmation and the
-// first-launch clock belong to the install, not to an account).
+// first-launch time belong to the install, not to an account).
 const AGE_CONFIRMED_KEY = 'bc_age_confirmed';
 const FIRST_LAUNCH_KEY = 'bc_first_launch_at';
 
@@ -25,10 +23,11 @@ export const PENDING_IRIS_KEY = 'bc_pending_iris_msg';
 // value limit, and it holds nothing sensitive.
 const GUEST_LIBRARY_KEY = 'bc_guest_library_v1';
 
-// ── First-launch clock ─────────────────────────────────────────────────────
+// ── First launch ───────────────────────────────────────────────────────────
 
 // Records firstLaunchAt on the first run of this build (fresh installs and
-// existing installs alike). Never overwrites an existing value.
+// existing installs alike). Never overwrites an existing value. Sent with the
+// last onboarding step for analytics.
 export async function ensureFirstLaunchAt(): Promise<string> {
   const existing = await SecureStore.getItemAsync(FIRST_LAUNCH_KEY).catch(() => null);
   if (existing && !Number.isNaN(Date.parse(existing))) return existing;
@@ -39,11 +38,6 @@ export async function ensureFirstLaunchAt(): Promise<string> {
 
 export async function getFirstLaunchAt(): Promise<string | null> {
   return SecureStore.getItemAsync(FIRST_LAUNCH_KEY).catch(() => null);
-}
-
-export async function isGuestExpired(): Promise<boolean> {
-  const firstLaunchAt = await ensureFirstLaunchAt();
-  return Date.now() >= Date.parse(firstLaunchAt) + GUEST_DAYS * DAY_MS;
 }
 
 // ── Age gate ───────────────────────────────────────────────────────────────
@@ -57,12 +51,10 @@ export async function confirmAge(): Promise<void> {
 }
 
 // Where a user without a session enters the app: the 18+ gate until it's
-// confirmed, then guest mode for GUEST_DAYS from first launch, then the
-// sign-up-only guest paywall. Shared by launch (index.tsx), the age gate and
+// confirmed, then guest mode. Shared by launch (index.tsx), the age gate and
 // "Continue as guest" on login so the rules can't drift.
-export async function guestEntryRoute(): Promise<'/(auth)/age-gate' | '/(auth)/guest-paywall' | '/(tabs)/home'> {
+export async function guestEntryRoute(): Promise<'/(auth)/age-gate' | '/(tabs)/home'> {
   if (!(await isAgeConfirmed())) return '/(auth)/age-gate';
-  if (await isGuestExpired()) return '/(auth)/guest-paywall';
   return '/(tabs)/home';
 }
 

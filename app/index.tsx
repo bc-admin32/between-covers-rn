@@ -261,8 +261,7 @@ export default function SplashScreen() {
         }
 
         // ── GUEST (no token, or its session is gone) ─────────────────────
-        // 18+ gate first, then guest browsing for GUEST_DAYS from first
-        // launch, then the sign-up-only guest paywall.
+        // 18+ gate first, then guest browsing (no time limit).
         router.replace((await guestEntryRoute()) as any);
       } catch {
         goLogin();

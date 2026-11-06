@@ -6,8 +6,7 @@ import { setReturnTo } from './guest';
 // Why the guest is being asked to sign up — keys the copy on the login screen.
 export type GateReason =
   | 'reply' | 'react' | 'vote' | 'submit' | 'report' | 'block'
-  | 'iris' | 'live' | 'rate' | 'profile' | 'submission' | 'feedback' | 'library'
-  | 'expired';
+  | 'iris' | 'live' | 'rate' | 'profile' | 'submission' | 'feedback' | 'library';
 
 // signup_started.source on the login screen: which gated action sent the
 // guest there. Finer-grained than GateReason (which only picks login copy);

@@ -51,8 +51,8 @@ export default function AboutScreen() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      // firstLaunchAt lets the backend start the trial from the guest clock:
-      // trialEnd = min(firstLaunchAt + 7d, now + 7d).
+      // firstLaunchAt is for analytics only (how long they were a guest);
+      // the backend starts the trial at sign-up.
       const firstLaunchAt = await ensureFirstLaunchAt();
       const res = await apiPost('/onboarding/submit', { step: 'L9Com', value: 'ACK', firstLaunchAt });
       if (res?.nextRoute) {
