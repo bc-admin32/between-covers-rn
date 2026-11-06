@@ -340,7 +340,8 @@ export default function LoungeThreadScreen() {
 
       const res = await apiPost<{ result: string; message: string; reply?: Reply }>(
         '/lounge/thread/reply',
-        { threadId, content: text.trim(), replyTo: replyToPayload, ...(spoiler ? { spoiler: true } : {}) }
+        // Spoiler marking is for the Community Read only.
+        { threadId, content: text.trim(), replyTo: replyToPayload, ...(isBookClub && spoiler ? { spoiler: true } : {}) }
       );
 
       if (res.result === 'published' && res.reply) {
@@ -487,9 +488,13 @@ export default function LoungeThreadScreen() {
                   style={styles.editInput}
                   autoFocus
                 />
-                <View style={styles.editSpoilerRow}>
-                  <SpoilerToggle value={editSpoiler} onChange={setEditSpoiler} disabled={editSubmitting} />
-                </View>
+                {/* Community Read only. Elsewhere the reply keeps whatever spoiler
+                    flag it already has (editSpoiler starts from it). */}
+                {isBookClub && (
+                  <View style={styles.editSpoilerRow}>
+                    <SpoilerToggle value={editSpoiler} onChange={setEditSpoiler} disabled={editSubmitting} />
+                  </View>
+                )}
                 <View style={styles.editActions}>
                   <TouchableOpacity onPress={() => { setEditingReply(null); setEditText(''); setEditError(null); }} style={styles.editCancelButton} disabled={editSubmitting}>
                     <Text style={styles.editCancelText}>Cancel</Text>
@@ -549,12 +554,13 @@ export default function LoungeThreadScreen() {
 
           {submitError && <Text style={styles.submitError}>{submitError}</Text>}
 
-          <View style={styles.composerMeta}>
-            <SpoilerToggle value={spoiler} onChange={setSpoiler} disabled={submitting} />
-            {isBookClub && (
+          {/* Spoiler marking: Community Read only. */}
+          {isBookClub && (
+            <View style={styles.composerMeta}>
+              <SpoilerToggle value={spoiler} onChange={setSpoiler} disabled={submitting} />
               <Text style={styles.composerHint}>Mark spoilers so everyone can read at their own pace.</Text>
-            )}
-          </View>
+            </View>
+          )}
 
           <View style={styles.composerRow}>
             <TouchableOpacity

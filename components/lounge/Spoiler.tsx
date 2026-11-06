@@ -2,8 +2,11 @@ import { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ApiError } from '../../lib/api';
 
-// Spoiler support for Lounge replies (all threads, incl. Iris Thoughts).
-// A reply with spoiler: true is covered — text AND image/GIF — until tapped.
+// Spoiler support for Lounge replies.
+// Marking a reply as a spoiler (SpoilerToggle) is offered only in the
+// Community Read (Book Club) thread. Display works everywhere: any reply with
+// spoiler: true is covered — text AND image/GIF — until tapped, in every
+// thread and Iris Thoughts, so older spoiler replies keep showing as before.
 // Own replies are never covered; they show a small "Spoiler" tag instead.
 
 // Revealed replies, kept for the app session (module scope) so a reply stays

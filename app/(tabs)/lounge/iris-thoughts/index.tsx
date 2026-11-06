@@ -16,7 +16,7 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import PostMenu from '../../../../components/lounge/PostMenu';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
 import {
-  SpoilerCover, SpoilerTag, SpoilerToggle, useSpoilerReveal, isThreadClosedError, THREAD_CLOSED_MESSAGE,
+  SpoilerCover, SpoilerTag, useSpoilerReveal, isThreadClosedError, THREAD_CLOSED_MESSAGE,
 } from '../../../../components/lounge/Spoiler';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
@@ -176,7 +176,6 @@ export default function IrisThoughtsScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [spoiler, setSpoiler] = useState(false);
   // Set by a 403 "This discussion is closed." on post, or by thread.closed.
   const [closedNow, setClosedNow] = useState(false);
   const { isRevealed, reveal } = useSpoilerReveal();
@@ -249,12 +248,12 @@ export default function IrisThoughtsScreen() {
     try {
       const res = await apiPost<{ result: string; reply?: Reply }>(
         '/lounge/thread/reply',
-        { threadId, content: text.trim(), ...(spoiler ? { spoiler: true } : {}) }
+        // No spoiler marking here: that's for the Community Read only.
+        { threadId, content: text.trim() }
       );
       if (res.result === 'published' && res.reply) {
-        setReplies((prev) => [...prev, { ...res.reply!, spoiler: res.reply!.spoiler ?? spoiler, reactions: res.reply!.reactions ?? [] }]);
+        setReplies((prev) => [...prev, { ...res.reply!, reactions: res.reply!.reactions ?? [] }]);
         setText('');
-        setSpoiler(false);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.result === 'rejected_minor') {
         setSubmitError("That didn't quite fit the vibe — give it another go! 💛");
@@ -356,10 +355,6 @@ export default function IrisThoughtsScreen() {
 
           {submitError && <Text style={styles.submitError}>{submitError}</Text>}
 
-          <View style={styles.composerMeta}>
-            <SpoilerToggle value={spoiler} onChange={setSpoiler} disabled={submitting} />
-          </View>
-
           <View style={styles.composerRow}>
             <TouchableOpacity
               style={[styles.composerButton, showEmojiTray && styles.composerButtonActive]}
@@ -441,7 +436,6 @@ const styles = StyleSheet.create({
   emojiTray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
   emojiButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center' },
   emojiText: { fontSize: 18 },
-  composerMeta: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   closedBar: { borderTopWidth: 1, borderTopColor: 'rgba(196,168,130,0.3)', backgroundColor: '#F0EDE4', paddingTop: spacing.md, alignItems: 'center' },
   closedText: { fontSize: 13, color: '#B09A7E', fontFamily: 'Nunito_600SemiBold' },
   submitError: { fontSize: 12, color: '#B83255', paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
