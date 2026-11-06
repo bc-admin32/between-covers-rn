@@ -9,8 +9,9 @@
 //
 // No React Native imports, so the reader can be tested on its own.
 
+// The voice Lambda's Function URL (response streaming).
 // Empty = streaming off: every turn uses POST /iris/voice as before.
-export const IRIS_VOICE_STREAM_URL = '';
+export const IRIS_VOICE_STREAM_URL = 'https://hvigskp2xhc3v5ete45zv66ule0ejvem.lambda-url.us-east-1.on.aws/';
 
 // No new line for this long = the stream failed.
 export const STREAM_STALL_MS = 15_000;
