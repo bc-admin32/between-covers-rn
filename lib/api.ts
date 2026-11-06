@@ -1,6 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
+import { fetch as expoFetch } from 'expo/fetch';
 import { ensureFresh, refreshSession, clearRefreshToken } from './auth';
 import { getGuestPreferencesHeader } from './guestPreferences';
+
+type ExpoFetchResponse = Awaited<ReturnType<typeof expoFetch>>;
 
 const API_BASE = 'https://api.betweencovers.app';
 
@@ -197,4 +200,33 @@ export function apiPatch<T = any>(path: string, body?: unknown): Promise<T> {
 
 export function apiDelete<T = any>(path: string): Promise<T> {
   return apiFetch<T>(path, { method: 'DELETE' });
+}
+
+// POST to an absolute URL (e.g. a Lambda Function URL) and return the
+// response unread, so the caller can stream the body. Uses expo/fetch, whose
+// response.body delivers data as it arrives (the global fetch buffers it).
+// Same auth as apiFetch: refresh before sending, and once more after a 401.
+// Signed-in only. Throws ApiError for a non-2xx response.
+export async function apiPostStream(url: string, body: unknown): Promise<ExpoFetchResponse> {
+  let token = await getToken();
+  if (!token) throw new ApiError(401, { guestBlocked: true }, `Guest blocked: POST ${url}`);
+  token = await ensureFresh(token);
+
+  const send = (t: string) => expoFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+    body: JSON.stringify(body),
+  });
+
+  let res = await send(token);
+  if (res.status === 401) {
+    const retryToken = await tokenForRetry(token);
+    if (retryToken) res = await send(retryToken);
+  }
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => null);
+    const detail = errBody?.message ?? errBody?.error ?? (errBody ? JSON.stringify(errBody) : null);
+    throw new ApiError(res.status, errBody, `HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
+  return res;
 }
