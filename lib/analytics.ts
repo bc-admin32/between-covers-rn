@@ -34,6 +34,7 @@ type EventName =
   | 'cozy_section_viewed'
   | 'book_added_to_library'
   | 'book_status_changed'
+  | 'voice_turn_timing'
   | 'retailer_cta_tapped'
   | 'book_tag_committed'
   | 'tag_modal_closed'

@@ -16,6 +16,10 @@ const BARGE_IN_MS = 200;           // loud this long before Iris is interrupted
 const END_SILENCE_MS = 1000;       // quiet this long ends the turn
 export const MAX_TURN_MS = 60_000;
 const PREROLL_MS = 500;            // audio kept from just before speech / interrupt
+const TRAILING_SILENCE_KEPT_MS = 250; // of the end-of-turn silence, only this much is uploaded
+// Upper bounds of the mid-turn pause buckets (pauses the speaker carried on
+// after). Anything reaching END_SILENCE_MS ends the turn instead.
+export const PAUSE_BUCKET_LIMITS_MS = [300, 500, 700, END_SILENCE_MS] as const;
 
 export function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -70,6 +74,23 @@ export function buildWav(chunks: Uint8Array[]): Uint8Array {
   return out;
 }
 
+// Drops whole chunks of the end-of-turn silence from the upload, keeping
+// TRAILING_SILENCE_KEPT_MS so the last word isn't clipped. `silenceMs` is the
+// quiet run at the end of `chunks`.
+export function trimTrailingSilence(chunks: Uint8Array[], silenceMs: number): { chunks: Uint8Array[]; trimmedMs: number } {
+  let dropMs = silenceMs - TRAILING_SILENCE_KEPT_MS;
+  let end = chunks.length;
+  let trimmedMs = 0;
+  while (dropMs > 0 && end > 1) {
+    const lastMs = chunks[end - 1].length / BYTES_PER_MS;
+    if (lastMs > dropMs) break;
+    end--;
+    dropMs -= lastMs;
+    trimmedMs += lastMs;
+  }
+  return { chunks: end === chunks.length ? chunks : chunks.slice(0, end), trimmedMs };
+}
+
 // listening: waiting for / recording the user's turn.
 // paused:    a turn is being sent; mic audio is dropped.
 // speaking:  Iris is playing; mic audio is only watched for an interrupt.
@@ -78,8 +99,21 @@ export type DetectorMode = 'listening' | 'paused' | 'speaking';
 export type DetectorEvent =
   | { type: 'speechStart' }
   | { type: 'bargeIn' }
-  | { type: 'turnEnd'; chunks: Uint8Array[] }
+  | { type: 'turnEnd'; chunks: Uint8Array[]; info: TurnInfo }
   | null;
+
+// About one finished turn, for the voice_turn_timing event.
+export type TurnInfo = {
+  endedBy: 'silence' | 'maxLength';
+  turnMs: number;         // audio in the turn as uploaded (after the trim)
+  trimmedMs: number;      // end-of-turn silence left out of the upload
+  silenceWaitMs: number;  // quiet time waited before the turn ended
+  // Mid-turn pauses the speaker carried on after, counted by length:
+  // <300, 300–500, 500–700, 700–1000 ms. The 500–700 and 700–1000 buckets
+  // are what a shorter END_SILENCE_MS would start cutting off.
+  pauses: number[];
+  longestPauseMs: number;
+};
 
 // What counts as talking: the louder of a fixed minimum and a multiple of the
 // measured room noise.
@@ -127,6 +161,8 @@ export class TurnDetector {
   private bargeInEnabled: boolean;
   private tuning: SpeechThresholdTuning;
   private longestLoudMs = 0;
+  private pauses: number[] = [];
+  private longestPauseMs = 0;
 
   constructor(bargeInEnabled: boolean, tuning: SpeechThresholdTuning = DEFAULT_SPEECH_TUNING) {
     this.bargeInEnabled = bargeInEnabled;
@@ -204,13 +240,34 @@ export class TurnDetector {
 
     this.turn.push(bytes);
     this.turnMs += ms;
-    this.silenceMs = rms < speechRms ? this.silenceMs + ms : 0;
+    if (rms < speechRms) {
+      this.silenceMs += ms;
+    } else {
+      if (this.silenceMs > 0) this.recordPause(this.silenceMs);
+      this.silenceMs = 0;
+    }
     if (this.silenceMs >= END_SILENCE_MS || this.turnMs >= MAX_TURN_MS) {
-      const chunks = this.turn;
+      const endedBy = this.silenceMs >= END_SILENCE_MS ? 'silence' : 'maxLength';
+      const silenceWaitMs = this.silenceMs;
+      const { chunks, trimmedMs } = trimTrailingSilence(this.turn, silenceWaitMs);
+      const info: TurnInfo = {
+        endedBy,
+        turnMs: Math.round(this.turnMs - trimmedMs),
+        trimmedMs: Math.round(trimmedMs),
+        silenceWaitMs: Math.round(silenceWaitMs),
+        pauses: this.pauses,
+        longestPauseMs: Math.round(this.longestPauseMs),
+      };
       this.setMode('paused');
-      return { type: 'turnEnd', chunks };
+      return { type: 'turnEnd', chunks, info };
     }
     return null;
+  }
+
+  private recordPause(ms: number): void {
+    const bucket = PAUSE_BUCKET_LIMITS_MS.findIndex((limit) => ms < limit);
+    if (bucket !== -1) this.pauses[bucket]++;
+    this.longestPauseMs = Math.max(this.longestPauseMs, ms);
   }
 
   private startTurn(chunks: Uint8Array[], ms: number): void {
@@ -221,6 +278,8 @@ export class TurnDetector {
     this.speaking = true;
     this.silenceMs = 0;
     this.loudMs = 0;
+    this.pauses = PAUSE_BUCKET_LIMITS_MS.map(() => 0);
+    this.longestPauseMs = 0;
   }
 
   private addPreroll(bytes: Uint8Array, ms: number): void {

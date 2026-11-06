@@ -8,10 +8,10 @@ import { apiPost, ApiError } from '../../lib/api';
 import { markIrisVoiceTermsRequired } from '../../lib/irisVoiceTerms';
 import {
   TurnDetector, SAMPLE_RATE, base64ToBytes, buildWav, floatRms, pcm16Rms,
-  DEFAULT_SPEECH_TUNING, IOS_SPEECH_TUNING,
+  DEFAULT_SPEECH_TUNING, IOS_SPEECH_TUNING, PAUSE_BUCKET_LIMITS_MS, type TurnInfo,
 } from '../../lib/irisVoiceAudio';
 import { breadcrumb, currentTrail, endBreadcrumbs } from '../../lib/crashCapture';
-import { reportClientError } from '../../lib/analytics';
+import { reportClientError, track } from '../../lib/analytics';
 
 // Talking over Iris stops her. Off on Fire: its echo cancellation lets her
 // own voice through the mic, which interrupted her mid-sentence. Fire users
@@ -172,6 +172,58 @@ function summarizeStats(s: VoiceStats) {
   };
 }
 
+// ── Per-turn timing ──
+// One voice_turn_timing event per turn: how long each client step took from
+// the moment the user stopped talking to Iris's audio starting, plus the
+// turn's mid-turn pauses (to judge a shorter END_SILENCE_MS).
+
+type TurnOutcome = 'played' | 'text' | 'no_speech' | 'error' | 'interrupted' | 'abandoned';
+
+type TurnTiming = {
+  info: TurnInfo;
+  turnEndAt: number;         // detector ended the turn (after the silence wait)
+  sentAt: number | null;     // WAV built and base64-encoded; request starting
+  replyAt: number | null;    // response received
+  uploadBytes: number;       // base64 audio in the request
+  replyAudioBytes: number;   // base64 audio in the response
+  sent: boolean;
+};
+
+function newTurnTiming(info: TurnInfo): TurnTiming {
+  return { info, turnEndAt: Date.now(), sentAt: null, replyAt: null, uploadBytes: 0, replyAudioBytes: 0, sent: false };
+}
+
+const ms = (from: number | null, to: number | null) => (from !== null && to !== null ? to - from : null);
+
+function sendTurnTiming(t: TurnTiming, outcome: TurnOutcome): void {
+  if (t.sent) return;
+  t.sent = true;
+  const now = Date.now();
+  const { info } = t;
+  track('voice_turn_timing', {
+    outcome,
+    platform: Platform.OS,
+    fire: IS_FIRE,
+    // Client steps, in ms
+    silenceWaitMs: info.silenceWaitMs,                  // user stopped talking → turn ended
+    encodeMs: ms(t.turnEndAt, t.sentAt),                // WAV + base64
+    requestMs: ms(t.sentAt, t.replyAt),                 // upload + server + download
+    replyToPlayingMs: outcome === 'played' ? ms(t.replyAt, now) : null, // file write + player start
+    totalMs: info.silenceWaitMs + (now - t.turnEndAt),  // user stopped talking → this outcome
+    // Sizes
+    turnMs: info.turnMs,
+    trimmedMs: info.trimmedMs,
+    endedBy: info.endedBy,
+    uploadBytes: t.uploadBytes,
+    replyAudioBytes: t.replyAudioBytes,
+    // Mid-turn pauses the user carried on after, by length (ms)
+    pauses: Object.fromEntries(info.pauses.map((n, i) => [
+      i === 0 ? `<${PAUSE_BUCKET_LIMITS_MS[0]}` : `${PAUSE_BUCKET_LIMITS_MS[i - 1]}-${PAUSE_BUCKET_LIMITS_MS[i]}`, n,
+    ])),
+    longestPauseMs: info.longestPauseMs,
+  });
+}
+
 // Base64 of a byte array, encoded natively via a temp file (a ~2 MB turn is
 // slow to encode in JS).
 async function bytesToBase64(bytes: Uint8Array): Promise<string> {
@@ -212,6 +264,7 @@ export function useIrisVoiceLoop(opts: Options) {
     file: File;
     subs: { remove: () => void }[];
     pulse: Animated.CompositeAnimation | null;
+    timing: TurnTiming | null;
   } | null>(null);
   const smoothLevelRef = useRef(0);
 
@@ -227,6 +280,8 @@ export function useIrisVoiceLoop(opts: Options) {
     playbackRef.current = null;
     if (!pb) return;
     breadcrumb('voice: stopPlayback');
+    // Stopped before any audio was heard (tap, barge-in or leaving voice mode).
+    if (pb.timing) sendTurnTiming(pb.timing, 'interrupted');
     pb.subs.forEach((s) => s.remove());
     pb.pulse?.stop();
     try { pb.player.pause(); } catch {}
@@ -243,7 +298,7 @@ export function useIrisVoiceLoop(opts: Options) {
     setPhase('listening');
   }, [setPhase]);
 
-  const play = useCallback((audioB64: string) => {
+  const play = useCallback((audioB64: string, timing: TurnTiming | null) => {
     const file = new File(Paths.cache, `iris-reply-${Date.now()}.mp3`);
     file.write(audioB64, { encoding: 'base64' });
 
@@ -273,6 +328,11 @@ export function useIrisVoiceLoop(opts: Options) {
     }
 
     subs.push(player.addListener('playbackStatusUpdate', (status) => {
+      const pb = playbackRef.current;
+      if (status.playing && pb?.player === player && pb.timing) {
+        sendTurnTiming(pb.timing, 'played');
+        pb.timing = null;
+      }
       if (status.didJustFinish && playbackRef.current?.player === player) {
         breadcrumb('voice: playback finished');
         stopPlayback();
@@ -280,20 +340,23 @@ export function useIrisVoiceLoop(opts: Options) {
       }
     }));
 
-    playbackRef.current = { player, file, subs, pulse };
+    playbackRef.current = { player, file, subs, pulse, timing };
     breadcrumb('voice: play');
     player.play();
     setPhase('speaking');
   }, [level, listen, setPhase, stopPlayback]);
 
-  const sendTurn = useCallback(async (chunks: Uint8Array[]) => {
+  const sendTurn = useCallback(async (chunks: Uint8Array[], info: TurnInfo) => {
     const gen = ++turnGenRef.current;
+    const timing = newTurnTiming(info);
     setPhase('thinking');
     setReplyText(null);
     const { sessionId, from, openingMessage } = optsRef.current;
 
     try {
       const audio = await bytesToBase64(buildWav(chunks));
+      timing.sentAt = Date.now();
+      timing.uploadBytes = audio.length;
       statsRef.current.turnsSent++;
       breadcrumb('voice: sending turn');
       const res = await withTimeout(apiPost<VoiceResponse>('/iris/voice', {
@@ -304,6 +367,8 @@ export function useIrisVoiceLoop(opts: Options) {
         from: from || null,
       }), REQUEST_TIMEOUT_MS);
 
+      timing.replyAt = Date.now();
+      timing.replyAudioBytes = res.audio?.length ?? 0;
       statsRef.current.repliesReceived++;
       breadcrumb(`voice: reply received (audio: ${res.audio ? 'yes' : 'no'}, noSpeech: ${!!res.noSpeech})`);
       // The turn is part of the conversation even if the user has since left
@@ -313,22 +378,28 @@ export function useIrisVoiceLoop(opts: Options) {
       if (!res.noSpeech && res.transcript && res.reply) {
         optsRef.current.onTurn({ transcript: res.transcript, reply: res.reply });
       }
-      if (!mountedRef.current || gen !== turnGenRef.current || !activeRef.current) return;
+      if (!mountedRef.current || gen !== turnGenRef.current || !activeRef.current) {
+        sendTurnTiming(timing, 'abandoned');
+        return;
+      }
       if (res.noSpeech) {
+        sendTurnTiming(timing, 'no_speech');
         listen();
         return;
       }
 
       setError(null);
       if (res.audio) {
-        play(res.audio);
+        play(res.audio, timing);
       } else {
+        sendTurnTiming(timing, 'text');
         setReplyText(res.reply ?? null);
         listen();
       }
     } catch (err) {
       statsRef.current.sendFailures++;
       statsRef.current.lastSendError = errorText(err);
+      sendTurnTiming(timing, 'error');
       if (!mountedRef.current || gen !== turnGenRef.current) return;
       if (err instanceof ApiError && err.status === 403 && err.body?.error === 'VOICE_TERMS_REQUIRED') {
         markIrisVoiceTermsRequired();
@@ -375,7 +446,7 @@ export function useIrisVoiceLoop(opts: Options) {
       setReplyText(null);
       setPhase('listening');
     } else if (ev.type === 'turnEnd') {
-      sendTurn(ev.chunks);
+      sendTurn(ev.chunks, ev.info);
     }
   }, [sendTurn, setPhase, stopPlayback]);
 
