@@ -154,6 +154,11 @@ export function breadcrumb(step: string): void {
   }
 }
 
+// The current trail (last MAX_BREADCRUMBS steps), for attaching to a report.
+export function recentBreadcrumbs(): string[] {
+  return [...breadcrumbs];
+}
+
 // Voice mode closed normally: drop the trail so the next launch doesn't
 // report it. Ignored if a newer trail has started since.
 export function endBreadcrumbs(trail: number): void {

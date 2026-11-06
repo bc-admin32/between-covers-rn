@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Easing, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { File, Paths } from 'expo-file-system';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer } from 'expo-audio';
 import { useAudioRecorder, AudioStudioModule, type AudioDataEvent } from '@siteed/audio-studio';
 import { apiPost, apiPostStream, ApiError } from '../../lib/api';
 import {
@@ -13,7 +13,8 @@ import {
   TurnDetector, SAMPLE_RATE, base64ToBytes, buildWav, floatRms, pcm16Rms,
   DEFAULT_SPEECH_TUNING, IOS_SPEECH_TUNING, PAUSE_BUCKET_LIMITS_MS, type TurnInfo,
 } from '../../lib/irisVoiceAudio';
-import { breadcrumb, currentTrail, endBreadcrumbs } from '../../lib/crashCapture';
+import { breadcrumb, currentTrail, endBreadcrumbs, recentBreadcrumbs } from '../../lib/crashCapture';
+import { ReplyQueue, type QueuePlayer, type ReplyQueueSummary } from '../../lib/irisReplyQueue';
 import { reportClientError, track } from '../../lib/analytics';
 
 // Talking over Iris stops her. Off on Fire: its echo cancellation lets her
@@ -27,6 +28,12 @@ const VOICE_INTERRUPT_ENABLED = !IS_FIRE || VOICE_INTERRUPT_ON_FIRE;
 const STEADY_PULSE = IS_FIRE;
 
 const REQUEST_TIMEOUT_MS = 45_000;
+
+// voice_turn_stuck: a turn that hasn't gone back to listening this long
+// after it ended is reported (once), unless a clip is still active.
+const STUCK_AFTER_MS = 30_000;
+const STUCK_ACTIVE_MS = 3_000;   // clip activity this recent = still playing
+const STUCK_RECHECK_MS = 10_000;
 
 export type VoicePhase = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type VoiceErrorKind = 'mic' | 'offline' | 'failed';
@@ -65,8 +72,9 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 // ── Session diagnostics ──
 // Counted for every voice session. If the session closes without a single
-// turn, they're sent as a client_error ('voice_no_turns') so we can see where
-// the record → detect path stalled: start, chunks, levels or turn detection.
+// reply, they're sent as a client_error ('voice_no_replies') with the step log,
+// so we can see where it stalled: start, chunks, levels, turn detection, or
+// turns that ended but never got an answer.
 
 const MIN_REPORT_SESSION_MS = 3000;
 // Upper bounds of the level histogram buckets; the last bucket is "≥ 0.05".
@@ -194,13 +202,17 @@ type TurnTiming = {
   replyAudioBytes: number;   // base64 audio in the response
   streamed: boolean;         // reply came over the sentence stream
   fellBack: boolean;         // the stream failed to open; /iris/voice was used
+  playingAt: number | null;  // first clip reported playing
+  clips: ReplyQueueSummary | null;
+  interruptedAfterAudio: boolean;
   sent: boolean;
 };
 
 function newTurnTiming(info: TurnInfo): TurnTiming {
   return {
     info, turnEndAt: Date.now(), sentAt: null, replyAt: null,
-    uploadBytes: 0, replyAudioBytes: 0, streamed: false, fellBack: false, sent: false,
+    uploadBytes: 0, replyAudioBytes: 0, streamed: false, fellBack: false,
+    playingAt: null, clips: null, interruptedAfterAudio: false, sent: false,
   };
 }
 
@@ -221,8 +233,14 @@ function sendTurnTiming(t: TurnTiming, outcome: TurnOutcome): void {
     silenceWaitMs: info.silenceWaitMs,                  // user stopped talking → turn ended
     encodeMs: ms(t.turnEndAt, t.sentAt),                // WAV + base64
     requestMs: ms(t.sentAt, t.replyAt),                 // upload + server + download (stream: to first sentence)
-    replyToPlayingMs: outcome === 'played' ? ms(t.replyAt, now) : null, // file write + player start
-    totalMs: info.silenceWaitMs + (now - t.turnEndAt),  // user stopped talking → this outcome
+    replyToPlayingMs: ms(t.replyAt, t.playingAt),       // file write + player start
+    // user stopped talking → Iris's first audio (played) or this outcome
+    totalMs: info.silenceWaitMs + ((t.playingAt ?? now) - t.turnEndAt),
+    // Clips (one per streamed sentence)
+    clipsPlayed: t.clips?.played ?? null,
+    clipsSkipped: t.clips?.skipped ?? null,
+    clipOutcomes: t.clips?.outcomes ?? null,
+    interruptedAfterAudio: t.interruptedAfterAudio,
     // Sizes
     turnMs: info.turnMs,
     trimmedMs: info.trimmedMs,
@@ -238,31 +256,18 @@ function sendTurnTiming(t: TurnTiming, outcome: TurnOutcome): void {
 }
 
 // ── Reply playback ──
-// Iris's reply plays as a queue of MP3 clips: one clip from /iris/voice, one
-// per sentence from the stream. The next clip is loaded while the current
-// one plays, so sentences follow with only a short gap.
-
-type Clip = { player: AudioPlayer; file: File; subs: { remove: () => void }[] };
+// Iris's reply plays through ReplyQueue (lib/irisReplyQueue): one clip from
+// /iris/voice, one per sentence from the stream. Android plays one player at
+// a time; iOS preloads the next clip. Every clip has safety timers.
 
 type Reply = {
-  pending: string[];          // base64 MP3 clips not loaded yet
-  current: Clip | null;       // playing
-  next: Clip | null;          // loaded, starts when `current` finishes
-  done: boolean;              // no more clips coming
-  started: boolean;           // the first clip has started
-  stopped: boolean;           // interrupted or replaced; ignore late clips
+  queue: ReplyQueue;
+  timing: TurnTiming;
   pulse: Animated.CompositeAnimation | null;
-  timing: TurnTiming | null;  // sent once the first clip is heard
+  sampling: boolean | null;  // first player supports level sampling
 };
 
 let clipCounter = 0;
-
-function releaseClip(clip: Clip): void {
-  clip.subs.forEach((s) => s.remove());
-  try { clip.player.pause(); } catch {}
-  try { clip.player.remove(); } catch {}
-  try { clip.file.delete(); } catch {}
-}
 
 function isTermsError(err: unknown): boolean {
   return err instanceof ApiError && err.status === 403 && err.body?.error === 'VOICE_TERMS_REQUIRED';
@@ -313,50 +318,95 @@ export function useIrisVoiceLoop(opts: Options) {
     setPhaseState(p);
   }, []);
 
+  // Reply over (finished or stopped): reset the glow and send the turn's
+  // timing, with clip counts.
+  const settleReply = useCallback((reply: Reply, how: 'finished' | 'stopped') => {
+    reply.pulse?.stop();
+    smoothLevelRef.current = 0;
+    level.setValue(0);
+    const t = reply.timing;
+    t.clips = reply.queue.summary;
+    if (t.playingAt !== null) {
+      t.interruptedAfterAudio = how === 'stopped';
+      sendTurnTiming(t, 'played');
+    } else {
+      sendTurnTiming(t, how === 'stopped' ? 'interrupted' : 'error');
+    }
+  }, [level]);
+
   // Stops Iris's reply and drops anything still queued (tap, barge-in,
   // leaving voice mode, or a new reply replacing it).
   const stopPlayback = useCallback(() => {
-    const rp = replyRef.current;
+    const reply = replyRef.current;
     replyRef.current = null;
-    if (!rp) return;
-    rp.stopped = true;
+    if (!reply) return;
     breadcrumb('voice: stopPlayback');
-    // Stopped before any audio was heard.
-    if (rp.timing) sendTurnTiming(rp.timing, 'interrupted');
-    rp.timing = null;
-    if (rp.current) releaseClip(rp.current);
-    if (rp.next) releaseClip(rp.next);
-    rp.current = null;
-    rp.next = null;
-    rp.pending = [];
-    rp.pulse?.stop();
-    smoothLevelRef.current = 0;
-    level.setValue(0);
-  }, [level]);
+    reply.queue.stop();
+    settleReply(reply, 'stopped');
+  }, [settleReply]);
+
+  // voice_turn_stuck watchdog, one per turn. Cleared when the turn goes back
+  // to listening.
+  const stuckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearStuckWatch = useCallback(() => {
+    if (stuckRef.current) clearTimeout(stuckRef.current);
+    stuckRef.current = null;
+  }, []);
 
   const listen = useCallback(() => {
+    clearStuckWatch();
     if (!activeRef.current) return;
     breadcrumb('voice: listening');
     detectorRef.current.setMode('listening');
     setPhase('listening');
-  }, [setPhase]);
+  }, [clearStuckWatch, setPhase]);
 
-  // Moves the queue along: starts the next clip when nothing is playing,
-  // loads the one after it, and goes back to listening once the last clip
-  // has played. Assigned every render so it sees the current callbacks.
-  const pumpRef = useRef<(rp: Reply) => void>(() => {});
+  const armStuckWatch = useCallback((gen: number, timing: TurnTiming) => {
+    clearStuckWatch();
+    const check = () => {
+      stuckRef.current = null;
+      if (gen !== turnGenRef.current || !activeRef.current) return;
+      const phaseNow = phaseRef.current;
+      if (phaseNow === 'listening' || phaseNow === 'idle') return;
+      const reply = replyRef.current;
+      // A long reply that is still playing isn't stuck.
+      if (reply && Date.now() - reply.queue.lastActivityAt < STUCK_ACTIVE_MS) {
+        stuckRef.current = setTimeout(check, STUCK_RECHECK_MS);
+        return;
+      }
+      breadcrumb(`voice: turn stuck in ${phaseNow}`);
+      reportClientError('voice_turn_stuck', new Error(`Voice turn stuck in ${phaseNow}`), null, {
+        phase: phaseNow,
+        secondsSinceTurnEnd: Math.round((Date.now() - timing.turnEndAt) / 1000),
+        streamed: timing.streamed,
+        fellBack: timing.fellBack,
+        requestStarted: timing.sentAt !== null,
+        replyReceived: timing.replyAt !== null,
+        audioStarted: timing.playingAt !== null,
+        queue: reply ? reply.queue.debugState() : null,
+        platform: Platform.OS,
+        device: { manufacturer: Device.manufacturer, model: Device.modelName },
+        steps: recentBreadcrumbs(),
+      });
+    };
+    stuckRef.current = setTimeout(check, STUCK_AFTER_MS);
+  }, [clearStuckWatch]);
 
-  const loadClip = (rp: Reply, audioB64: string): Clip => {
+  // One clip's player. The old player is fully released (release(), not just
+  // remove(), which on Android leaves the native player alive).
+  const createClipPlayer = useCallback((reply: Reply, audioB64: string): QueuePlayer => {
     const file = new File(Paths.cache, `iris-reply-${Date.now()}-${clipCounter++}.mp3`);
     file.write(audioB64, { encoding: 'base64' });
-    breadcrumb('voice: createAudioPlayer');
     const player = createAudioPlayer({ uri: file.uri }, { updateInterval: 100, keepAudioSessionActive: true });
-    const clip: Clip = { player, file, subs: [] };
+    const subs: { remove: () => void }[] = [];
+    let active = false;
 
-    if (!STEADY_PULSE && player.isAudioSamplingSupported) {
+    const sampling = !STEADY_PULSE && player.isAudioSamplingSupported;
+    if (reply.sampling === null) reply.sampling = sampling;
+    if (sampling) {
       player.setAudioSamplingEnabled(true);
-      clip.subs.push(player.addListener('audioSampleUpdate', (sample) => {
-        if (rp.current !== clip) return;
+      subs.push(player.addListener('audioSampleUpdate', (sample) => {
+        if (!active) return;
         const frames = sample.channels[0]?.frames ?? [];
         const target = Math.min(1, floatRms(frames) * 4);
         smoothLevelRef.current = smoothLevelRef.current * 0.6 + target * 0.4;
@@ -364,81 +414,67 @@ export function useIrisVoiceLoop(opts: Options) {
       }));
     }
 
-    clip.subs.push(player.addListener('playbackStatusUpdate', (status) => {
-      if (rp.stopped || rp.current !== clip) return;
-      if (status.playing && rp.timing) {
-        sendTurnTiming(rp.timing, 'played');
-        rp.timing = null;
-      }
-      if (status.didJustFinish) {
-        releaseClip(clip);
-        rp.current = null;
-        pumpRef.current(rp);
-      }
-    }));
-    return clip;
-  };
+    return {
+      play: () => player.play(),
+      pause: () => player.pause(),
+      release: () => {
+        subs.forEach((sub) => sub.remove());
+        try { player.remove(); } catch {}
+        try { player.release(); } catch {}
+        try { file.delete(); } catch {}
+      },
+      onStatus: (listener) => {
+        const sub = player.addListener('playbackStatusUpdate', (status) => listener({
+          playing: status.playing,
+          didJustFinish: status.didJustFinish,
+          duration: status.duration,
+          playbackState: status.playbackState,
+        }));
+        return () => sub.remove();
+      },
+      setActive: (a) => { active = a; },
+    };
+  }, [level]);
 
-  pumpRef.current = (rp: Reply) => {
-    if (rp.stopped || replyRef.current !== rp) return;
-    if (!rp.current) {
-      let clip = rp.next;
-      rp.next = null;
-      if (!clip && rp.pending.length) clip = loadClip(rp, rp.pending.shift()!);
-      if (!clip) {
-        if (!rp.done) return; // waiting for the next sentence
-        breadcrumb('voice: playback finished');
-        // A reply whose audio never reported playing.
-        if (rp.timing) sendTurnTiming(rp.timing, 'error');
-        rp.timing = null;
-        replyRef.current = null;
-        rp.pulse?.stop();
-        smoothLevelRef.current = 0;
-        level.setValue(0);
-        listen();
-        return;
-      }
-      rp.current = clip;
-      if (!rp.started) {
-        rp.started = true;
+  const startReply = useCallback((timing: TurnTiming): Reply => {
+    stopPlayback();
+    const reply = { timing, pulse: null, sampling: null } as unknown as Reply;
+    reply.queue = new ReplyQueue({
+      createPlayer: (audio) => createClipPlayer(reply, audio),
+      preloadNext: Platform.OS === 'ios',
+      setTimer: (fn, delay) => setTimeout(fn, delay),
+      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      defer: (fn) => { setTimeout(fn, 0); },
+      now: () => Date.now(),
+      log: (step) => breadcrumb(`voice: ${step}`),
+    }, {
+      onFirstStart: () => {
         // Watch the mic for an interrupt from the moment Iris starts talking,
         // and keep watching between sentences.
         detectorRef.current.setMode('speaking');
         setPhase('speaking');
-        if (STEADY_PULSE || !clip.player.isAudioSamplingSupported) {
-          rp.pulse = Animated.loop(Animated.sequence([
+        if (STEADY_PULSE || !reply.sampling) {
+          reply.pulse = Animated.loop(Animated.sequence([
             Animated.timing(level, { toValue: 0.6, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
             Animated.timing(level, { toValue: 0.25, duration: 500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
           ]));
-          rp.pulse.start();
+          reply.pulse.start();
         }
-      }
-      breadcrumb('voice: play');
-      clip.player.play();
-    }
-    if (!rp.next && rp.pending.length) rp.next = loadClip(rp, rp.pending.shift()!);
-  };
-
-  const startReply = useCallback((timing: TurnTiming): Reply => {
-    stopPlayback();
-    const rp: Reply = {
-      pending: [], current: null, next: null, done: false, started: false, stopped: false, pulse: null, timing,
-    };
-    replyRef.current = rp;
-    return rp;
-  }, [stopPlayback]);
-
-  const addClip = (rp: Reply, audioB64: string) => {
-    if (rp.stopped) return;
-    rp.pending.push(audioB64);
-    pumpRef.current(rp);
-  };
-
-  const endReply = (rp: Reply) => {
-    if (rp.stopped) return;
-    rp.done = true;
-    pumpRef.current(rp);
-  };
+      },
+      onClipPlaying: () => {
+        if (reply.timing.playingAt === null) reply.timing.playingAt = Date.now();
+      },
+      onFinished: () => {
+        if (replyRef.current !== reply) return;
+        replyRef.current = null;
+        breadcrumb('voice: playback finished');
+        settleReply(reply, 'finished');
+        listen();
+      },
+    });
+    replyRef.current = reply;
+    return reply;
+  }, [createClipPlayer, level, listen, setPhase, settleReply, stopPlayback]);
 
   // Reads one streamed reply: plays sentences as they arrive and hands the
   // finished turn to the chat screen. Throws (to sendTurn's error handling)
@@ -473,7 +509,7 @@ export function useIrisVoiceLoop(opts: Options) {
             setError(null);
             rp = startReply(timing);
           }
-          addClip(rp, line.audio);
+          rp.queue.add(line.audio);
           return;
         }
         case 'done': {
@@ -485,7 +521,7 @@ export function useIrisVoiceLoop(opts: Options) {
           if (line.sessionId) optsRef.current.onSessionId(line.sessionId);
           if (transcript && line.reply) optsRef.current.onTurn({ transcript, reply: line.reply });
           if (rp) {
-            endReply(rp);
+            rp.queue.end();
           } else if (!isCurrent()) {
             sendTurnTiming(timing, 'abandoned');
           } else {
@@ -512,13 +548,13 @@ export function useIrisVoiceLoop(opts: Options) {
       await readVoiceStream(body, onLine);
       if (!finished) throw new Error('Stream ended without a done line');
     } catch (err) {
-      const playing: Reply | null = rp;
-      if (playing && (playing as Reply).started) {
+      const playing = rp as Reply | null;
+      if (playing && playing.queue.started) {
         // Audio is already playing: finish what arrived, then listen.
         statsRef.current.sendFailures++;
         statsRef.current.lastSendError = errorText(err);
         breadcrumb(`voice: stream failed mid-reply: ${errorText(err)}`);
-        endReply(playing);
+        playing.queue.end();
         return;
       }
       if (playing) stopPlayback();
@@ -530,6 +566,7 @@ export function useIrisVoiceLoop(opts: Options) {
     const gen = ++turnGenRef.current;
     const timing = newTurnTiming(info);
     const isCurrent = () => mountedRef.current && gen === turnGenRef.current && activeRef.current;
+    armStuckWatch(gen, timing);
     setPhase('thinking');
     setReplyText(null);
     const { sessionId, from, openingMessage } = optsRef.current;
@@ -599,8 +636,8 @@ export function useIrisVoiceLoop(opts: Options) {
       setError(null);
       if (res.audio) {
         const rp = startReply(timing);
-        addClip(rp, res.audio);
-        endReply(rp);
+        rp.queue.add(res.audio);
+        rp.queue.end();
       } else {
         sendTurnTiming(timing, 'text');
         setReplyText(res.reply ?? null);
@@ -619,9 +656,9 @@ export function useIrisVoiceLoop(opts: Options) {
       setError(err instanceof ApiError || err instanceof TimeoutError ? 'failed' : 'offline');
       listen();
     }
-  // readStream, addClip and endReply only use refs and stable callbacks.
+  // readStream only uses refs and stable callbacks.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listen, setPhase, startReply, stopPlayback]);
+  }, [armStuckWatch, listen, setPhase, startReply, stopPlayback]);
 
   const onAudioStream = useCallback(async (event: AudioDataEvent) => {
     const stats = statsRef.current;
@@ -747,15 +784,18 @@ export function useIrisVoiceLoop(opts: Options) {
 
     return () => {
       appStateSub.remove();
-      // A session that heard no complete turn: report where it stalled.
-      // Read the detector before it's paused below.
+      clearStuckWatch();
+      // A session that got no reply: report where it stalled (no turn ended,
+      // or turns ended but nothing came back). Read the detector before it's
+      // paused below.
       const summary = summarizeStats(stats);
-      if (stats.turnEnds === 0 && summary.sessionMs >= MIN_REPORT_SESSION_MS) {
+      if (stats.repliesReceived === 0 && summary.sessionMs >= MIN_REPORT_SESSION_MS) {
         reportClientError(
-          'voice_no_turns',
+          'voice_no_replies',
           new Error(
-            `Voice session ended with no turns (start: ${stats.startRecording}, chunks: ${stats.chunks}, ` +
-            `peak: ${stats.peakRms.toFixed(4)}, speechStarts: ${stats.speechStarts})`
+            `Voice session ended with no replies (start: ${stats.startRecording}, chunks: ${stats.chunks}, ` +
+            `peak: ${stats.peakRms.toFixed(4)}, speechStarts: ${stats.speechStarts}, ` +
+            `turnEnds: ${stats.turnEnds}, turnsSent: ${stats.turnsSent}, sendFailures: ${stats.sendFailures})`
           ),
           null,
           {
@@ -763,6 +803,7 @@ export function useIrisVoiceLoop(opts: Options) {
             detector: detectorRef.current.getDiagnostics(),
             phaseAtEnd: phaseRef.current,
             device: { manufacturer: Device.manufacturer, model: Device.modelName },
+            steps: recentBreadcrumbs(),
           }
         );
       }

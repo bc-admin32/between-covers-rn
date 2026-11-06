@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "eas-build-pre-install": "node scripts/eas-pre-install-exclude-dev-client.js && node scripts/eas-pre-install-iap-variant.js",
     "postinstall": "patch-package",
+    "test:voice": "node --test \"lib/__tests__/*.test.mjs\"",
     "release:patch": "node scripts/bump-version.js patch",
     "release:minor": "node scripts/bump-version.js minor",
     "release:major": "node scripts/bump-version.js major"
