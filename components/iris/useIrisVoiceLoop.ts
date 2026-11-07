@@ -46,6 +46,7 @@ type VoiceResponse = {
   audio?: string | null;
   audioFormat?: string;
   noSpeech?: boolean;
+  voiceLimitReached?: boolean;
 };
 
 type Options = {
@@ -59,6 +60,9 @@ type Options = {
   // The app went to the background while voice mode was on (not counting the
   // mic permission dialog).
   onBackground: () => void;
+  // The weekly voice cap was hit. Called once Iris's goodbye has played (or
+  // right away if there's nothing to play); the screen switches to text.
+  onVoiceLimitReached: () => void;
 };
 
 class TimeoutError extends Error {}
@@ -265,6 +269,9 @@ type Reply = {
   timing: TurnTiming;
   pulse: Animated.CompositeAnimation | null;
   sampling: boolean | null;  // first player supports level sampling
+  // Last reply before the voice cap: when it ends, leave voice mode instead
+  // of listening again.
+  final: boolean;
 };
 
 let clipCounter = 0;
@@ -361,6 +368,15 @@ export function useIrisVoiceLoop(opts: Options) {
     setPhase('listening');
   }, [clearStuckWatch, setPhase]);
 
+  // Weekly voice cap: hand off to the chat screen, which leaves voice mode
+  // (unmounting this hook stops the mic). Called even if the user has already
+  // left voice mode, so the mic stays locked.
+  const endVoice = useCallback(() => {
+    clearStuckWatch();
+    breadcrumb('voice: limit reached, switching to text');
+    optsRef.current.onVoiceLimitReached();
+  }, [clearStuckWatch]);
+
   const armStuckWatch = useCallback((gen: number, timing: TurnTiming) => {
     clearStuckWatch();
     const check = () => {
@@ -438,7 +454,7 @@ export function useIrisVoiceLoop(opts: Options) {
 
   const startReply = useCallback((timing: TurnTiming): Reply => {
     stopPlayback();
-    const reply = { timing, pulse: null, sampling: null } as unknown as Reply;
+    const reply = { timing, pulse: null, sampling: null, final: false } as unknown as Reply;
     reply.queue = new ReplyQueue({
       createPlayer: (audio) => createClipPlayer(reply, audio),
       preloadNext: Platform.OS === 'ios',
@@ -450,8 +466,8 @@ export function useIrisVoiceLoop(opts: Options) {
     }, {
       onFirstStart: () => {
         // Watch the mic for an interrupt from the moment Iris starts talking,
-        // and keep watching between sentences.
-        detectorRef.current.setMode('speaking');
+        // and keep watching between sentences. Her goodbye can't be talked over.
+        detectorRef.current.setMode(reply.final ? 'paused' : 'speaking');
         setPhase('speaking');
         if (STEADY_PULSE || !reply.sampling) {
           reply.pulse = Animated.loop(Animated.sequence([
@@ -469,12 +485,20 @@ export function useIrisVoiceLoop(opts: Options) {
         replyRef.current = null;
         breadcrumb('voice: playback finished');
         settleReply(reply, 'finished');
-        listen();
+        if (reply.final) endVoice();
+        else listen();
       },
     });
     replyRef.current = reply;
     return reply;
-  }, [createClipPlayer, level, listen, setPhase, settleReply, stopPlayback]);
+  }, [createClipPlayer, endVoice, level, listen, setPhase, settleReply, stopPlayback]);
+
+  // Makes a reply the last one before the voice cap. Clips may already be
+  // playing, so stop watching the mic for an interrupt now.
+  const markFinal = (reply: Reply) => {
+    reply.final = true;
+    if (detectorRef.current.getMode() === 'speaking') detectorRef.current.setMode('paused');
+  };
 
   // Reads one streamed reply: plays sentences as they arrive and hands the
   // finished turn to the chat screen. Throws (to sendTurn's error handling)
@@ -520,6 +544,18 @@ export function useIrisVoiceLoop(opts: Options) {
           // left voice mode, so hand it to the chat screen either way.
           if (line.sessionId) optsRef.current.onSessionId(line.sessionId);
           if (transcript && line.reply) optsRef.current.onTurn({ transcript, reply: line.reply });
+          if (line.voiceLimitReached) {
+            // Let the goodbye finish, then switch to text. Nothing playing
+            // (no audio, already stopped, or voice mode left): switch now.
+            if (rp && !rp.queue.isStopped && isCurrent()) {
+              markFinal(rp);
+              rp.queue.end();
+            } else {
+              if (!rp) sendTurnTiming(timing, isCurrent() ? 'text' : 'abandoned');
+              endVoice();
+            }
+            return;
+          }
           if (rp) {
             rp.queue.end();
           } else if (!isCurrent()) {
@@ -625,6 +661,21 @@ export function useIrisVoiceLoop(opts: Options) {
       }
       if (!isCurrent()) {
         sendTurnTiming(timing, 'abandoned');
+        if (res.voiceLimitReached) endVoice();
+        return;
+      }
+      if (res.voiceLimitReached && !res.noSpeech) {
+        setError(null);
+        if (res.audio) {
+          // Let the goodbye finish (onFinished switches to text).
+          const rp = startReply(timing);
+          rp.final = true;
+          rp.queue.add(res.audio);
+          rp.queue.end();
+        } else {
+          sendTurnTiming(timing, 'text');
+          endVoice();
+        }
         return;
       }
       if (res.noSpeech) {
@@ -658,7 +709,7 @@ export function useIrisVoiceLoop(opts: Options) {
     }
   // readStream only uses refs and stable callbacks.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [armStuckWatch, listen, setPhase, startReply, stopPlayback]);
+  }, [armStuckWatch, endVoice, listen, setPhase, startReply, stopPlayback]);
 
   const onAudioStream = useCallback(async (event: AudioDataEvent) => {
     const stats = statsRef.current;
@@ -826,12 +877,15 @@ export function useIrisVoiceLoop(opts: Options) {
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Tapping the circle stops Iris and goes straight back to listening.
+  // Tapping the circle stops Iris and goes straight back to listening, or,
+  // during her goodbye at the voice cap, straight to text.
   const interrupt = useCallback(() => {
     if (phaseRef.current !== 'speaking') return;
+    const final = replyRef.current?.final ?? false;
     stopPlayback();
-    listen();
-  }, [listen, stopPlayback]);
+    if (final) endVoice();
+    else listen();
+  }, [endVoice, listen, stopPlayback]);
 
   return { phase, level, replyText, error, interrupt };
 }

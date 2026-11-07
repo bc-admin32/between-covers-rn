@@ -4,6 +4,7 @@
 //   {"type":"transcript","text":"...","sessionId":"..."}   sessionId optional
 //   {"type":"sentence","seq":0,"text":"...","audio":"<base64 mp3>"}  repeats
 //   {"type":"done","reply":"...","sessionId":"...","softLimit":false}
+//       voiceLimitReached: true = weekly voice cap hit; the reply is Iris's goodbye
 //   {"type":"no_speech"}
 //   {"type":"error","status":403,"error":"VOICE_TERMS_REQUIRED"}
 //
@@ -19,7 +20,7 @@ export const STREAM_STALL_MS = 15_000;
 export type VoiceStreamLine =
   | { type: 'transcript'; text: string; sessionId?: string | null }
   | { type: 'sentence'; seq: number; text: string; audio: string }
-  | { type: 'done'; reply: string | null; sessionId: string | null; softLimit?: boolean }
+  | { type: 'done'; reply: string | null; sessionId: string | null; softLimit?: boolean; voiceLimitReached?: boolean }
   | { type: 'no_speech' }
   | { type: 'error'; status: number; error: string };
 

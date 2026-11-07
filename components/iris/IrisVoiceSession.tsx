@@ -16,6 +16,7 @@ type Props = {
   onTurn: (turn: { transcript: string; reply: string }) => void;
   onTermsRequired: () => void;
   onBackground: () => void;
+  onVoiceLimitReached: () => void;
 };
 
 export default function IrisVoiceSession({ paddingBottom, ...loopOpts }: Props) {

@@ -129,6 +129,9 @@ export default function IrisChatScreen() {
   const [voiceTermsVisible, setVoiceTermsVisible] = useState(false);
   const [checkingVoice, setCheckingVoice] = useState(false);
   const reopenVoiceTermsRef = useRef(false);
+  // Weekly voice cap hit: voice stays off until the chat is opened again.
+  // Screen state only; nothing is saved on the device.
+  const [voiceLocked, setVoiceLocked] = useState(false);
 
   // Back in text mode the message list remounts; jump to the newest bubbles.
   useEffect(() => {
@@ -150,6 +153,10 @@ export default function IrisChatScreen() {
   async function handleToggleMode() {
     if (mode === 'voice') {
       setMode('text');
+      return;
+    }
+    if (voiceLocked) {
+      Alert.alert('Voice chat', 'Iris can’t chat out loud right now, but she’s still here for you. Keep the conversation going over text! 💬');
       return;
     }
     if (isGuest === null || checkingVoice) return;
@@ -292,12 +299,22 @@ export default function IrisChatScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.modeToggle, mode === 'voice' && styles.modeToggleVoice]}
+          style={[
+            styles.modeToggle,
+            mode === 'voice' && styles.modeToggleVoice,
+            mode === 'text' && voiceLocked && styles.modeToggleLocked,
+          ]}
           onPress={handleToggleMode}
           disabled={sending || checkingVoice}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={mode === 'voice' ? 'Switch to text chat' : 'Switch to voice chat'}
+          accessibilityLabel={
+            mode === 'voice'
+              ? 'Switch to text chat'
+              : voiceLocked
+              ? 'Voice chat unavailable'
+              : 'Switch to voice chat'
+          }
         >
           {mode === 'voice' ? (
             <ChatCircleText size={18} color="#fff" weight="bold" />
@@ -343,6 +360,10 @@ export default function IrisChatScreen() {
               // voice mode. The voice session decides what counts as leaving
               // (Android's permission dialog doesn't).
               onBackground={() => setMode('text')}
+              onVoiceLimitReached={() => {
+                setVoiceLocked(true);
+                setMode('text');
+              }}
             />
           </Suspense>
         </VoiceErrorBoundary>
@@ -459,6 +480,7 @@ const styles = StyleSheet.create({
   onlineText: { fontSize: 11, color: '#B09A7E' },
   modeToggle: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center', marginLeft: spacing.xs },
   modeToggleVoice: { backgroundColor: '#B83255' },
+  modeToggleLocked: { opacity: 0.4 },
   voiceBody: { flex: 1 },
   messages: { flex: 1 },
   messagesContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
