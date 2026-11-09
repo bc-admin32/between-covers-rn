@@ -11,14 +11,16 @@ import { apiGet, apiPost } from '../../../lib/api';
 import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
+import { resolveLayout } from '../../../lib/cozyLayout';
+import PillowTalk from '../../../components/playroom/PillowTalk';
 
 const BC_LOGO = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/backgrounds/logo.png';
 const SUPPORT_EMAIL = 'support@betweencovers.app';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
-type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
-type Section =
+export type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
+export type Section =
   | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
   | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
   | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null; replyCount?: number }
@@ -30,8 +32,12 @@ type Section =
 // doesn't know about is simply never rendered.
 
 type LoungeData = {
-  active: { weekId: string; startDate: string; endDate: string; sections: Section[] } | null;
+  // layout follows the live Cozy month: "playroom" shows Pillow Talk.
+  active: { weekId: string; startDate: string; endDate: string; sections: Section[]; layout?: string; tiles?: Record<string, boolean> } | null;
   archivePreview: { weekId: string; startDate: string; endDate: string }[];
+  // Weeks that ended in the last 30 days, newest first (Pillow Talk's
+  // past-weeks link shows only when there are some).
+  archiveRecent?: { weekId: string; startDate: string; endDate: string }[];
   loungeTermsAcceptedAt?: string | null;
   // Set by the /guest/lounge/resolve mirror. Guests never see the terms
   // prompt (loungeTermsAcceptedAt is always null for them).
@@ -216,9 +222,9 @@ export default function LoungeScreen() {
   const pollTotal = pollResult?.totalVotes ?? poll?.totalVotes ?? 0;
   const votedOptionId = pollResult?.selectedOptionId ?? poll?.selectedOptionId ?? selectedOption;
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* EULA gate — shown once until user accepts community terms */}
+  // EULA gate — shown once until user accepts community terms. Shared by the
+  // classic Lounge and Pillow Talk.
+  const eulaGate = (
       <Modal visible={eulaModal} transparent animationType="slide" onRequestClose={() => {}}>
         <View style={styles.eulaOverlay}>
           <View style={styles.eulaSheet}>
@@ -257,6 +263,33 @@ export default function LoungeScreen() {
           </View>
         </View>
       </Modal>
+  );
+
+  // PlayRoom months get Pillow Talk; everything below is the classic Lounge.
+  if (resolveLayout(active.layout) === 'playroom') {
+    return (
+      <PillowTalk
+        gate={eulaGate}
+        week={active}
+        hasRecentWeeks={(data.archiveRecent?.length ?? 0) > 0}
+        primary={primary}
+        secondary={secondary}
+        iris={iris}
+        poll={poll}
+        monthly={monthly}
+        bookClub={bookClub}
+        pollState={{
+          hasVoted, options: pollOptions, totalVotes: pollTotal, votedOptionId,
+          selectedOption, submitting: pollSubmitting,
+          onSelect: setSelectedOption, onVote: handleVote,
+        }}
+      />
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {eulaGate}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 

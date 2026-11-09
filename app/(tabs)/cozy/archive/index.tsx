@@ -9,6 +9,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import PlayRoomHome from '../../../../components/playroom/PlayRoomHome';
+import { resolveLayout } from '../../../../lib/cozyLayout';
 
 const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
@@ -31,7 +33,11 @@ type VisualItem = {
 
 type CozyData = {
   weekId: string;
+  monthLabel?: string;
   theme: { title: string; tagline: string };
+  // Last month's own layout: "playroom" shows it as The PlayRoom.
+  layout?: string;
+  tiles?: Record<string, boolean>;
   sections: {
     spotlight?: { book: BookItem | null; alignment: any };
     books?: BookItem[];
@@ -86,6 +92,11 @@ export default function CozyArchiveScreen() {
         <ActivityIndicator color={colors.primary} />
       </View>
     );
+  }
+
+  // Last month in its own layout; everything below is the classic archive.
+  if (data && resolveLayout(data.layout) === 'playroom') {
+    return <PlayRoomHome month={data} isArchive />;
   }
 
   return (

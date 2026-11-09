@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { monthEvents } from '../../../../lib/cozyEvents';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, hasSession } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
@@ -308,6 +309,8 @@ export default function CozyEventsScreen() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const eventIdRef = useRef<string | undefined>(undefined);
   const { isGuest, requireAccount } = useGuest();
+  const { eventId: eventIdParam } = useLocalSearchParams<{ eventId?: string }>();
+  const requestedEventId = typeof eventIdParam === 'string' && eventIdParam ? eventIdParam : undefined;
 
   useEffect(() => {
     const guestPromise = hasSession().then((signedIn) => !signedIn);
@@ -321,7 +324,13 @@ export default function CozyEventsScreen() {
         ]);
         setStatus(statusRes);
         const events: BCEvent[] = homeRes?.active?.sections?.events ?? [];
-        setEvent(events[0] ?? null);
+        // Opened from a PlayRoom event card: show that event (looked up in
+        // both places events arrive). Without an id — or if it's not found —
+        // this is the classic behavior: the month's first event.
+        const picked = requestedEventId
+          ? (monthEvents(homeRes?.active?.sections) as BCEvent[]).find((e) => e.eventId === requestedEventId)
+          : undefined;
+        setEvent(picked ?? events[0] ?? null);
       } catch {} finally {
         setLoaded(true);
       }

@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -311,19 +312,23 @@ export default function CozyMediaScreen() {
   const [loaded, setLoaded] = useState(false);
   const [selectedItem, setSelectedItem] = useState<VisualItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Opened from a PlayRoom tile: its name, and last month when from the archive.
+  const params = useLocalSearchParams<{ month?: string; title?: string }>();
+  const monthKey = cozyMonthKey(params.month);
+  const tileTitle = titleParam(params.title);
 
   useEffect(() => {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
-        const raw: VisualItem[] = response?.active?.sections?.visual ?? [];
+        const raw: VisualItem[] = response?.[monthKey]?.sections?.visual ?? [];
         setWatchItems(raw);
       } catch {} finally {
         setLoaded(true);
       }
     }
     load();
-  }, []);
+  }, [monthKey]);
 
   const handleRatingUpdate = useCallback((movieId: string, ratingSummary: RatingSummary | null) => {
     setWatchItems((prev) => prev.map((item) => item.movieId === movieId ? { ...item, ratingSummary } : item));
@@ -339,7 +344,7 @@ export default function CozyMediaScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>Watch & Unwind</Text>
-            <Text style={styles.headerTitle}>Visual Escapes</Text>
+            <Text style={styles.headerTitle}>{tileTitle ?? 'Visual Escapes'}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/media' as any)}>

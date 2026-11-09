@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
@@ -168,15 +168,19 @@ export default function LoungeArchiveScreen() {
   const [weeks, setWeeks] = useState<ArchiveWeek[]>([]);
   const [bookClubs, setBookClubs] = useState<ArchiveBookClub[]>([]);
   const [loading, setLoading] = useState(true);
+  // From Pillow Talk: window=30 asks for the weeks that ended in the last 30
+  // days (across months), titled "Past 30 days". The classic call is unchanged.
+  const { window: windowParam } = useLocalSearchParams<{ window?: string }>();
+  const isRecent = windowParam === '30';
 
   useEffect(() => {
-    apiGet<ArchiveResponse>('/lounge/archive')
+    apiGet<ArchiveResponse>(isRecent ? '/lounge/archive?window=30' : '/lounge/archive')
       .then((res) => {
         setWeeks(res.weeks ?? []);
         setBookClubs(collectBookClubs(res));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isRecent]);
 
   // Each Book Club goes once, above the first listed week of its month.
   // A club whose month has no archived week is shown at the very top.
@@ -206,7 +210,7 @@ export default function LoungeArchiveScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <CaretLeft size={22} color="#6A5550" weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.title}>The Archive</Text>
+            <Text style={styles.title}>{isRecent ? 'Past 30 days' : 'The Archive'}</Text>
           </View>
         </View>
 

@@ -1,17 +1,23 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, AppState } from 'react-native';
 import { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../lib/api';
 import { registerForPushNotifications } from '../../lib/pushNotifications';
 import { useGuest } from '../../lib/useGuest';
+import { setActiveCozyLayout, useActiveCozyLayout } from '../../lib/cozyLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   HouseSimple,
   HeartStraight,
+  Keyhole,
   Book,
   Chats,
   User,
 } from '../../components/icons';
+
+// The Cozy tab's cached /cozy/home payload (written by the Cozy screen).
+const COZY_CACHE_KEY = 'bc_cozy_cache_v2';
 
 const ACTIVE_COLOR = '#B83255';
 const INACTIVE_COLOR = '#8C7B8C';
@@ -19,13 +25,16 @@ const ICON_SIZE = 22;
 
 type IconName = 'home' | 'cozy' | 'library' | 'lounge' | 'profile';
 
-function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
+function TabIcon({ name, focused, playroom = false }: { name: IconName; focused: boolean; playroom?: boolean }) {
   const color = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
   const weight = focused ? 'fill' : 'regular';
 
   const icon = {
     home:    <HouseSimple  size={ICON_SIZE} color={color} weight={weight} />,
-    cozy:    <HeartStraight size={ICON_SIZE} color={color} weight={weight} />,
+    // The PlayRoom months get a keyhole.
+    cozy:    playroom
+      ? <Keyhole       size={ICON_SIZE} color={color} weight={weight} />
+      : <HeartStraight size={ICON_SIZE} color={color} weight={weight} />,
     library: <Book          size={ICON_SIZE} color={color} weight={weight} />,
     lounge:  <Chats         size={ICON_SIZE} color={color} weight={weight} />,
     profile: <User          size={ICON_SIZE} color={color} weight={weight} />,
@@ -42,6 +51,24 @@ export default function TabLayout() {
   const [hasLiveEvent, setHasLiveEvent] = useState(false);
   const insets = useSafeAreaInsets();
   const { isGuest, requireAccount } = useGuest();
+  const cozyLayout = useActiveCozyLayout();
+
+  // Cozy tab icon: the active month's layout, from the cached payload right
+  // away, then from /cozy/home at launch and each time the app comes back
+  // (so it flips on the 1st even if Cozy isn't opened).
+  useEffect(() => {
+    SecureStore.getItemAsync(COZY_CACHE_KEY)
+      .then((cached) => { if (cached) setActiveCozyLayout(JSON.parse(cached)?.active?.layout); })
+      .catch(() => {});
+    const refresh = () => {
+      apiGet<{ active?: { layout?: string } }>('/cozy/home')
+        .then((res) => setActiveCozyLayout(res?.active?.layout))
+        .catch(() => {});
+    };
+    refresh();
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     apiGet<{ events: { status: string }[] }>('/live?status=ACTIVE')
@@ -79,7 +106,7 @@ export default function TabLayout() {
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="cozy" focused={focused} />
+            <TabIcon name="cozy" focused={focused} playroom={cozyLayout === 'playroom'} />
           ),
         }}
       />

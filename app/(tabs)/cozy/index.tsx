@@ -16,6 +16,8 @@ import { parseLocalEndOfDay } from '../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
+import PlayRoomHome from '../../../components/playroom/PlayRoomHome';
+import { resolveLayout, setActiveCozyLayout } from '../../../lib/cozyLayout';
 
 // Home payload cache (also read by cozy/author for its first paint). Bumped
 // for the scroll-row payload (?rows=scroll) so an old 3-item response is
@@ -73,6 +75,9 @@ type CozyData = {
   weekId: string;
   monthLabel?: string;
   theme: { title: string; tagline: string };
+  // "playroom" shows The PlayRoom; anything else (or missing) is classic.
+  layout?: string;
+  tiles?: Record<string, boolean>;
   sections: {
     spotlight?: { book: BookItem | null; alignment: any };
     // The month's Book of the Month (also first in `books`), or absent.
@@ -297,12 +302,14 @@ export default function CozyScreen() {
         if (cached) {
           const parsed = JSON.parse(cached);
           setData(parsed?.active ?? null);
+          setActiveCozyLayout(parsed?.active?.layout);
           setLoading(false);
         }
         const response = await apiGet(COZY_HOME_PATH);
         const body = JSON.stringify(response);
         lastBodyRef.current = body;
         setData(response?.active ?? null);
+        setActiveCozyLayout(response?.active?.layout);
         await SecureStore.setItemAsync(CACHE_KEY, body);
       } catch {} finally {
         setLoading(false);
@@ -327,6 +334,7 @@ export default function CozyScreen() {
           lastBodyRef.current = body;
           skipSectionTrackRef.current = true;
           setData(response?.active ?? null);
+          setActiveCozyLayout(response?.active?.layout);
           await SecureStore.setItemAsync(CACHE_KEY, body);
         })
         .catch(() => {});
@@ -397,6 +405,16 @@ export default function CozyScreen() {
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={colors.primary} />
       </View>
+    );
+  }
+
+  // PlayRoom months get The PlayRoom; everything below is the classic page.
+  if (resolveLayout(data?.layout) === 'playroom') {
+    return (
+      <PlayRoomHome
+        month={data}
+        offShelfCount={offShelf?.enabled ? offShelf.books.length : 0}
+      />
     );
   }
 

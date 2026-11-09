@@ -4,9 +4,10 @@ import {
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
+import { newbiesLabel, titleParam } from '../../../../lib/cozyLayout';
 import { spacing, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
@@ -25,6 +26,12 @@ export default function NewReleasesScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<NewReleasesData | null>(null);
   const [loading, setLoading] = useState(true);
+  // From the PlayRoom's Newbies tile (`title` set): the heading becomes
+  // "[Month]'s Newbies" for the month shown, and `month` (YYYY-MM) opens a
+  // given month (last month, from the archive).
+  const params = useLocalSearchParams<{ title?: string; month?: string }>();
+  const isNewbies = !!titleParam(params.title);
+  const startMonth = typeof params.month === 'string' && /^\d{4}-\d{2}$/.test(params.month) ? params.month : undefined;
 
   const load = async (month?: string) => {
     setLoading(true);
@@ -39,8 +46,8 @@ export default function NewReleasesScreen() {
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    load(startMonth);
+  }, [startMonth]);
 
   const sections = data?.sections ?? [];
 
@@ -76,7 +83,7 @@ export default function NewReleasesScreen() {
 
       {/* TITLE BLOCK */}
       <View style={styles.titleBlock}>
-        <Text style={styles.eyebrow}>NEW RELEASES</Text>
+        <Text style={styles.eyebrow}>{isNewbies ? newbiesLabel(data?.monthLabel) : 'NEW RELEASES'}</Text>
         {!!data?.monthLabel && <Text style={styles.monthLabel}>{data.monthLabel}</Text>}
         <Text style={styles.subtitle}>Fresh arrivals, sorted by genre</Text>
       </View>

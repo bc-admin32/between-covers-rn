@@ -47,6 +47,7 @@ type EventName =
   | 'subscription_started'
   | 'iris_chat_sent'
   | 'cozy_section_viewed'
+  | 'playroom_tile_opened'
   | 'book_added_to_library'
   | 'book_status_changed'
   | 'voice_turn_timing'

@@ -19,6 +19,7 @@ export const Copy: Icon = require('phosphor-react-native/src/icons/Copy').defaul
 export const Funnel: Icon = require('phosphor-react-native/src/icons/Funnel').default;
 export const HeartStraight: Icon = require('phosphor-react-native/src/icons/HeartStraight').default;
 export const HouseSimple: Icon = require('phosphor-react-native/src/icons/HouseSimple').default;
+export const Keyhole: Icon = require('phosphor-react-native/src/icons/Keyhole').default;
 export const Microphone: Icon = require('phosphor-react-native/src/icons/Microphone').default;
 export const User: Icon = require('phosphor-react-native/src/icons/User').default;
 export const Warning: Icon = require('phosphor-react-native/src/icons/Warning').default;

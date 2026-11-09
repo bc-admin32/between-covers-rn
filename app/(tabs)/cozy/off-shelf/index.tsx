@@ -4,9 +4,10 @@ import {
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
+import { titleParam } from '../../../../lib/cozyLayout';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
@@ -23,6 +24,8 @@ export default function OffShelfScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<OffShelfData | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // "Keep Me Guessing" when opened from Between the Sheets in a PlayRoom month.
+  const tileTitle = titleParam(useLocalSearchParams<{ title?: string }>().title);
 
   useEffect(() => {
     async function load() {
@@ -51,7 +54,7 @@ export default function OffShelfScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>SUSPICIOUS BEHAVIOR</Text>
-            <Text style={styles.headerTitle}>Off The Shelf</Text>
+            <Text style={styles.headerTitle}>{tileTitle ?? 'Off The Shelf'}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/off-shelf' as any)}>

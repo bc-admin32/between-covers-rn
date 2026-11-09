@@ -84,7 +84,8 @@ export default function MonthlyWallScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  const { promptId } = useLocalSearchParams<{ promptId: string }>();
+  // `title`: "Behind Closed Doors" when opened from Pillow Talk.
+  const { promptId, title } = useLocalSearchParams<{ promptId: string; title?: string }>();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -120,7 +121,7 @@ export default function MonthlyWallScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <CaretLeft size={20} color="#C4A882" weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.title}>Confession Wall</Text>
+            <Text style={styles.title}>{typeof title === 'string' && title.trim() ? title : 'Confession Wall'}</Text>
           </View>
         </View>
 

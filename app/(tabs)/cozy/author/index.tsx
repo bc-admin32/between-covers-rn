@@ -12,6 +12,7 @@ import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
+import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
 
 // Same key Cozy home writes (cozy/index.tsx) — read here for first paint.
 const CACHE_KEY = 'bc_cozy_cache_v2';
@@ -85,7 +86,11 @@ export default function AuthorDetailScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  useLocalSearchParams<{ weekId?: string }>();
+  // From the PlayRoom's Talk Dirty to Me tile: its name, and month=previous
+  // for last month (from the archive).
+  const params = useLocalSearchParams<{ weekId?: string; month?: string; title?: string }>();
+  const monthKey = cozyMonthKey(params.month);
+  const tileTitle = titleParam(params.title);
 
   const [spotlight, setSpotlight] = useState<AuthorSpotlight | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +100,8 @@ export default function AuthorDetailScreen() {
     const load = async () => {
       let haveData = false;
       try {
-        const cached = await SecureStore.getItemAsync(CACHE_KEY);
+        // The cache only holds this month.
+        const cached = monthKey === 'active' ? await SecureStore.getItemAsync(CACHE_KEY) : null;
         if (cached) {
           const parsed = JSON.parse(cached);
           const cachedSpotlight = parsed?.active?.sections?.authorSpotlight ?? null;
@@ -105,8 +111,9 @@ export default function AuthorDetailScreen() {
             setLoading(false);
           }
         }
-        const response = await apiGet<{ active?: { sections?: { authorSpotlight?: AuthorSpotlight | null } } }>('/cozy/home');
-        const fresh = response?.active?.sections?.authorSpotlight ?? null;
+        type MonthSpotlight = { sections?: { authorSpotlight?: AuthorSpotlight | null } };
+        const response = await apiGet<{ active?: MonthSpotlight; previous?: MonthSpotlight }>('/cozy/home');
+        const fresh = response?.[monthKey]?.sections?.authorSpotlight ?? null;
         if (fresh) {
           setSpotlight(fresh);
           haveData = true;
@@ -120,7 +127,7 @@ export default function AuthorDetailScreen() {
       }
     };
     load();
-  }, []);
+  }, [monthKey]);
 
   if (loading && !spotlight) {
     return (
@@ -159,7 +166,7 @@ export default function AuthorDetailScreen() {
 
         {/* HEADER */}
         <View style={styles.headerBlock}>
-          <Text style={styles.eyebrow}>The Mind Behind the Magic</Text>
+          <Text style={styles.eyebrow}>{tileTitle ?? 'The Mind Behind the Magic'}</Text>
           <Text style={styles.name}>{spotlight.name}</Text>
           <Text style={styles.typeLabel}>{typeLabel}</Text>
         </View>

@@ -5,9 +5,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import EventCard from '../../../../components/playroom/EventCard';
+import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
+import { monthEvents, type CozyEvent } from '../../../../lib/cozyEvents';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
@@ -134,28 +137,50 @@ export default function CozyItemsScreen() {
   const [items, setItems] = useState<LifestyleItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<LifestyleItem | null>(null);
+  // Opened from the PlayRoom's Aftercare tile: the month's events (and their
+  // recordings) go above the extras, the page takes the tile's name, and
+  // month=previous shows last month (from the archive).
+  const params = useLocalSearchParams<{ playroom?: string; month?: string; title?: string }>();
+  const isAftercare = params.playroom === '1';
+  const monthKey = cozyMonthKey(params.month);
+  const tileTitle = titleParam(params.title);
+  const [events, setEvents] = useState<CozyEvent[]>([]);
 
   useEffect(() => {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
+        const month = response?.[monthKey];
         const candidates = [
-          response?.active?.sections?.LIFESTYLE,
-          response?.active?.sections?.lifestyle,
-          response?.active?.sections?.enhancements,
-          response?.active?.sections?.ENHANCEMENTS,
-          response?.active?.sections?.items,
+          month?.sections?.LIFESTYLE,
+          month?.sections?.lifestyle,
+          month?.sections?.enhancements,
+          month?.sections?.ENHANCEMENTS,
+          month?.sections?.items,
         ].filter(Array.isArray);
         const data: LifestyleItem[] = candidates.reduce<LifestyleItem[]>(
           (best, cur) => (cur.length >= best.length ? cur : best), []
         );
         setItems(data);
+        if (isAftercare) setEvents(monthEvents(month?.sections));
       } catch {} finally {
         setLoaded(true);
       }
     }
     load();
-  }, []);
+  }, [monthKey, isAftercare]);
+
+  // With events above, the pick count moves down to sit over the extras.
+  const countInScroll = isAftercare && events.length > 0;
+  const countRow = (
+    <View style={styles.countRow}>
+      <View style={styles.countLine} />
+      {loaded && items.length > 0 && (
+        <Text style={styles.countText}>{items.length} {items.length === 1 ? 'Pick' : 'Picks'}</Text>
+      )}
+      <View style={styles.countLine} />
+    </View>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -171,7 +196,7 @@ export default function CozyItemsScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>The Little Things</Text>
-            <Text style={styles.headerTitle}>Cozy Extras</Text>
+            <Text style={styles.headerTitle}>{tileTitle ?? 'Cozy Extras'}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/items' as any)}>
@@ -186,19 +211,23 @@ export default function CozyItemsScreen() {
       </View>
 
       {/* COUNT */}
-      <View style={styles.countRow}>
-        <View style={styles.countLine} />
-        {loaded && items.length > 0 && (
-          <Text style={styles.countText}>{items.length} {items.length === 1 ? 'Pick' : 'Picks'}</Text>
-        )}
-        <View style={styles.countLine} />
-      </View>
+      {!countInScroll && countRow}
 
       {/* GRID */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
+        {/* AFTERCARE: the month's events and recordings, then the extras.
+            EventCard brings its own side margin, so it cancels the grid's. */}
+        {loaded && isAftercare && events.length > 0 && (
+          <View style={{ marginHorizontal: -spacing.md }}>
+            {events.map((e, i) => (
+              <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} canOpenEvent={monthKey === 'active'} />
+            ))}
+            {items.length > 0 && countRow}
+          </View>
+        )}
         {!loaded ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && countInScroll ? null : items.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🛍️</Text>
             <Text style={styles.emptyTitle}>Coming soon</Text>

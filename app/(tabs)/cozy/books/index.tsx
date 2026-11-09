@@ -4,9 +4,10 @@ import {
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { CaretLeft, Funnel } from '../../../../components/icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
+import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
@@ -49,25 +50,49 @@ export default function CozyBooksScreen() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [bookOfMonth, setBookOfMonth] = useState<BookOfMonth | null>(null);
   const [loading, setLoading] = useState(true);
+  // Opened from the PlayRoom's Between the Sheets tile: after the shelf come
+  // the reader's personal pick ("I saw this and thought of you") and Keep Me
+  // Guessing (Off The Shelf, this month only). month=previous → last month.
+  const params = useLocalSearchParams<{ playroom?: string; month?: string; title?: string }>();
+  const isBetweenTheSheets = params.playroom === '1';
+  const monthKey = cozyMonthKey(params.month);
+  const tileTitle = titleParam(params.title);
+  const [spotlight, setSpotlight] = useState<BookItem | null>(null);
+  const [offShelf, setOffShelf] = useState<{ blurb?: string; books: BookCardData[] } | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
+        const month = response?.[monthKey];
         const data: BookItem[] =
-          response?.active?.sections?.BOOKS ??
-          response?.active?.sections?.books ?? [];
+          month?.sections?.BOOKS ??
+          month?.sections?.books ?? [];
         setBooks(data);
         setBookOfMonth(
-          response?.active?.sections?.bookOfMonth ??
+          month?.sections?.bookOfMonth ??
           data.find((b) => b.isBookOfMonth) ?? null
         );
+        if (isBetweenTheSheets) setSpotlight(month?.sections?.spotlight?.book ?? null);
       } catch {} finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [monthKey, isBetweenTheSheets]);
+
+  useEffect(() => {
+    if (!isBetweenTheSheets || monthKey !== 'active') return;
+    apiGet<{ enabled?: boolean; blurb?: string; books?: BookCardData[] }>('/cozy/off-shelf')
+      .then((res) => {
+        if (res?.enabled && Array.isArray(res.books) && res.books.length > 0) {
+          setOffShelf({ blurb: res.blurb, books: res.books });
+        }
+      })
+      .catch(() => {});
+  }, [isBetweenTheSheets, monthKey]);
+
+  const hasExtras = isBetweenTheSheets && (!!spotlight || !!offShelf);
 
   // Group by primarySubgenre, ordered by the shared taxonomy so this screen's
   // genre order matches New Releases. Untagged books fall into "Other", last.
@@ -89,8 +114,8 @@ export default function CozyBooksScreen() {
             <CaretLeft size={20} color="#0F2A48" weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>This Month's Bookshelf</Text>
-            <Text style={styles.headerTitle}>On Iris's Shelf</Text>
+            <Text style={styles.headerLabel}>{monthKey === 'previous' ? "Last Month's Bookshelf" : "This Month's Bookshelf"}</Text>
+            <Text style={styles.headerTitle}>{tileTitle ?? "On Iris's Shelf"}</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -136,7 +161,7 @@ export default function CozyBooksScreen() {
       >
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : books.length === 0 ? (
+        ) : books.length === 0 && !hasExtras ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📚</Text>
             <Text style={styles.emptyTitle}>Coming soon</Text>
@@ -147,6 +172,9 @@ export default function CozyBooksScreen() {
         ) : (
           <>
             {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
+            {isBetweenTheSheets && sections.length > 0 && (
+              <Text style={styles.playroomHeading}>Iris's Shelf</Text>
+            )}
             {sections.map((section) => (
               <View key={section.key} style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -164,6 +192,34 @@ export default function CozyBooksScreen() {
                 </View>
               </View>
             ))}
+
+            {/* BETWEEN THE SHEETS: the personal pick, then Keep Me Guessing */}
+            {isBetweenTheSheets && spotlight && (
+              <View style={styles.section}>
+                <Text style={styles.playroomHeading}>I saw this and thought of you</Text>
+                <View style={styles.gridInner}>
+                  <BookCard book={toCard(spotlight)} style={styles.bookCard} />
+                </View>
+              </View>
+            )}
+            {isBetweenTheSheets && offShelf && (
+              <View style={styles.section}>
+                <View style={styles.playroomHeadingRow}>
+                  <Text style={[styles.playroomHeading, { marginBottom: 0 }]}>Keep Me Guessing</Text>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/(tabs)/cozy/off-shelf?title=${encodeURIComponent('Keep Me Guessing')}` as any)}
+                  >
+                    <Text style={styles.viewAll}>View All →</Text>
+                  </TouchableOpacity>
+                </View>
+                {!!offShelf.blurb && <Text style={styles.playroomBlurb}>{offShelf.blurb}</Text>}
+                <View style={styles.gridInner}>
+                  {offShelf.books.slice(0, 6).map((book, i) => (
+                    <BookCard key={book.bookId ?? i} book={book} style={styles.bookCard} />
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
         <View style={{ height: 100 }} />
@@ -197,6 +253,10 @@ const styles = StyleSheet.create({
   sectionCount: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
   gridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   bookCard: { width: '45%' },
+  playroomHeading: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 12, paddingHorizontal: spacing.xs },
+  playroomHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingHorizontal: spacing.xs },
+  playroomBlurb: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, marginBottom: 12, paddingHorizontal: spacing.xs },
+  viewAll: { fontSize: 12, fontWeight: '700', color: '#B83255' },
   emptyState: { alignItems: 'center', paddingTop: 64, gap: spacing.sm },
   emptyEmoji: { fontSize: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48' },
