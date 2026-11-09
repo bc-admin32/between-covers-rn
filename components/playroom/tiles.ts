@@ -18,8 +18,8 @@ export type TileDef = {
 export const PLAYROOM_TILES: TileDef[] = [
   { key: 'betweenTheSheets', label: 'Between the Sheets', image: null, placeholder: '#7A2240' },
   { key: 'watchMe',          label: 'Watch Me',           image: null, placeholder: '#3B2A4A' },
-  { key: 'aftercare',        label: 'Aftercare',          image: null, placeholder: '#A0526B' },
-  { key: 'talkDirtyToMe',    label: 'Talk Dirty to Me',   image: null, placeholder: '#5C1F33' },
+  { key: 'aftercare',        label: 'Self Care',          image: null, placeholder: '#A0526B' },
+  { key: 'talkDirtyToMe',    label: 'Beyond the Cover',   image: null, placeholder: '#5C1F33' },
   { key: 'pillowTalk',       label: 'Pillow Talk',        image: null, placeholder: '#6B4A6E' },
   { key: 'newbies',          label: 'Newbies',            image: null, placeholder: '#B83255' },
 ];

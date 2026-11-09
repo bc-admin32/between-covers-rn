@@ -137,7 +137,7 @@ export default function CozyItemsScreen() {
   const [items, setItems] = useState<LifestyleItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<LifestyleItem | null>(null);
-  // Opened from the PlayRoom's Aftercare tile: the month's events (and their
+  // Opened from the PlayRoom's Self Care tile: the month's events (and their
   // recordings) go above the extras, the page takes the tile's name, and
   // month=previous shows last month (from the archive).
   const params = useLocalSearchParams<{ playroom?: string; month?: string; title?: string }>();

@@ -86,7 +86,7 @@ export default function AuthorDetailScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  // From the PlayRoom's Talk Dirty to Me tile: its name, and month=previous
+  // From the PlayRoom's Beyond the Cover tile: its name, and month=previous
   // for last month (from the archive).
   const params = useLocalSearchParams<{ weekId?: string; month?: string; title?: string }>();
   const monthKey = cozyMonthKey(params.month);

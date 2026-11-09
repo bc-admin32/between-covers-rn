@@ -139,7 +139,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
               </View>
             )}
 
-            {/* EVENTS — this month only; last month's are on its Aftercare page */}
+            {/* EVENTS — this month only; last month's are on its Self Care page */}
             {!isArchive && events.map((e, i) => (
               <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} />
             ))}
