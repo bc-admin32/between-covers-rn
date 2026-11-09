@@ -3,18 +3,25 @@ import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
-import { apiPost } from './api';
+import * as Updates from 'expo-updates';
+import { apiPost, hasSession } from './api';
 import {
   readPendingCrashReports, clearPendingCrashReports,
   readUnfinishedBreadcrumbs, clearUnfinishedBreadcrumbs,
 } from './crashCapture';
 
 const STORAGE_KEY = 'bc_event_buffer_v1';
-const SESSION_KEY = 'bc_session_id_v1';
+// Sessions used to be stored here and kept until sign-out. They're now
+// in memory only; the old key is removed on launch.
+const OLD_SESSION_KEY = 'bc_session_id_v1';
 // Device-scoped guest ID, created once and never cleared (not in signout's
 // key lists) so the backend can link a guest's events to the account they
 // later sign up or sign in with. SecureStore: on iOS it survives reinstall.
 const GUEST_ID_KEY = 'bc_guest_id';
+// Set at sign-out, cleared when the user is back in. A Face ID / Touch ID
+// sign-out keeps the login token for quick re-entry, so "is a token stored?"
+// can't tell; this flag makes events count as guest until then.
+const SIGNED_OUT_KEY = 'bc_analytics_signed_out';
 // signup_completed for a NEW account waits until onboarding finishes; its
 // payload (method, attribution) is held here meanwhile, across restarts.
 // Per-user: cleared by signOut (USER_DATA_KEYS).
@@ -22,9 +29,17 @@ export const PENDING_SIGNUP_KEY = 'bc_pending_signup';
 const FLUSH_INTERVAL_MS = 30_000;
 const MAX_BUFFER_SIZE = 20;
 const MAX_BATCH_SIZE = 100;
+// Back from the background after this long = a new session.
+const SESSION_RESUME_TIMEOUT_MS = 30 * 60 * 1000;
+// Screen visits shorter than this aren't sent.
+const MIN_SCREEN_MS = 1000;
+const SIGNOUT_FLUSH_TIMEOUT_MS = 2_000;
+const SIGNIN_FLUSH_TIMEOUT_MS = 2_000;
 
 type EventName =
   | 'app_open'
+  | 'session_start'
+  | 'screen_view'
   | 'signup_started'
   | 'signup_completed'
   | 'onboarding_completed'
@@ -43,6 +58,8 @@ type EventName =
   | 'age_gate_confirmed'
   | 'client_error';
 
+type SessionReason = 'cold_start' | 'resume' | 'sign_out';
+
 type AnalyticsEvent = {
   eventId: string;
   eventName: EventName;
@@ -52,16 +69,35 @@ type AnalyticsEvent = {
   properties?: Record<string, unknown>;
 };
 
-let buffer: AnalyticsEvent[] = [];
+// A queued event. `guest` is stored on the device only (stripped before
+// sending): true = recorded signed out, so it's always sent without a token;
+// false = recorded signed in. Missing on events queued by an older app
+// version: those go with whoever is signed in when they're sent, as before.
+type QueuedEvent = AnalyticsEvent & { guest?: boolean };
+
+let buffer: QueuedEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
-let sessionId: string | null = null;
 let guestId: string | null = null;
 let initialized = false;
 // Bumped by resetAnalyticsForSignOut(): a flush still in flight from the
 // previous account must not put its failed batch back into the new buffer.
 let bufferEpoch = 0;
+// One flush at a time, so a batch is never sent twice and the sign-in send
+// waits for any flush already running.
+let flushChain: Promise<void> = Promise.resolve();
 
-const SIGNOUT_FLUSH_TIMEOUT_MS = 2_000;
+// New on every launch (cold start); replaced after a long background and at
+// sign-out. In memory only.
+let sessionId: string = uuid();
+let backgroundAt: number | null = null;
+
+// The screen being timed for screen_view. screenSince is null while the app
+// is in the background.
+let currentScreen: string | null = null;
+let screenSince: number | null = null;
+
+// Cached SIGNED_OUT_KEY; null until first read.
+let signedOut: boolean | null = null;
 
 function uuid(): string {
   // RFC4122 v4 — good enough, no native crypto dep needed
@@ -80,15 +116,15 @@ function detectPlatform(): 'ios' | 'android' | 'amazon' {
   return Device.manufacturer === 'Amazon' ? 'amazon' : 'android';
 }
 
-async function getSessionId(): Promise<string> {
-  if (sessionId) return sessionId;
-  let stored = await AsyncStorage.getItem(SESSION_KEY);
-  if (!stored) {
-    stored = uuid();
-    await AsyncStorage.setItem(SESSION_KEY, stored);
-  }
-  sessionId = stored;
-  return stored;
+// Build label sent with every batch: the app version as the x-app-version
+// header, the update channel and update ID as top-level body fields.
+function appVersion(): string {
+  return Constants.expoConfig?.version ?? 'unknown';
+}
+
+function buildLabel(): { channel: string; updateId: string | null } {
+  if (!Updates.isEnabled) return { channel: 'dev', updateId: null };
+  return { channel: Updates.channel || 'dev', updateId: Updates.updateId ?? null };
 }
 
 // Reads (or on first launch creates) the device guest ID. Never throws; if
@@ -125,10 +161,11 @@ async function loadBuffer(): Promise<void> {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) buffer = parsed;
+      // Events tracked before init (already in memory) stay after the stored ones.
+      if (Array.isArray(parsed)) buffer = [...parsed, ...buffer];
     }
   } catch {
-    buffer = [];
+    // Keep what's in memory.
   }
 }
 
@@ -140,18 +177,84 @@ async function persistBuffer(): Promise<void> {
   }
 }
 
+// ── Signed in or guest ──
+
+// True when events should count as guest: signed out (including a Face ID /
+// Touch ID sign-out that kept the token), or no token stored.
+async function isGuestNow(): Promise<boolean> {
+  if (signedOut === null) {
+    signedOut = (await AsyncStorage.getItem(SIGNED_OUT_KEY).catch(() => null)) === '1';
+  }
+  return signedOut || !(await hasSession());
+}
+
+// Call when the user is back in: a new sign-in, or Face ID / Touch ID
+// re-entry with the kept token.
+export async function markSignedIn(): Promise<void> {
+  signedOut = false;
+  await AsyncStorage.removeItem(SIGNED_OUT_KEY).catch(() => {});
+}
+
+// ── Sessions ──
+
+function startSession(reason: SessionReason, opts: { guest?: boolean } = {}): Promise<void> {
+  sessionId = uuid();
+  return record('session_start', { reason }, opts);
+}
+
+// ── Screen views ──
+// screen_view { screen, durationMs } is sent when the user leaves a screen
+// and when the app goes to the background. Visits under MIN_SCREEN_MS are
+// skipped.
+
+function endScreen(): Promise<void> {
+  const screen = currentScreen;
+  const since = screenSince;
+  screenSince = null;
+  if (!screen || since === null) return Promise.resolve();
+  const durationMs = Date.now() - since;
+  if (durationMs < MIN_SCREEN_MS) return Promise.resolve();
+  return record('screen_view', { screen, durationMs });
+}
+
+function resumeScreen(): void {
+  if (currentScreen && screenSince === null && AppState.currentState !== 'background') {
+    screenSince = Date.now();
+  }
+}
+
+// Called by the root layout with the route pattern (e.g. "/cozy",
+// "/submissions/[type]") whenever it changes.
+export function setScreen(screen: string): void {
+  if (screen === currentScreen) return;
+  endScreen();
+  currentScreen = screen;
+  screenSince = AppState.currentState === 'background' ? null : Date.now();
+}
+
+// ── Init ──
+
 export async function initAnalytics(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
+  // First event of every launch.
+  startSession('cold_start');
+  AsyncStorage.removeItem(OLD_SESSION_KEY).catch(() => {});
   await loadBuffer();
-  await getSessionId();
 
-  // Flush on app foreground/background transitions
   AppState.addEventListener('change', (state) => {
-    if (state === 'background' || state === 'inactive') {
-      flush().catch(() => {});
+    if (state === 'background') {
+      backgroundAt = Date.now();
+      // Record the current screen's time first, then send.
+      endScreen().finally(() => { flush().catch(() => {}); });
     } else if (state === 'active') {
+      const wasAwayMs = backgroundAt === null ? 0 : Date.now() - backgroundAt;
+      backgroundAt = null;
+      if (wasAwayMs >= SESSION_RESUME_TIMEOUT_MS) startSession('resume');
+      resumeScreen();
+      flush().catch(() => {});
+    } else if (state === 'inactive') {
       flush().catch(() => {});
     }
   });
@@ -167,37 +270,60 @@ export async function initAnalytics(): Promise<void> {
   }
 }
 
-// Hard sign-out: send what's buffered while the old token is still valid
-// (best-effort, capped at SIGNOUT_FLUSH_TIMEOUT_MS), then start a fresh
-// session ID and an empty buffer so nothing from this account is sent under
-// the next one. Both live in AsyncStorage. bc_guest_id is deliberately kept.
+// ── Sign-in / sign-out ──
+
+// Call just before the sign-in token is saved: sends the queue as guest
+// events while there's still no token (best-effort, short timeout). Guest
+// events that miss it are still sent without a token later.
+export async function sendQueuedAsGuest(): Promise<void> {
+  try {
+    await Promise.race([
+      flush().catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, SIGNIN_FLUSH_TIMEOUT_MS)),
+    ]);
+  } catch {}
+}
+
+// Every sign-out, including a Face ID / Touch ID one that keeps the token:
+// send what's buffered while the token is still valid (best-effort, capped at
+// SIGNOUT_FLUSH_TIMEOUT_MS), drop the account's unsent events so nothing from
+// this account goes out later, and start a new session. Events from here on
+// count as guest until markSignedIn(). bc_guest_id is deliberately kept.
 export async function resetAnalyticsForSignOut(): Promise<void> {
   try {
+    await endScreen();
     await Promise.race([
       flush().catch(() => {}),
       new Promise<void>((resolve) => setTimeout(resolve, SIGNOUT_FLUSH_TIMEOUT_MS)),
     ]);
   } catch {}
+  signedOut = true;
+  await AsyncStorage.setItem(SIGNED_OUT_KEY, '1').catch(() => {});
   bufferEpoch += 1;
-  buffer = [];
-  sessionId = null;
-  await AsyncStorage.multiRemove([STORAGE_KEY, SESSION_KEY]).catch(() => {});
+  buffer = buffer.filter((e) => e.guest === true);
+  await persistBuffer();
+  await startSession('sign_out', { guest: true });
+  resumeScreen();
 }
 
-export async function track(
+// ── Recording ──
+
+async function record(
   eventName: EventName,
-  properties: Record<string, unknown> = {}
+  properties: Record<string, unknown>,
+  opts: { guest?: boolean } = {}
 ): Promise<void> {
   try {
-    const sid = await getSessionId();
-    const evt: AnalyticsEvent = {
+    // Session and time are taken now, before any await.
+    const evt: QueuedEvent = {
       eventId: uuid(),
       eventName,
       eventTimestamp: new Date().toISOString(),
-      sessionId: sid,
+      sessionId,
       platform: detectPlatform(),
       properties,
     };
+    evt.guest = opts.guest ?? (await isGuestNow());
     buffer.push(evt);
     await persistBuffer();
 
@@ -207,6 +333,21 @@ export async function track(
   } catch {
     // Never throw from track() — analytics must not break the app
   }
+}
+
+export function track(
+  eventName: EventName,
+  properties: Record<string, unknown> = {}
+): Promise<void> {
+  return record(eventName, properties);
+}
+
+async function postBatch(events: AnalyticsEvent[], asGuest: boolean): Promise<void> {
+  await apiPost(
+    '/events/batch',
+    { events, guestId: await getGuestId(), ...buildLabel() },
+    { headers: { 'x-app-version': appVersion() }, asGuest }
+  );
 }
 
 // Reports an error right away, in its own batch: if the backend rejects the
@@ -225,7 +366,7 @@ export async function reportClientError(
       eventId: uuid(),
       eventName: 'client_error',
       eventTimestamp: new Date().toISOString(),
-      sessionId: await getSessionId(),
+      sessionId,
       platform: detectPlatform(),
       properties: {
         where,
@@ -233,13 +374,13 @@ export async function reportClientError(
         message: err.message.slice(0, 500),
         stack: (err.stack ?? '').slice(0, 2000),
         componentStack: (componentStack ?? '').slice(0, 2000),
-        appVersion: Constants.expoConfig?.version ?? 'unknown',
+        appVersion: appVersion(),
         os: Platform.OS,
         osVersion: String(Platform.Version),
         ...extra,
       },
     };
-    await apiPost('/events/batch', { events: [evt], guestId: await getGuestId() });
+    await postBatch([evt], false);
     return true;
   } catch {
     return false;
@@ -285,33 +426,70 @@ export async function sendPendingCrashReports(): Promise<void> {
   }
 }
 
-async function flush(): Promise<void> {
-  if (buffer.length === 0) return;
-  const epoch = bufferEpoch;
+// ── Sending ──
 
-  // Snapshot current buffer; clear it so new events queue up cleanly.
-  // If the POST fails (5xx), put events back at the front.
-  const toSend = buffer.slice(0, MAX_BATCH_SIZE);
-  const remaining = buffer.slice(MAX_BATCH_SIZE);
-  buffer = remaining;
-  await persistBuffer();
+function flush(): Promise<void> {
+  const run = flushChain.then(doFlush, doFlush);
+  flushChain = run.catch(() => {});
+  return run;
+}
 
+// Sends one group. 'sent' and 'dropped' are final; 'retry' puts it back.
+async function sendGroup(events: QueuedEvent[], asGuest: boolean): Promise<'sent' | 'dropped' | 'retry'> {
+  if (events.length === 0) return 'sent';
+  const wire: AnalyticsEvent[] = events.map(({ guest: _guest, ...e }) => e);
   try {
-    // guestId on every batch, guest or signed in; the backend copies it onto
-    // each saved event.
-    await apiPost('/events/batch', { events: toSend, guestId: await getGuestId() });
-    // Success — events are gone for good. Buffer already cleared.
+    await postBatch(wire, asGuest);
+    return 'sent';
   } catch (err: any) {
     // Retain on transient failures (network, 5xx). Drop on 4xx (validation)
     // since retrying would just fail again.
     const status = err?.status || err?.response?.status;
     if (status && status >= 400 && status < 500) {
-      // Validation error — drop these events, log it
-      console.warn('[analytics] dropping batch on 4xx:', status, toSend.length);
-    } else if (epoch === bufferEpoch) {
-      // Network or 5xx — put back at the front for next flush
-      buffer = [...toSend, ...buffer];
-      await persistBuffer();
+      console.warn('[analytics] dropping batch on 4xx:', status, events.length);
+      return 'dropped';
     }
+    return 'retry';
+  }
+}
+
+async function doFlush(): Promise<void> {
+  if (buffer.length === 0) return;
+  const epoch = bufferEpoch;
+
+  // Snapshot current buffer; clear it so new events queue up cleanly.
+  const toSend = buffer.slice(0, MAX_BATCH_SIZE);
+  buffer = buffer.slice(MAX_BATCH_SIZE);
+  await persistBuffer();
+
+  // Guest events always go without a token. Signed-in events go with one;
+  // signed out (or no token stored) they'd be saved as guest events, so
+  // they're dropped. Events from an older app version (no mark) go as
+  // whoever is signed in now.
+  const signedIn = !(await isGuestNow());
+  const guestEvents: QueuedEvent[] = [];
+  const userEvents: QueuedEvent[] = [];
+  for (const e of toSend) {
+    const isGuest = e.guest ?? !signedIn;
+    (isGuest ? guestEvents : userEvents).push(e);
+  }
+  if (userEvents.length && !signedIn) {
+    console.warn('[analytics] dropping signed-in events with no session:', userEvents.length);
+    userEvents.length = 0;
+  }
+
+  const [guestResult, userResult] = await Promise.all([
+    sendGroup(guestEvents, true),
+    sendGroup(userEvents, false),
+  ]);
+
+  const retry = [
+    ...(guestResult === 'retry' ? guestEvents : []),
+    ...(userResult === 'retry' ? userEvents : []),
+  ];
+  if (retry.length && epoch === bufferEpoch) {
+    // Network or 5xx — put back at the front for next flush
+    buffer = [...retry, ...buffer];
+    await persistBuffer();
   }
 }

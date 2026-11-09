@@ -121,8 +121,9 @@ async function tokenForRetry(sent: string): Promise<string | null> {
   return null;
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let token = await getToken();
+// asGuest: send without a token even when signed in (guest-path rules apply).
+async function apiFetch<T>(path: string, options: RequestInit = {}, asGuest = false): Promise<T> {
+  let token = asGuest ? null : await getToken();
   // Proactive: refresh before sending if the id token is about to expire.
   if (token) token = await ensureFresh(token);
 
@@ -182,12 +183,16 @@ export function apiGet<T = any>(path: string): Promise<T> {
   return apiFetch<T>(path, { method: 'GET' });
 }
 
-export function apiPost<T = any>(path: string, body?: unknown): Promise<T> {
+export function apiPost<T = any>(
+  path: string,
+  body?: unknown,
+  opts: { headers?: Record<string, string>; asGuest?: boolean } = {}
+): Promise<T> {
   return apiFetch<T>(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }, opts.asGuest);
 }
 
 export function apiPatch<T = any>(path: string, body?: unknown): Promise<T> {

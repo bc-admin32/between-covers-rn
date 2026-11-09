@@ -9,7 +9,7 @@ import { normalizeRoute } from '../../lib/routes';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../lib/theme';
-import { track } from '../../lib/analytics';
+import { track, markSignedIn } from '../../lib/analytics';
 import { clearGuestIntent, guestEntryRoute, landAfterAuth } from '../../lib/guest';
 import { signOut } from '../../lib/signout';
 import { hasSession } from '../../lib/api';
@@ -158,6 +158,7 @@ export default function LoginScreen() {
       });
       const data = await res.json();
       if (data?.nextRoute?.startsWith('/')) {
+        await markSignedIn();
         router.replace(normalizeRoute(data.nextRoute) as any);
       }
     } catch {}
@@ -220,6 +221,7 @@ export default function LoginScreen() {
       } catch (error) {
         console.warn('[guest-preferences] account transfer failed', error);
       }
+      await markSignedIn();
       await landAfterAuth(router, result.nextRoute);
     } catch (error) {
       console.warn('[auth] account resolve retry failed', error);

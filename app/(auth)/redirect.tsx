@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { signOut } from '../../lib/signout';
 import { colors } from '../../lib/theme';
-import { track, setPendingSignup } from '../../lib/analytics';
+import { track, setPendingSignup, sendQueuedAsGuest, markSignedIn } from '../../lib/analytics';
 import { normalizeRoute } from '../../lib/routes';
 import { getAttribution, clearAttribution } from '../../lib/attribution';
 import { landAfterAuth } from '../../lib/guest';
@@ -150,10 +150,14 @@ export default function RedirectScreen() {
 
         setStatus('Saving credentials…');
 
+        // Send queued events while there's still no token, so pre-sign-in
+        // events stay under the guest (best-effort, short timeout).
+        await sendQueuedAsGuest();
         await SecureStore.setItemAsync('bc_id_token', idToken);
         await SecureStore.setItemAsync('bc_access_token', accessToken);
         // Lets lib/auth refresh the 1-day id/access tokens (180-day refresh).
         await saveRefreshToken(refreshToken);
+        await markSignedIn();
         setSessionKnown(true);
 
         try {

@@ -73,6 +73,12 @@ export async function signOut(opts: { force?: boolean } = {}): Promise<void> {
     // above, which is the actual privacy boundary.
   }
 
+  // Analytics, soft and hard alike, while the token is still valid: flush the
+  // buffer (best-effort, short timeout), drop this account's unsent events,
+  // start a new session (session_start { reason: 'sign_out' }), and count
+  // events as guest until the user is back in.
+  await resetAnalyticsForSignOut();
+
   // Soft sign-out: keep auth tokens + biometric preference, return.
   if (!isHard) {
     const biometricEnabled = await SecureStore.getItemAsync('bc_biometric_enabled');
@@ -82,10 +88,6 @@ export async function signOut(opts: { force?: boolean } = {}): Promise<void> {
   }
 
   // Hard sign-out path: invalidate Cognito session AND wipe everything.
-  // Analytics first, while the token is still valid: flush the buffer
-  // (best-effort, short timeout), then reset bc_session_id_v1 and
-  // bc_event_buffer_v1 — they live in AsyncStorage, not SecureStore.
-  await resetAnalyticsForSignOut();
   // A refresh already in flight must not write tokens back after the wipe.
   invalidatePendingRefresh();
   const logout = async () => {

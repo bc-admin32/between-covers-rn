@@ -9,7 +9,7 @@ import { normalizeRoute } from '../lib/routes';
 import { signOut } from '../lib/signout';
 import { isPaywallRoute, reconcileAndroidPurchases, reconcileAmazonPurchases } from '../lib/subscription';
 import { ensureFirstLaunchAt, guestEntryRoute } from '../lib/guest';
-import { getGuestId } from '../lib/analytics';
+import { getGuestId, markSignedIn } from '../lib/analytics';
 import { REFRESH_MARGIN_MS, refreshSession, readIdToken, tokenExpiresWithin } from '../lib/auth';
 
 const API_BASE = 'https://api.betweencovers.app';
@@ -244,6 +244,8 @@ export default function SplashScreen() {
             await waitForSplash();
 
             if (resolved.ok && resolved.data?.nextRoute?.startsWith('/')) {
+              // Back in with the stored token (Face ID gate passed, or none).
+              await markSignedIn();
               router.replace(normalizeRoute(resolved.data.nextRoute) as any);
               return;
             }

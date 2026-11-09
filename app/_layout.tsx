@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
-import { useRouter, useRootNavigationState } from 'expo-router';
+import { useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -12,7 +12,7 @@ import { useFonts } from 'expo-font';
 import { analytics, HeyCatchProvider } from '@heycatch/sdk';
 import { colors } from '../lib/theme';
 import { withIAPContext } from '../lib/iap-shim';
-import { initAnalytics, track, sendPendingCrashReports } from '../lib/analytics';
+import { initAnalytics, track, sendPendingCrashReports, setScreen } from '../lib/analytics';
 import { captureFromUrl } from '../lib/attribution';
 
 // HeyCatch (product analytics, wraps posthog-react-native) — separate from
@@ -44,6 +44,14 @@ function RootLayout() {
   const navigationState = useRootNavigationState();
   const navReadyRef = useRef(false);
   const pendingNavRef = useRef<string | null>(null);
+
+  // screen_view: the route pattern, without groups or params, e.g. "/cozy",
+  // "/book", "/submissions/[type]". lib/analytics times each screen.
+  const segments = useSegments() as string[];
+  const screen = '/' + segments.filter((s) => !(s.startsWith('(') && s.endsWith(')'))).join('/');
+  useEffect(() => {
+    setScreen(screen);
+  }, [screen]);
 
   useEffect(() => {
     navReadyRef.current = !!navigationState?.key;
