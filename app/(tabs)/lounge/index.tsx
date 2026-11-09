@@ -21,8 +21,8 @@ const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris
 const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
 export type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 export type Section =
-  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
-  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; isHot: boolean; replyCount?: number }
+  | { type: 'PRIMARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; buttonLabel?: string | null; isHot: boolean; replyCount?: number }
+  | { type: 'SECONDARY_THREAD'; sk: string; threadId: string; sectionHeaderLabel?: string | null; title: string; description: string; ctaLabel: string; buttonLabel?: string | null; isHot: boolean; replyCount?: number }
   | { type: 'IRIS_THOUGHT'; sk: string; title: string; body: string; ctaLabel: string; isHot: boolean; threadId?: string | null; replyCount?: number }
   | { type: 'POLL'; sk: string; pollId: string; question: string; options: PollOption[]; totalVotes: number; hasVoted: boolean; selectedOptionId: string | null; isHot: boolean }
   | { type: 'MONTHLY_PROMPT'; promptId: string; title: string; body: string; submissionsOpen: boolean; closesAt: string | null; submissionCount: number; userHasSubmitted: boolean; userSubmission: string | null; isHot: boolean; anonymous?: boolean }

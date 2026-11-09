@@ -159,7 +159,7 @@ export default function PillowTalk({
                 <View style={styles.cardFooterRow}>
                   <Text style={styles.cardFoot}>{replies(d.replyCount)}</Text>
                   <TouchableOpacity style={styles.smallButton} onPress={() => openThread(d.threadId)}>
-                    <Text style={styles.primaryButtonText}>{d.ctaLabel?.trim() || 'Join the Conversation'}</Text>
+                    <Text style={styles.primaryButtonText}>{d.buttonLabel?.trim() || 'Join the Conversation'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
