@@ -102,6 +102,8 @@ function RootLayout() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     DancingScript_700Bold: require('@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Cormorant_500Medium: require('@expo-google-fonts/cormorant/500Medium/Cormorant_500Medium.ttf'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     Cormorant_600SemiBold: require('@expo-google-fonts/cormorant/600SemiBold/Cormorant_600SemiBold.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     Cormorant_700Bold: require('@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf'),

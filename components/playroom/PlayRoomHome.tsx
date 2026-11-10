@@ -12,7 +12,7 @@ import EventCard from './EventCard';
 import { PLAYROOM_TILES } from './tiles';
 import {
   PLAYROOM_BACKGROUND_URL, IRIS_PLAYROOM_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
-  CARD_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_SERIF,
+  CARD_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_THEME, FONT_TILE, FONT_BODY,
 } from './playroomStyle';
 
 // The PlayRoom: the Cozy tab's page in "playroom" months. It shows the month
@@ -197,12 +197,15 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                     />
                   </View>
                 )}
-                <View style={styles.bannerOuter}>
-                  <View style={styles.bannerInner}>
-                    {!!monthName && <Text style={styles.bannerMonth}>{monthName}</Text>}
-                    <Text style={styles.bannerTitle}>{month.theme.title}</Text>
-                    {!!month.theme.tagline && <Text style={styles.bannerTagline}>{month.theme.tagline}</Text>}
+                {/* No frame: a thin gold line above and below the theme. */}
+                <View style={styles.themeBlock}>
+                  <View style={styles.themeLine} accessible={false} />
+                  <View style={styles.themeText}>
+                    {!!monthName && <Text style={styles.themeMonth}>{monthName}</Text>}
+                    <Text style={styles.themeTitle}>{month.theme.title}</Text>
+                    {!!month.theme.tagline && <Text style={styles.themeTagline}>{month.theme.tagline}</Text>}
                   </View>
+                  <View style={styles.themeLine} accessible={false} />
                 </View>
               </View>
             )}
@@ -270,18 +273,19 @@ const styles = StyleSheet.create({
   irisPortrait: { width: 120, height: 160 },
   irisRing: { width: 92, height: 92, borderRadius: 46, padding: 3, borderWidth: 1.5, borderColor: ROSE_GOLD },
   irisImage: { width: '100%', height: '100%', borderRadius: 43 },
-  bannerOuter: { flex: 1, padding: 4, borderWidth: 1, borderColor: GOLD, borderRadius: 6, backgroundColor: CARD_FILL },
-  bannerInner: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(217,181,122,0.6)', borderRadius: 3 },
-  bannerMonth: { fontSize: 12, letterSpacing: 5, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS },
-  bannerTitle: { fontSize: 40, lineHeight: 54, color: CHAMPAGNE, fontFamily: FONT_SCRIPT, textAlign: 'center', paddingHorizontal: 10 },
-  bannerTagline: { fontSize: 11, lineHeight: 16, letterSpacing: 3, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS, textAlign: 'center' },
+  themeBlock: { flex: 1 },
+  themeLine: { height: StyleSheet.hairlineWidth * 2, backgroundColor: GOLD, opacity: 0.9 },
+  themeText: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
+  themeMonth: { ...shadow, fontSize: 12, letterSpacing: 5, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY },
+  themeTitle: { ...shadow, fontSize: 36, lineHeight: 42, color: CHAMPAGNE, fontFamily: FONT_THEME, textAlign: 'center', marginTop: 2 },
+  themeTagline: { ...shadow, fontSize: 12, lineHeight: 17, letterSpacing: 1, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', marginTop: 4 },
 
   tileList: { paddingHorizontal: SIDE, gap: TILE_GAP, marginTop: spacing.sm },
   tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: CARD_FILL },
   tilePhoto: { height: '100%', overflow: 'hidden' },
   tileText: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
-  tileTitle: { fontSize: 22, lineHeight: 25, color: CHAMPAGNE, fontFamily: FONT_SERIF, textAlign: 'center' },
-  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS, textAlign: 'center', opacity: 0.9 },
+  tileTitle: { fontSize: 22, lineHeight: 25, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center' },
+  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', opacity: 0.9 },
 
   empty: { ...shadow, textAlign: 'center', color: CHAMPAGNE, fontFamily: 'Nunito_400Regular', marginTop: spacing.xl, paddingHorizontal: spacing.lg },
 });
