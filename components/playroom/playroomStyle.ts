@@ -19,6 +19,8 @@ export const GOLD = '#D9B57A';
 // Translucent wine cards with a thin rose-gold border.
 export const CARD_FILL = 'rgba(58,10,26,0.62)';
 export const CARD_BORDER = 'rgba(227,176,150,0.55)';
+// Tile cards are solid; event cards keep CARD_FILL.
+export const TILE_FILL = '#390B1C';
 
 export const FONT_SCRIPT = 'GreatVibes_400Regular'; // "The PlayRoom" only
 export const FONT_CAPS = 'Cormorant_600SemiBold'; // used in capitals, widely spaced

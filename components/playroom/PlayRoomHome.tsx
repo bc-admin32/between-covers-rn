@@ -12,7 +12,7 @@ import EventCard from './EventCard';
 import { PLAYROOM_TILES, TILE_IMAGE_BASE } from './tiles';
 import {
   PLAYROOM_BACKGROUND_URL, IRIS_PLAYROOM_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
-  CARD_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_THEME, FONT_TILE, FONT_BODY,
+  TILE_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_THEME, FONT_TILE, FONT_BODY,
 } from './playroomStyle';
 
 // The PlayRoom: the Cozy tab's page in "playroom" months. It shows the month
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   themeTagline: { ...shadow, fontSize: 12, lineHeight: 17, letterSpacing: 1, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', marginTop: 4 },
 
   tileList: { paddingHorizontal: SIDE, gap: TILE_GAP, marginTop: spacing.sm },
-  tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: CARD_FILL },
+  tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: TILE_FILL },
   tilePhoto: { height: '100%', overflow: 'hidden' },
   tileText: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
   tileTitle: { fontSize: 22, lineHeight: 25, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center' },
