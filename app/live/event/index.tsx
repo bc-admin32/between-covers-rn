@@ -20,12 +20,11 @@ import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from '../
 import LiveEventTermsModal, { shouldShowLiveEventTermsGate } from '../../../components/live/LiveEventTermsModal';
 import EjectionBanner, { type EjectionEvent } from '../../../components/live/EjectionBanner';
 import WarningBanner, { type WarningEvent } from '../../../components/live/WarningBanner';
+import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Single-room legacy flow has no rooms[], so report writes target a
 // synthetic "main" room — the backend treats it as the event's own chat.
 const SINGLE_ROOM_ID = 'main';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
 type GameState = {
   activeGameType: string | null;

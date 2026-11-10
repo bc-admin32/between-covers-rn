@@ -13,11 +13,11 @@ import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
 import { resolveLayout } from '../../../lib/cozyLayout';
 import PillowTalk from '../../../components/playroom/PillowTalk';
+import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 const BC_LOGO = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/backgrounds/logo.png';
 const SUPPORT_EMAIL = 'support@betweencovers.app';
 
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 const IRIS_TEACUP = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/teacup.png';
 export type PollOption = { id: string; label: string; votes?: number; voteCount?: number };
 export type Section =

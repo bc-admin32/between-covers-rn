@@ -20,13 +20,12 @@ import LiveEventRestrictionScreen, { type LiveEventRestrictionReason } from './L
 import LiveEventTermsModal from './LiveEventTermsModal';
 import EjectionBanner, { type EjectionEvent } from './EjectionBanner';
 import WarningBanner, { type WarningEvent } from './WarningBanner';
+import { IRIS_AVATAR } from '../../lib/irisAvatar';
 
 // RoomScreen — second modal layer, sits on top of LobbyModal.
 // Joins a single room: chat over IVS WebSocket, optional Sketch the Scene
 // video, sticky pinned bar for Iris commentary, game banner, composer.
 // "Back to Lobby" closes this modal and reveals the lobby underneath.
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
 // Poll cadence: normally every 30s (matches backend chime tick).
 // During an active sketchTheScene game we poll faster so reveal transitions

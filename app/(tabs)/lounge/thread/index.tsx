@@ -17,9 +17,9 @@ import { OptimizedImage } from '../../../../components/OptimizedImage';
 import {
   SpoilerCover, SpoilerTag, SpoilerToggle, useSpoilerReveal, isThreadClosedError, THREAD_CLOSED_MESSAGE,
 } from '../../../../components/lounge/Spoiler';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
 type Reaction = { emoji: string; count: number; reactedByMe: boolean };
 // spoiler: the quoted reply is a spoiler — bodySnippet is never sent or shown.

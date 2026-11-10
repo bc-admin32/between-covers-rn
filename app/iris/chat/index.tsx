@@ -15,6 +15,7 @@ import { startBreadcrumbs, breadcrumb, importWithoutFatal } from '../../../lib/c
 import { spacing, radius, colors } from '../../../lib/theme';
 import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
 import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
+import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Loaded on first switch to voice, so text chat never loads the audio libraries.
 // If loading throws, VoiceErrorBoundary gets the real error and drops back to
@@ -22,8 +23,6 @@ import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
 const IrisVoiceSession = lazy(() =>
   importWithoutFatal(() => import('../../../components/iris/IrisVoiceSession'))
 );
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar2.png';
 
 const CONTEXT_GREETINGS: Record<string, string> = {
   home: "Hi! What are you in the mood for today — a new read, something to watch, or just a cozy chat?",
