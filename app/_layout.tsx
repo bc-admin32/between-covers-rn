@@ -102,9 +102,13 @@ function RootLayout() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     DancingScript_700Bold: require('@expo-google-fonts/dancing-script/700Bold/DancingScript_700Bold.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Cormorant_600SemiBold: require('@expo-google-fonts/cormorant/600SemiBold/Cormorant_600SemiBold.ttf'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     Cormorant_700Bold: require('@expo-google-fonts/cormorant/700Bold/Cormorant_700Bold.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     Cormorant_700Bold_Italic: require('@expo-google-fonts/cormorant/700Bold_Italic/Cormorant_700Bold_Italic.ttf'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    GreatVibes_400Regular: require('@expo-google-fonts/great-vibes/400Regular/GreatVibes_400Regular.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     Lato_700Bold: require('@expo-google-fonts/lato/700Bold/Lato_700Bold.ttf'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports

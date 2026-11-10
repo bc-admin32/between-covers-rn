@@ -1,15 +1,19 @@
-import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CaretLeft } from '../icons';
+import { CaretLeft, HeartStraight } from '../icons';
 import { spacing } from '../../lib/theme';
 import { track } from '../../lib/analytics';
-import { resolveTiles, newbiesLabel, type TileKey } from '../../lib/cozyLayout';
+import { resolveTiles, newbiesLabel, monthNameFromLabel, type TileKey } from '../../lib/cozyLayout';
 import { monthEvents } from '../../lib/cozyEvents';
 import EventCard from './EventCard';
 import { PLAYROOM_TILES } from './tiles';
+import {
+  PLAYROOM_BACKGROUND_URL, IRIS_PLAYROOM_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
+  CARD_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_SERIF,
+} from './playroomStyle';
 
 // The PlayRoom: the Cozy tab's page in "playroom" months. It shows the month
 // from /cozy/home (active, or previous for the archive). The tiles open the
@@ -39,6 +43,9 @@ export type PlayRoomMonth = {
 
 const TILE_GAP = 12;
 const SIDE = spacing.md;
+// Tile photo: 42% of the card's width, at the photos' 720 x 500 shape.
+const PHOTO_SHARE = 0.42;
+const PHOTO_RATIO = 720 / 500;
 
 // Same lookup the classic Cozy page uses for Cozy Extras.
 function lifestyleCount(s: NonNullable<PlayRoomMonth['sections']>): number {
@@ -52,6 +59,11 @@ function monthFromWeekId(weekId?: string): string | null {
   return m ? m[1] : null;
 }
 
+// Set once the PlayRoom portrait of Iris fails to load, so later visits go
+// straight to the avatar. Resets on the next app launch, which picks up a
+// newly uploaded portrait.
+let irisPortraitMissing = false;
+
 export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = false }: {
   month: PlayRoomMonth | null;
   // Books in Keep Me Guessing (Off The Shelf) — 0 when it's switched off.
@@ -62,12 +74,22 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const tileWidth = Math.floor((width - SIDE * 2 - TILE_GAP) / 2);
+  const cardWidth = width - SIDE * 2;
+  const photoWidth = Math.round(cardWidth * PHOTO_SHARE);
+  const tileHeight = Math.round(photoWidth / PHOTO_RATIO);
+  // Until the background is uploaded (or if it fails to load), the page is WINE.
+  const [backgroundFailed, setBackgroundFailed] = useState(false);
+  const [irisPortraitFailed, setIrisPortraitFailed] = useState(irisPortraitMissing);
+  const onIrisPortraitError = () => {
+    irisPortraitMissing = true;
+    setIrisPortraitFailed(true);
+  };
 
   const sections = month?.sections ?? {};
   const tiles = resolveTiles(month?.tiles);
   const monthKey = isArchive ? 'previous' : 'active';
   const events = monthEvents(sections);
+  const monthName = monthNameFromLabel(month?.monthLabel);
   const label = (key: TileKey, fallback: string) => (key === 'newbies' ? newbiesLabel(month?.monthLabel) : fallback);
 
   // A switched-on tile with nothing behind it is hidden. Pillow Talk is this
@@ -108,58 +130,110 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      {!backgroundFailed && (
+        <Image
+          source={{ uri: PLAYROOM_BACKGROUND_URL }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={250}
+          onError={() => setBackgroundFailed(true)}
+          accessible={false}
+        />
+      )}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+      >
 
         {/* HEADER */}
         <View style={styles.header}>
           {isArchive ? (
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityLabel="Back">
-              <CaretLeft size={20} color="#FDF0F4" weight="bold" />
+              <CaretLeft size={20} color={CHAMPAGNE} weight="bold" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.archiveButton} onPress={() => router.push('/(tabs)/cozy/archive' as any)}>
               <Text style={styles.archiveButtonText}>← Last Month</Text>
             </TouchableOpacity>
           )}
-          {isArchive && !!month?.monthLabel && <Text style={styles.eyebrow}>{month.monthLabel}</Text>}
+          <Text style={styles.brand}>Between Covers</Text>
+          <View style={styles.divider} accessible={false}>
+            <View style={styles.dividerLine} />
+            <HeartStraight size={10} color={ROSE_GOLD} weight="regular" />
+            <View style={styles.dividerLine} />
+          </View>
           <Text style={styles.heading} accessibilityRole="header">The PlayRoom</Text>
+          {isArchive && <Text style={styles.archiveLabel}>Last Month</Text>}
         </View>
 
         {!month ? (
           <Text style={styles.empty}>{isArchive ? 'No previous month available yet.' : 'Nothing here yet — check back soon.'}</Text>
         ) : (
           <>
-            {/* THEME */}
+            {/* IRIS + THEME BANNER */}
             {!!month.theme?.title && (
-              <View style={styles.theme}>
-                <Text style={styles.themeLabel}>{isArchive ? "last month's theme" : "this month's theme"}</Text>
-                <Text style={styles.themeTitle}>{month.theme.title}</Text>
-                {!!month.theme.tagline && <Text style={styles.tagline}>{month.theme.tagline}</Text>}
+              <View style={styles.themeRow}>
+                {!irisPortraitFailed ? (
+                  // Kept in memory only (not on disk), so a replaced
+                  // iris.png shows up on the next app launch.
+                  <Image
+                    source={{ uri: IRIS_PLAYROOM_URL }}
+                    style={styles.irisPortrait}
+                    contentFit="contain"
+                    cachePolicy="memory"
+                    onError={onIrisPortraitError}
+                    accessibilityLabel="Iris"
+                  />
+                ) : (
+                  <View style={styles.irisRing}>
+                    <Image
+                      source={{ uri: IRIS_AVATAR_URL }}
+                      style={styles.irisImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      accessibilityLabel="Iris"
+                    />
+                  </View>
+                )}
+                <View style={styles.bannerOuter}>
+                  <View style={styles.bannerInner}>
+                    {!!monthName && <Text style={styles.bannerMonth}>{monthName}</Text>}
+                    <Text style={styles.bannerTitle}>{month.theme.title}</Text>
+                    {!!month.theme.tagline && <Text style={styles.bannerTagline}>{month.theme.tagline}</Text>}
+                  </View>
+                </View>
               </View>
             )}
 
             {/* EVENTS — this month only; last month's are on its Self Care page */}
             {!isArchive && events.map((e, i) => (
-              <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} />
+              <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} variant="playroom" />
             ))}
 
-            {/* TILES — three rows of two */}
-            <View style={styles.grid}>
+            {/* TILES — one wide card per row: photo left, icon + title + description right */}
+            <View style={styles.tileList}>
               {visibleTiles.map((t) => {
                 const tileLabel = label(t.key, t.label);
+                const TileIcon = t.icon;
                 return (
                   <TouchableOpacity
                     key={t.key}
-                    style={[styles.tile, { width: tileWidth, height: tileWidth, backgroundColor: t.placeholder }]}
+                    style={[styles.tile, { height: tileHeight }]}
                     activeOpacity={0.85}
                     onPress={() => openTile(t.key, tileLabel)}
                     accessibilityRole="button"
                     accessibilityLabel={tileLabel}
+                    accessibilityHint={t.description}
                   >
-                    {t.image && <Image source={t.image} style={StyleSheet.absoluteFill} contentFit="cover" />}
-                    <View style={styles.tileLabelBand}>
-                      <Text style={styles.tileLabel} numberOfLines={2}>{tileLabel}</Text>
+                    <View style={[styles.tilePhoto, { width: photoWidth, backgroundColor: t.placeholder }]}>
+                      {t.image && <Image source={t.image} style={StyleSheet.absoluteFill} contentFit="cover" />}
+                    </View>
+                    <View style={styles.tileText}>
+                      <TileIcon size={20} color={ROSE_GOLD} weight="light" />
+                      <Text style={styles.tileTitle} numberOfLines={2}>{tileLabel}</Text>
+                      <Text style={styles.tileDescription} numberOfLines={1}>{t.description}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -174,22 +248,40 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   );
 }
 
+// Text over the background photo gets a soft shadow so it stays readable.
+const shadow = { textShadowColor: 'rgba(20,4,10,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 } as const;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1E0F17' },
+  container: { flex: 1, backgroundColor: WINE },
   scrollContent: { paddingBottom: spacing.xl },
+
   header: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.md, paddingHorizontal: SIDE },
-  backButton: { alignSelf: 'flex-start', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(253,240,244,0.12)' },
-  archiveButton: { alignSelf: 'flex-end', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(232,180,195,0.5)' },
-  archiveButtonText: { fontSize: 12, color: '#E8B4C3', fontFamily: 'Nunito_700Bold' },
-  eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: '#E8B4C3', fontFamily: 'Nunito_700Bold', marginTop: spacing.sm },
-  heading: { fontSize: 46, lineHeight: 52, color: '#FDF0F4', fontFamily: 'Cormorant_700Bold_Italic', marginTop: spacing.sm, textAlign: 'center' },
-  theme: { alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
-  themeLabel: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: '#E8B4C3', fontFamily: 'Nunito_700Bold' },
-  themeTitle: { fontSize: 30, lineHeight: 34, color: '#FDF0F4', fontFamily: 'Cormorant_700Bold_Italic', textAlign: 'center', marginTop: 6 },
-  tagline: { fontSize: 15, lineHeight: 21, color: 'rgba(253,240,244,0.8)', fontFamily: 'Nunito_400Regular_Italic', textAlign: 'center', marginTop: spacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: SIDE, rowGap: TILE_GAP, marginTop: spacing.sm },
-  tile: { borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
-  tileLabelBand: { backgroundColor: 'rgba(20,8,14,0.55)', paddingHorizontal: 12, paddingVertical: 10 },
-  tileLabel: { fontSize: 18, lineHeight: 21, color: '#FDF0F4', fontFamily: 'Cormorant_700Bold_Italic' },
-  empty: { textAlign: 'center', color: 'rgba(253,240,244,0.8)', fontFamily: 'Nunito_400Regular', marginTop: spacing.xl, paddingHorizontal: spacing.lg },
+  backButton: { alignSelf: 'flex-start', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: 'rgba(58,10,26,0.5)' },
+  archiveButton: { alignSelf: 'flex-end', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: 'rgba(58,10,26,0.4)' },
+  archiveButtonText: { fontSize: 13, letterSpacing: 1, color: CHAMPAGNE, fontFamily: FONT_CAPS },
+  brand: { ...shadow, fontSize: 13, letterSpacing: 5, textTransform: 'uppercase', color: ROSE_GOLD, fontFamily: FONT_CAPS, marginTop: spacing.sm },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '70%', marginTop: 6 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: ROSE_GOLD, opacity: 0.8 },
+  // Script swashes reach past the glyph box; the padding stops Android clipping them.
+  heading: { ...shadow, fontSize: 56, lineHeight: 76, color: CHAMPAGNE, fontFamily: FONT_SCRIPT, textAlign: 'center', paddingHorizontal: 16 },
+  archiveLabel: { ...shadow, fontSize: 12, letterSpacing: 4, textTransform: 'uppercase', color: ROSE_GOLD, fontFamily: FONT_CAPS },
+
+  themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SIDE, marginBottom: spacing.lg },
+  irisPortrait: { width: 120, height: 160 },
+  irisRing: { width: 92, height: 92, borderRadius: 46, padding: 3, borderWidth: 1.5, borderColor: ROSE_GOLD },
+  irisImage: { width: '100%', height: '100%', borderRadius: 43 },
+  bannerOuter: { flex: 1, padding: 4, borderWidth: 1, borderColor: GOLD, borderRadius: 6, backgroundColor: CARD_FILL },
+  bannerInner: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(217,181,122,0.6)', borderRadius: 3 },
+  bannerMonth: { fontSize: 12, letterSpacing: 5, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS },
+  bannerTitle: { fontSize: 40, lineHeight: 54, color: CHAMPAGNE, fontFamily: FONT_SCRIPT, textAlign: 'center', paddingHorizontal: 10 },
+  bannerTagline: { fontSize: 11, lineHeight: 16, letterSpacing: 3, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS, textAlign: 'center' },
+
+  tileList: { paddingHorizontal: SIDE, gap: TILE_GAP, marginTop: spacing.sm },
+  tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: CARD_FILL },
+  tilePhoto: { height: '100%', overflow: 'hidden' },
+  tileText: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
+  tileTitle: { fontSize: 22, lineHeight: 25, color: CHAMPAGNE, fontFamily: FONT_SERIF, textAlign: 'center' },
+  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS, textAlign: 'center', opacity: 0.9 },
+
+  empty: { ...shadow, textAlign: 'center', color: CHAMPAGNE, fontFamily: 'Nunito_400Regular', marginTop: spacing.xl, paddingHorizontal: spacing.lg },
 });

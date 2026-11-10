@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { spacing } from '../../lib/theme';
 import { parseLocalDate } from '../../lib/dateUtils';
 import { EVENT_STAGE_LABELS, eventStage, type CozyEvent } from '../../lib/cozyEvents';
+import { CHAMPAGNE, ROSE_GOLD, CARD_FILL, CARD_BORDER, FONT_CAPS, FONT_SERIF } from './playroomStyle';
 
 function formatEventDate(iso?: string): string {
   if (!iso) return '';
@@ -26,8 +27,15 @@ async function openLink(url: string) {
 // Recording" once the recording link is filled in.
 // `canOpenEvent`: an upcoming event opens the Cozy Events screen on this
 // event (join, questions, the live player). Off for last month's events.
-export default function EventCard({ event, canOpenEvent = true }: { event: CozyEvent; canOpenEvent?: boolean }) {
+// `variant="playroom"`: the PlayRoom home page's wine-and-rose-gold look. The
+// Self Care page uses the default.
+export default function EventCard({ event, canOpenEvent = true, variant = 'default' }: {
+  event: CozyEvent;
+  canOpenEvent?: boolean;
+  variant?: 'default' | 'playroom';
+}) {
   const router = useRouter();
+  const pr = variant === 'playroom';
   const stage = eventStage(event);
   const date = formatEventDate(event.eventDate);
 
@@ -44,7 +52,7 @@ export default function EventCard({ event, canOpenEvent = true }: { event: CozyE
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, pr && playroom.card]}
       activeOpacity={onPress ? 0.85 : 1}
       onPress={onPress}
       disabled={!onPress}
@@ -52,15 +60,15 @@ export default function EventCard({ event, canOpenEvent = true }: { event: CozyE
     >
       {!!event.imageUrl && <Image source={{ uri: event.imageUrl }} style={styles.image} contentFit="cover" />}
       <View style={styles.body}>
-        <Text style={styles.stage}>{EVENT_STAGE_LABELS[stage]}</Text>
-        <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
-        {!!date && <Text style={styles.date}>{date}</Text>}
+        <Text style={[styles.stage, pr && playroom.stage]}>{EVENT_STAGE_LABELS[stage]}</Text>
+        <Text style={[styles.title, pr && playroom.title]} numberOfLines={2}>{event.title}</Text>
+        {!!date && <Text style={[styles.date, pr && playroom.date]}>{date}</Text>}
         {!!event.description && (
-          <Text style={styles.description} numberOfLines={3}>{event.description}</Text>
+          <Text style={[styles.description, pr && playroom.description]} numberOfLines={3}>{event.description}</Text>
         )}
         {cta && (
-          <View style={styles.cta}>
-            <Text style={styles.ctaText}>{cta}</Text>
+          <View style={[styles.cta, pr && playroom.cta]}>
+            <Text style={[styles.ctaText, pr && playroom.ctaText]}>{cta}</Text>
           </View>
         )}
       </View>
@@ -81,4 +89,14 @@ const styles = StyleSheet.create({
   description: { fontSize: 14, lineHeight: 20, color: 'rgba(253,240,244,0.85)', fontFamily: 'Nunito_400Regular', marginTop: spacing.sm },
   cta: { alignSelf: 'flex-start', marginTop: spacing.md, borderRadius: 999, backgroundColor: '#B83255', paddingHorizontal: 18, paddingVertical: 9 },
   ctaText: { fontSize: 13, color: '#fff', fontFamily: 'Nunito_700Bold' },
+});
+
+const playroom = StyleSheet.create({
+  card: { backgroundColor: CARD_FILL, borderColor: CARD_BORDER, borderRadius: 18 },
+  stage: { fontSize: 11, letterSpacing: 3, color: ROSE_GOLD, fontFamily: FONT_CAPS },
+  title: { fontSize: 25, lineHeight: 29, color: CHAMPAGNE, fontFamily: FONT_SERIF },
+  date: { fontSize: 12, letterSpacing: 1.5, textTransform: 'uppercase', color: ROSE_GOLD, fontFamily: FONT_CAPS },
+  description: { color: 'rgba(247,231,206,0.85)' },
+  cta: { backgroundColor: 'transparent', borderWidth: 1, borderColor: ROSE_GOLD },
+  ctaText: { fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_CAPS },
 });
