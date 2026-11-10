@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   themeLine: { height: StyleSheet.hairlineWidth * 2, backgroundColor: GOLD, opacity: 0.9 },
   themeText: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
   themeMonth: { ...shadow, fontSize: 12, letterSpacing: 5, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY },
-  themeTitle: { ...shadow, fontSize: 36, lineHeight: 42, color: CHAMPAGNE, fontFamily: FONT_THEME, textAlign: 'center', marginTop: 2 },
+  themeTitle: { ...shadow, fontSize: 35, lineHeight: 41, color: CHAMPAGNE, fontFamily: FONT_THEME, textAlign: 'center', marginTop: 2 },
   themeTagline: { ...shadow, fontSize: 12, lineHeight: 17, letterSpacing: 1, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', marginTop: 4 },
 
   tileList: { paddingHorizontal: SIDE, gap: TILE_GAP, marginTop: spacing.sm },

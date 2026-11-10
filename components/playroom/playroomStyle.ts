@@ -23,6 +23,6 @@ export const CARD_BORDER = 'rgba(227,176,150,0.55)';
 export const FONT_SCRIPT = 'GreatVibes_400Regular'; // "The PlayRoom" only
 export const FONT_CAPS = 'Cormorant_600SemiBold'; // used in capitals, widely spaced
 export const FONT_SERIF = 'Cormorant_700Bold';
-export const FONT_THEME = 'Cormorant_500Medium'; // the month's theme title
+export const FONT_THEME = 'Cormorant_400Regular_Italic'; // the month's theme title
 export const FONT_TILE = 'Cormorant_600SemiBold'; // tile titles
 export const FONT_BODY = 'Nunito_400Regular'; // month name, tagline, tile descriptions
