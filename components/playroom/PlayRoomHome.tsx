@@ -9,7 +9,7 @@ import { track } from '../../lib/analytics';
 import { resolveTiles, newbiesLabel, monthNameFromLabel, type TileKey } from '../../lib/cozyLayout';
 import { monthEvents } from '../../lib/cozyEvents';
 import EventCard from './EventCard';
-import { PLAYROOM_TILES } from './tiles';
+import { PLAYROOM_TILES, TILE_IMAGE_BASE } from './tiles';
 import {
   PLAYROOM_BACKGROUND_URL, IRIS_PLAYROOM_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
   CARD_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_THEME, FONT_TILE, FONT_BODY,
@@ -63,6 +63,8 @@ function monthFromWeekId(weekId?: string): string | null {
 // straight to the avatar. Resets on the next app launch, which picks up a
 // newly uploaded portrait.
 let irisPortraitMissing = false;
+// Tile photos that failed to load this launch (same idea, per tile).
+const tilePhotosMissing = new Set<TileKey>();
 
 export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = false }: {
   month: PlayRoomMonth | null;
@@ -83,6 +85,11 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   const onIrisPortraitError = () => {
     irisPortraitMissing = true;
     setIrisPortraitFailed(true);
+  };
+  const [failedTilePhotos, setFailedTilePhotos] = useState<ReadonlySet<TileKey>>(() => new Set(tilePhotosMissing));
+  const onTilePhotoError = (key: TileKey) => {
+    tilePhotosMissing.add(key);
+    setFailedTilePhotos(new Set(tilePhotosMissing));
   };
 
   const sections = month?.sections ?? {};
@@ -231,7 +238,19 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                     accessibilityHint={t.description}
                   >
                     <View style={[styles.tilePhoto, { width: photoWidth, backgroundColor: t.placeholder }]}>
-                      {t.image && <Image source={t.image} style={StyleSheet.absoluteFill} contentFit="cover" />}
+                      {!failedTilePhotos.has(t.key) && (
+                        // Kept in memory only, so a replaced photo shows up
+                        // on the next app launch.
+                        <Image
+                          source={{ uri: TILE_IMAGE_BASE + t.file }}
+                          style={StyleSheet.absoluteFill}
+                          contentFit="cover"
+                          cachePolicy="memory"
+                          transition={200}
+                          onError={() => onTilePhotoError(t.key)}
+                          accessible={false}
+                        />
+                      )}
                     </View>
                     <View style={styles.tileText}>
                       <TileIcon size={20} color={ROSE_GOLD} weight="light" />
