@@ -47,6 +47,17 @@ const SIDE = spacing.md;
 const PHOTO_SHARE = 0.42;
 const PHOTO_RATIO = 720 / 500;
 
+// Iris's circle: 92pt ring with a 1.5pt border and 3pt padding.
+const IRIS_RING = 92;
+const IRIS_INNER = IRIS_RING - 2 * (1.5 + 3);
+// The PlayRoom portrait (3:4, head and shoulders) is cropped to a square 80%
+// of its width, centered, starting 3% down: her whole head with the face
+// filling the circle, no blouse.
+const PORTRAIT_WIDTH = IRIS_INNER / 0.8;
+const PORTRAIT_HEIGHT = PORTRAIT_WIDTH * (4 / 3);
+const PORTRAIT_LEFT = -(PORTRAIT_WIDTH - IRIS_INNER) / 2;
+const PORTRAIT_TOP = -0.03 * PORTRAIT_HEIGHT;
+
 // Same lookup the classic Cozy page uses for Cozy Extras.
 function lifestyleCount(s: NonNullable<PlayRoomMonth['sections']>): number {
   const lists = [s.LIFESTYLE, s.lifestyle, s.enhancements, s.ENHANCEMENTS, s.items].filter(Array.isArray) as unknown[][];
@@ -182,19 +193,22 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
             {/* IRIS + THEME BANNER */}
             {!!month.theme?.title && (
               <View style={styles.themeRow}>
-                {!irisPortraitFailed ? (
-                  // Kept in memory only (not on disk), so a replaced
-                  // iris.png shows up on the next app launch.
-                  <Image
-                    source={{ uri: IRIS_PLAYROOM_URL }}
-                    style={styles.irisPortrait}
-                    contentFit="contain"
-                    cachePolicy="memory"
-                    onError={onIrisPortraitError}
-                    accessibilityLabel="Iris"
-                  />
-                ) : (
-                  <View style={styles.irisRing}>
+                <View style={styles.irisRing}>
+                  {!irisPortraitFailed ? (
+                    // Cropped to her face (see PORTRAIT_*). Kept in memory
+                    // only (not on disk), so a replaced iris.png shows up on
+                    // the next app launch.
+                    <View style={styles.irisClip}>
+                      <Image
+                        source={{ uri: IRIS_PLAYROOM_URL }}
+                        style={styles.irisPortrait}
+                        contentFit="cover"
+                        cachePolicy="memory"
+                        onError={onIrisPortraitError}
+                        accessibilityLabel="Iris"
+                      />
+                    </View>
+                  ) : (
                     <Image
                       source={{ uri: IRIS_AVATAR_URL }}
                       style={styles.irisImage}
@@ -202,8 +216,8 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                       cachePolicy="memory-disk"
                       accessibilityLabel="Iris"
                     />
-                  </View>
-                )}
+                  )}
+                </View>
                 {/* No frame: a thin gold line above and below the theme. */}
                 <View style={styles.themeBlock}>
                   <View style={styles.themeLine} accessible={false} />
@@ -289,9 +303,10 @@ const styles = StyleSheet.create({
   archiveLabel: { ...shadow, fontSize: 12, letterSpacing: 4, textTransform: 'uppercase', color: ROSE_GOLD, fontFamily: FONT_CAPS },
 
   themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SIDE, marginBottom: spacing.lg },
-  irisPortrait: { width: 120, height: 160 },
-  irisRing: { width: 92, height: 92, borderRadius: 46, padding: 3, borderWidth: 1.5, borderColor: ROSE_GOLD },
+  irisRing: { width: IRIS_RING, height: IRIS_RING, borderRadius: IRIS_RING / 2, padding: 3, borderWidth: 1.5, borderColor: ROSE_GOLD },
   irisImage: { width: '100%', height: '100%', borderRadius: 43 },
+  irisClip: { width: '100%', height: '100%', borderRadius: IRIS_INNER / 2, overflow: 'hidden' },
+  irisPortrait: { position: 'absolute', width: PORTRAIT_WIDTH, height: PORTRAIT_HEIGHT, left: PORTRAIT_LEFT, top: PORTRAIT_TOP },
   themeBlock: { flex: 1 },
   themeLine: { height: StyleSheet.hairlineWidth * 2, backgroundColor: GOLD, opacity: 0.9 },
   themeText: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
