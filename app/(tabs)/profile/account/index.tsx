@@ -118,10 +118,14 @@ export default function AccountSettingsScreen() {
         let label = 'Biometric';
         if (compatible) {
           const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            label = 'Face ID';
-          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-            label = 'Touch ID';
+          const face = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+          const finger = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+          // Apple's names on iOS only; Android says "Fingerprint".
+          if (Platform.OS === 'ios') {
+            if (face) label = 'Face ID';
+            else if (finger) label = 'Touch ID';
+          } else if (finger) {
+            label = 'Fingerprint';
           }
         }
         const stored = await SecureStore.getItemAsync('bc_biometric_enabled');
