@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import * as SecureStore from 'expo-secure-store';
+import { ArrowsDownUp, BookOpen, CaretRight, ListBullets, Plus, SquaresFour } from '../../../components/icons';
 import { apiGet, hasSession } from '../../../lib/api';
 import { getGuestBooks, type GuestBook } from '../../../lib/guest';
 import { useGuest } from '../../../lib/useGuest';
@@ -86,6 +87,11 @@ function libraryQuery(status: LibraryItem['status'] | null, asc: boolean): strin
 const COL_GAP = 12;
 const ROW_GAP = 20;
 
+// The member's Grid/List choice, kept on this device (cleared on sign-out).
+// New members start in Grid. The status filter isn't saved: the Library
+// always opens on All Books.
+const VIEW_KEY = 'bc_library_view';
+
 export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -108,6 +114,14 @@ export default function LibraryScreen() {
   statusRef.current = statusFilter;
   const sortRef = useRef(sortAsc);
   sortRef.current = sortAsc;
+
+  useEffect(() => {
+    SecureStore.getItemAsync(VIEW_KEY).then((v) => { if (v === 'list') setGridView(false); }).catch(() => {});
+  }, []);
+  const chooseView = (view: 'grid' | 'list') => {
+    setGridView(view === 'grid');
+    SecureStore.setItemAsync(VIEW_KEY, view).catch(() => {});
+  };
 
   useFocusEffect(useCallback(() => {
     async function load() {
@@ -181,7 +195,7 @@ export default function LibraryScreen() {
             <Text style={styles.guestBannerText}>
               Saved on this device only. Create a free account to keep your library.
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#B83255" />
+            <CaretRight size={16} color="#B83255" />
           </TouchableOpacity>
         )}
 
@@ -226,29 +240,45 @@ export default function LibraryScreen() {
 
         {/* ACTION ROW */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.sortButton} onPress={() => setSortAsc(!sortAsc)}>
-            <Ionicons name="swap-vertical" size={18} color="#0F2A48" />
+          {/* Sort on the left; Grid/List together, then Add (the most prominent) on the right. */}
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => setSortAsc(!sortAsc)}
+            accessibilityRole="button"
+            accessibilityLabel={sortAsc ? 'Sorted A to Z. Tap for Z to A' : 'Sorted Z to A. Tap for A to Z'}
+          >
+            <ArrowsDownUp size={18} color="#0F2A48" />
             <Text style={styles.sortText}>{sortAsc ? 'A–Z' : 'Z–A'}</Text>
           </TouchableOpacity>
 
-          <View style={styles.viewButtons}>
-            <TouchableOpacity
-              style={[styles.viewButton, gridView && styles.viewButtonActive]}
-              onPress={() => setGridView(true)}
-            >
-              <Ionicons name="grid" size={18} color={gridView ? '#B83255' : '#0F2A48'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewButton, !gridView && styles.viewButtonActive]}
-              onPress={() => setGridView(false)}
-            >
-              <Ionicons name="list" size={18} color={!gridView ? '#B83255' : '#0F2A48'} />
-            </TouchableOpacity>
+          <View style={styles.toolbarRight}>
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={[styles.viewButton, gridView && styles.viewButtonActive]}
+                onPress={() => chooseView('grid')}
+                accessibilityRole="button"
+                accessibilityLabel="Grid view"
+                accessibilityState={{ selected: gridView }}
+              >
+                <SquaresFour size={18} color={gridView ? '#FFFFFF' : '#6E6255'} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewButton, !gridView && styles.viewButtonActive]}
+                onPress={() => chooseView('list')}
+                accessibilityRole="button"
+                accessibilityLabel="List view"
+                accessibilityState={{ selected: !gridView }}
+              >
+                <ListBullets size={18} color={!gridView ? '#FFFFFF' : '#6E6255'} />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => router.push('/(tabs)/library/discover' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Add a book"
             >
-              <Ionicons name="add" size={18} color="#fff" />
+              <Plus size={20} color="#FFFFFF" weight="bold" />
             </TouchableOpacity>
           </View>
         </View>
@@ -261,7 +291,7 @@ export default function LibraryScreen() {
 
           {loaded && items.length === 0 && (
             <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={36} color="#A9C0D4" />
+              <BookOpen size={36} color="#6E6255" />
               <Text style={styles.emptyText}>
                 {statusFilter ? 'No books in this category yet.' : 'Your library is empty.'}
               </Text>
@@ -269,7 +299,7 @@ export default function LibraryScreen() {
                 style={styles.discoverButton}
                 onPress={() => router.push('/(tabs)/library/discover' as any)}
               >
-                <Text style={styles.discoverButtonText}>Discover Books</Text>
+                <Text style={styles.discoverButtonText}>Find More Books</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -292,7 +322,7 @@ export default function LibraryScreen() {
                         <Image source={{ uri: item.coverUrl }} style={styles.coverImage} />
                       ) : (
                         <View style={[styles.coverImage, styles.noCover]}>
-                          <Ionicons name="book" size={24} color="#A9C0D4" />
+                          <BookOpen size={24} color="#6E6255" />
                         </View>
                       )}
                       {/* Status on the cover's corner, so it never overlaps the title or details. */}
@@ -322,6 +352,7 @@ export default function LibraryScreen() {
                       styles.listItem,
                       i === 0 && styles.listItemFirst,
                       i === section.books.length - 1 && styles.listItemLast,
+                      i < section.books.length - 1 && styles.listDivider,
                     ]}
                     onPress={() => router.push(`/book?workId=${item.workId}` as any)}
                   >
@@ -330,13 +361,13 @@ export default function LibraryScreen() {
                         <Image source={{ uri: item.coverUrl }} style={styles.listCoverImage} />
                       ) : (
                         <View style={[styles.listCoverImage, styles.noCover]}>
-                          <Ionicons name="book" size={16} color="#A9C0D4" />
+                          <BookOpen size={16} color="#6E6255" />
                         </View>
                       )}
                     </View>
                     <View style={styles.listInfo}>
                       <Text style={styles.listTitle} numberOfLines={2}>{item.title}</Text>
-                      <Text style={styles.listAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
+                      <Text style={styles.listAuthor} numberOfLines={2}>{item.primaryAuthor}</Text>
                       <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={2} />
                     </View>
                     {item.status === 'DNF' && <Text style={styles.listMeta}>DNF</Text>}
@@ -409,12 +440,13 @@ const styles = StyleSheet.create({
   filterPillText: { fontSize: 12, fontWeight: '700', color: '#0F2A48' },
   filterPillTextActive: { color: '#fff' },
   actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  sortButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sortButton: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 4 },
   sortText: { fontSize: 11, fontWeight: '700', color: '#0F2A48', textTransform: 'uppercase', letterSpacing: 0.5 },
-  viewButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  viewButton: { padding: 6, borderRadius: radius.sm },
-  viewButtonActive: { backgroundColor: 'rgba(184,50,85,0.1)' },
-  addButton: { padding: 6, borderRadius: radius.sm, backgroundColor: '#0F2A48', marginLeft: 4 },
+  toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  viewToggle: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: '#8E8478', padding: 2 },
+  viewButton: { width: 36, height: 32, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  viewButtonActive: { backgroundColor: '#B83255' },
+  addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0F2A48', alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
   emptyState: { alignItems: 'center', marginTop: 80, gap: spacing.md },
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300' },
@@ -422,9 +454,9 @@ const styles = StyleSheet.create({
   discoverButtonText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   // Genre section header — mirrors CozyBooksScreen ("On Iris's Shelf").
   section: { marginBottom: spacing.lg },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: spacing.xs },
-  sectionTitle: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62' },
-  sectionCount: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8, paddingHorizontal: spacing.xs },
+  sectionTitle: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#6E6255' },
+  sectionCount: { fontSize: 12, fontWeight: '700', color: '#6E6255' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: COL_GAP, rowGap: ROW_GAP },
   coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 6 },
   coverImage: { width: '100%', height: '100%' },
@@ -432,14 +464,17 @@ const styles = StyleSheet.create({
   bookTitle: { fontSize: 11, fontWeight: '700', color: '#0F2A48', lineHeight: 14 },
   bookAuthor: { fontSize: 10, fontWeight: '400', color: '#6E6255', lineHeight: 13, marginTop: 2 },
   coverBadge: { position: 'absolute', top: 4, right: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: 'rgba(15,42,72,0.85)', color: '#FFFFFF', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  list: { gap: 1 },
-  listItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff', paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 4 },
+  // One rounded block with hairlines between rows, not separate cards.
+  list: { borderRadius: radius.md, overflow: 'hidden' },
+  listItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff', paddingHorizontal: spacing.md, paddingVertical: 8 },
+  listDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(15,42,72,0.12)' },
   listItemFirst: { borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
   listItemLast: { borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
   listCover: { width: 40, height: 56, borderRadius: 6, overflow: 'hidden', flexShrink: 0, backgroundColor: '#D7E2E9' },
   listCoverImage: { width: 40, height: 56 },
   listInfo: { flex: 1 },
   listTitle: { fontSize: 13, fontWeight: '600', color: '#0F2A48', lineHeight: 18 },
-  listAuthor: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', marginTop: 2 },
-  listMeta: { fontSize: 10, fontWeight: '700', color: '#B83255', flexShrink: 0 },
+  listAuthor: { fontSize: 11, fontWeight: '400', color: '#6E6255', marginTop: 2 },
+  // Status pinned top-right, level with the title.
+  listMeta: { fontSize: 10, fontWeight: '700', color: '#B83255', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 },
 });

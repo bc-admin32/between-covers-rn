@@ -27,6 +27,7 @@ const USER_DATA_KEYS = [
   'bc_guest_return_to',
   'bc_pending_iris_msg',
   'bc_pending_signup',
+  'bc_library_view',
 ];
 
 // Biometric preference — only cleared on hard sign-out

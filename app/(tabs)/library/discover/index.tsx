@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { CaretLeft } from '../../../../components/icons';
+import { CaretLeft, MagnifyingGlass } from '../../../../components/icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost, hasSession } from '../../../../lib/api';
@@ -414,12 +414,12 @@ export default function LibraryDiscoverScreen() {
       {mode === 'search' && (
         <>
           <View style={styles.searchContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <MagnifyingGlass size={18} color="#6E6255" />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search by title or author"
-              placeholderTextColor="#9c8f7e"
+              placeholderTextColor="#6E6255"
               style={styles.searchInput}
               returnKeyType="search"
             />
@@ -463,6 +463,10 @@ export default function LibraryDiscoverScreen() {
         ListEmptyComponent={renderListEmpty}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.resultsContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        // iOS: the last results can scroll up above the keyboard.
+        automaticallyAdjustKeyboardInsets
         initialNumToRender={6}
         windowSize={5}
         removeClippedSubviews
@@ -550,23 +554,23 @@ const styles = StyleSheet.create({
   irisButton: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#C4A882', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 3 },
   irisAvatar: { width: 44, height: 44, borderRadius: 22 },
   irisLine: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.md },
-  modeSwitch: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', padding: 3 },
+  modeSwitch: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#8E8478', padding: 3 },
   modeTab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   modeTabActive: { backgroundColor: '#0F2A48' },
-  modeTabText: { fontSize: 12, fontWeight: '700', color: '#9c8f7e' },
+  modeTabText: { fontSize: 12, fontWeight: '700', color: '#6E6255' },
   modeTabTextActive: { color: '#fff' },
   filterPanel: { marginBottom: spacing.sm },
   filterPanelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  filterLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#7a6e62', marginBottom: 12 },
-  clearFiltersText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
+  filterLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#6E6255', marginBottom: 12 },
+  clearFiltersText: { fontSize: 11, fontWeight: '400', color: '#6E6255', letterSpacing: 0.2 },
   pepperRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg },
   pepper: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#D7E2E9' },
   pepperActive: { backgroundColor: '#FDE8ED', borderColor: '#B83255' },
   pepperEmoji: { fontSize: 24 },
   pepperEmojiMuted: { opacity: 0.25 },
-  pepperNum: { fontSize: 10, fontWeight: '700', color: '#A9C0D4', marginTop: 4 },
+  pepperNum: { fontSize: 10, fontWeight: '700', color: '#6E6255', marginTop: 4 },
   pepperNumActive: { color: '#B83255' },
-  noneLabel: { fontSize: 8, fontWeight: '700', color: '#A9C0D4', marginTop: 4, textAlign: 'center' },
+  noneLabel: { fontSize: 8, fontWeight: '700', color: '#6E6255', marginTop: 4, textAlign: 'center' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   genrePill: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#D7E2E9' },
   genrePillActive: { backgroundColor: '#0F2A48', borderColor: '#0F2A48' },
@@ -580,18 +584,17 @@ const styles = StyleSheet.create({
   tropeModeToggle: { flexDirection: 'row', borderRadius: 20, borderWidth: 1, borderColor: '#D7E2E9', overflow: 'hidden', marginBottom: 12 },
   tropeModeSegment: { paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#fff' },
   tropeModeSegmentActive: { backgroundColor: '#A9C0D4' },
-  tropeModeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: '#9c8f7e' },
+  tropeModeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: '#6E6255' },
   tropeModeTextActive: { color: '#0F2A48' },
-  boundaryNote: { fontSize: 12, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center', marginBottom: spacing.md, lineHeight: 18 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', paddingHorizontal: spacing.md },
-  searchIcon: { fontSize: 14, marginRight: spacing.sm },
+  boundaryNote: { fontSize: 12, fontStyle: 'italic', color: '#6E6255', textAlign: 'center', marginBottom: spacing.md, lineHeight: 18 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 46, marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#8E8478', paddingHorizontal: spacing.md },
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: '#0F2A48' },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.md },
   results: { flex: 1 },
   resultsContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   emptyState: { paddingTop: 48, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300', lineHeight: 22, textAlign: 'center' },
-  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: spacing.md },
+  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: '#6E6255', marginBottom: spacing.md },
   // SectionList's renderItem gets one pre-chunked row (NUM_COLUMNS items) at
   // a time — gap covers horizontal space between items, marginBottom the
   // vertical space between rows (replacing the old flexWrap grid's gap).
@@ -600,13 +603,14 @@ const styles = StyleSheet.create({
   coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: 6, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 4 },
   coverImage: { width: '100%', height: '100%' },
   noCover: { alignItems: 'center', justifyContent: 'center' },
-  noCoverText: { fontSize: 9, color: '#A9C0D4' },
+  noCoverText: { fontSize: 9, color: '#6E6255' },
   bookTitle: { fontSize: 9, fontWeight: '700', color: '#0F2A48', lineHeight: 13, marginBottom: 2 },
-  bookAuthor: { fontSize: 8, fontWeight: '300', color: '#9c8f7e', marginBottom: 4 },
+  bookAuthor: { fontSize: 8, fontWeight: '400', color: '#6E6255', marginBottom: 4 },
   addedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 3 },
   addedText: { fontSize: 9, fontWeight: '700', color: '#B83255' },
-  addButton: { width: '100%', paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(15,42,72,0.07)', alignItems: 'center' },
-  addButtonText: { fontSize: 9, fontWeight: '700', color: '#0F2A48', letterSpacing: 0.4 },
+  // 32pt tall so it's an easy tap.
+  addButton: { width: '100%', height: 32, borderRadius: 999, backgroundColor: 'rgba(15,42,72,0.07)', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  addButtonText: { fontSize: 11, fontWeight: '700', color: '#0F2A48', letterSpacing: 0.4 },
   addMenu: { position: 'absolute', bottom: '100%', left: 0, right: 0, backgroundColor: '#fff', borderWidth: 1, borderColor: '#D7E2E9', borderRadius: radius.md, overflow: 'hidden', zIndex: 40, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 },
   addMenuItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0ede4' },
   addMenuItemText: { fontSize: 11, fontWeight: '600', color: '#0F2A48' },
