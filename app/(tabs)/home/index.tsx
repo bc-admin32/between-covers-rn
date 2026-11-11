@@ -5,6 +5,7 @@ import {
   AccessibilityInfo, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ImageSquare } from '../../../components/icons';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -352,6 +353,19 @@ export default function HomeScreen() {
       imageStyle={{ opacity: 0.75 }}
     >
       <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} source="trial" />
+      {/* My Escape: a small button that opens the Home background setting in
+          Account & Settings (members only; that screen needs an account). */}
+      {isGuest === false && (
+        <TouchableOpacity
+          style={[styles.escapeButton, { top: insets.top + 8 }]}
+          onPress={() => router.push('/(tabs)/profile/account?section=escape' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="My Escape: change your Home background"
+        >
+          <ImageSquare size={16} color="#0F2A48" weight="regular" />
+          <Text style={styles.escapeLabel}>My Escape</Text>
+        </TouchableOpacity>
+      )}
       <Modal
         visible={showBiometricPrompt}
         transparent
@@ -483,6 +497,8 @@ const styles = StyleSheet.create({
   retryButton: { paddingHorizontal: 28, paddingVertical: 10, borderRadius: 999, backgroundColor: '#B83255' },
   retryText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   content: { flex: 1, alignItems: 'center' },
+  escapeButton: { position: 'absolute', right: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.75)' },
+  escapeLabel: { fontSize: 11, color: '#0F2A48', fontWeight: '600' },
   memberSignIn: {
     marginTop: spacing.sm,
     paddingHorizontal: 16,

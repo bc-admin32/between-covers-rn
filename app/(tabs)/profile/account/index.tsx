@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Alert, Switch, Linking, Platform,
@@ -7,7 +7,7 @@ import * as Device from 'expo-device';
 import { CaretDown, CaretLeft } from '../../../../components/icons';
 import OptionSheet from '../../../../components/profile/OptionSheet';
 import { PF } from '../../../../lib/profileTheme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
@@ -24,6 +24,19 @@ const COUNTRIES: readonly { value: Country; label: string }[] = [
   { value: 'GB', label: '🇬🇧 United Kingdom' },
   { value: 'AU', label: '🇦🇺 Australia' },
 ];
+
+// My Escape: the Home background's reading atmosphere (saved as
+// `readingLocation`; same keys as before, new labels). The Monthly theme /
+// Choose my own switch waits for the backend, so the choices show directly.
+const ESCAPES = [
+  { value: 'SOFA', label: 'Cozy on the sofa' },
+  { value: 'FIREPLACE', label: 'By the fireplace' },
+  { value: 'OUTSIDE', label: 'Warm evenings outdoors' },
+  { value: 'BEACH', label: 'By the ocean' },
+  { value: 'NOOK', label: 'My cozy reading nook' },
+  { value: 'CAFE', label: 'At a café' },
+  { value: 'BED', label: 'Snuggled in bed' },
+] as const;
 
 // The store this copy of the app bills through, for the Delete note.
 function subscriptionStore(): { name: string; url: string } {
@@ -77,6 +90,13 @@ export default function AccountSettingsScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [escape, setEscape] = useState<string | null>(null);
+  const [escapeStatus, setEscapeStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // Home's My Escape button opens this screen with ?section=escape: scroll to the card.
+  const params = useLocalSearchParams<{ section?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const [contentY, setContentY] = useState<number | null>(null);
+  const [escapeY, setEscapeY] = useState<number | null>(null);
   const [savingBiometric, setSavingBiometric] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [deactivating, setDeactivating] = useState(false);
@@ -99,6 +119,7 @@ export default function AccountSettingsScreen() {
         setTimeZoneMode(data.timeZoneMode ?? 'AUTO');
         setCountry(data.country ?? 'US');
         setNotificationsEnabled(data.notificationsEnabled ?? false);
+        setEscape(data.readingLocation ?? null);
       } catch {
         setLoadFailed(true);
       }
@@ -187,6 +208,29 @@ export default function AccountSettingsScreen() {
       setTimeout(() => setSaveStatus('idle'), 3000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (params.section !== 'escape' || contentY == null || escapeY == null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, contentY + escapeY - 12), animated: true });
+  }, [params.section, contentY, escapeY]);
+
+  // Saved right away, like Notifications.
+  const chooseEscape = async (value: string) => {
+    if (value === escape) return;
+    await Haptics.selectionAsync();
+    const previous = escape;
+    setEscape(value);
+    setEscapeStatus('saving');
+    try {
+      await apiPatch('/profile', { readingLocation: value });
+      setEscapeStatus('saved');
+      setTimeout(() => setEscapeStatus('idle'), 2000);
+    } catch {
+      setEscape(previous);
+      setEscapeStatus('error');
+      setTimeout(() => setEscapeStatus('idle'), 3000);
     }
   };
 
@@ -280,7 +324,7 @@ export default function AccountSettingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* HEADER */}
         <View style={styles.header}>
@@ -301,7 +345,7 @@ export default function AccountSettingsScreen() {
         </View>
         <View style={styles.curve} />
 
-        <View style={styles.content}>
+        <View style={styles.content} onLayout={(e) => setContentY(e.nativeEvent.layout.y)}>
 
           {/* ACCOUNT INFORMATION */}
           <SectionCard title="Account Information">
@@ -355,6 +399,33 @@ export default function AccountSettingsScreen() {
             {saveStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success, textAlign: 'center' }]}>Saved ✓</Text>}
             {saveStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent, textAlign: 'center' }]}>Failed to save — try again</Text>}
           </SectionCard>
+
+          {/* MY ESCAPE */}
+          <View onLayout={(e) => setEscapeY(e.nativeEvent.layout.y)}>
+            <SectionCard title="My Escape">
+              <Text style={styles.escapeIntro}>Set the scene for your escape. Choose the monthly theme or a favorite reading atmosphere.</Text>
+              <View style={styles.tzOptions}>
+                {ESCAPES.map((e) => {
+                  const active = escape === e.value;
+                  return (
+                    <TouchableOpacity
+                      key={e.value}
+                      style={[styles.tzOption, active && styles.tzOptionSelected]}
+                      onPress={() => chooseEscape(e.value)}
+                      disabled={loadFailed}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.tzOptionText, active && styles.tzOptionTextSelected]}>{e.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {escapeStatus === 'saving' && <Text style={styles.notifStatusText}>Saving…</Text>}
+              {escapeStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success }]}>Saved ✓</Text>}
+              {escapeStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent }]}>Failed to save</Text>}
+            </SectionCard>
+          </View>
 
           {/* TIME ZONE */}
           <SectionCard title="Time Zone">
@@ -549,6 +620,7 @@ const styles = StyleSheet.create({
   deactivateButtonText: { fontSize: 13, color: PF.secondary },
   deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: PF.accent, alignItems: 'center', justifyContent: 'center' },
   deleteButtonText: { fontSize: 13, fontWeight: '700', color: PF.accent },
+  escapeIntro: { fontSize: 13, lineHeight: 19, color: PF.secondary },
   subscriptionNote: { fontSize: 12, lineHeight: 17, color: PF.secondary, textAlign: 'center' },
   subscriptionLink: { color: PF.text, fontWeight: '700', textDecorationLine: 'underline' },
 });

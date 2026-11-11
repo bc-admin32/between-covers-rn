@@ -28,6 +28,7 @@ export const FilmSlate: Icon = require('phosphor-react-native/src/icons/FilmSlat
 export const Funnel: Icon = require('phosphor-react-native/src/icons/Funnel').default;
 export const HeartStraight: Icon = require('phosphor-react-native/src/icons/HeartStraight').default;
 export const HouseSimple: Icon = require('phosphor-react-native/src/icons/HouseSimple').default;
+export const ImageSquare: Icon = require('phosphor-react-native/src/icons/ImageSquare').default;
 export const Keyhole: Icon = require('phosphor-react-native/src/icons/Keyhole').default;
 export const ListBullets: Icon = require('phosphor-react-native/src/icons/ListBullets').default;
 export const LockSimple: Icon = require('phosphor-react-native/src/icons/LockSimple').default;
