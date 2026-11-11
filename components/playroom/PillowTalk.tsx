@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../lib/theme';
 import { parseLocalDate } from '../../lib/dateUtils';
+import { CaretDown, CaretUp } from '../icons';
 import type { PollOption, Section } from '../../app/(tabs)/lounge/index';
 
 // Pillow Talk: the Lounge tab's page in PlayRoom months. The Lounge screen
@@ -58,6 +59,8 @@ export default function PillowTalk({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // The Confessional's monthly prompt is behind a tap.
+  const [promptOpen, setPromptOpen] = useState(false);
 
   const openThread = (threadId: string) => router.push(`/lounge/thread?id=${encodeURIComponent(threadId)}` as any);
   const readConfessions = (promptId: string) =>
@@ -89,41 +92,43 @@ export default function PillowTalk({
             <Text style={styles.confessionalTitle}>The Confessional</Text>
             <Text style={styles.confessionalTagline}>Some things are too good to keep to yourself.</Text>
 
-            <View style={styles.promptBox}>
-              {!!prompt.emoji && <Text style={styles.promptEmoji}>{prompt.emoji}</Text>}
-              <Text style={styles.promptTitle} selectable>{prompt.title}</Text>
-              <Text style={styles.promptBody} selectable>{monthly.body}</Text>
-            </View>
-
-            {monthly.userHasSubmitted ? (
-              <>
-                <Text style={styles.yoursLabel}>Your confession ✦</Text>
-                {!!monthly.userSubmission && <Text style={styles.yoursText}>"{monthly.userSubmission}"</Text>}
-                <TouchableOpacity style={styles.outlineButton} onPress={() => readConfessions(monthly.promptId)}>
-                  <Text style={styles.outlineButtonText}>Read the Confessions</Text>
-                </TouchableOpacity>
-              </>
-            ) : monthly.submissionsOpen ? (
-              <>
-                <Text style={styles.offPrompt}>Or forget the prompt. Tell us what's really on your mind.</Text>
-                <TouchableOpacity
-                  style={styles.primaryButton}
-                  onPress={() => router.push(`/(tabs)/lounge/monthly/submit?promptId=${monthly.promptId}` as any)}
-                >
-                  <Text style={styles.primaryButtonText}>Spill Your Confession</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineButton} onPress={() => readConfessions(monthly.promptId)}>
-                  <Text style={styles.outlineButtonText}>Read the Confessions</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.closedText}>Confessions are closed for this month.</Text>
-                <TouchableOpacity style={styles.outlineButton} onPress={() => readConfessions(monthly.promptId)}>
-                  <Text style={styles.outlineButtonText}>Read the Confessions</Text>
-                </TouchableOpacity>
-              </>
+            {/* The month's prompt, behind a tap. */}
+            <TouchableOpacity
+              style={styles.promptToggle}
+              onPress={() => setPromptOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: promptOpen }}
+            >
+              <Text style={styles.promptToggleText}>{promptOpen ? "Hide this month's prompt" : "See this month's prompt"}</Text>
+              {promptOpen ? <CaretUp size={14} color={GOLD} weight="bold" /> : <CaretDown size={14} color={GOLD} weight="bold" />}
+            </TouchableOpacity>
+            {promptOpen && (
+              <View style={styles.promptBox}>
+                {!!prompt.emoji && <Text style={styles.promptEmoji}>{prompt.emoji}</Text>}
+                <Text style={styles.promptTitle} selectable>{prompt.title}</Text>
+                <Text style={styles.promptBody} selectable>{monthly.body}</Text>
+                {monthly.submissionsOpen && !monthly.userHasSubmitted && (
+                  <Text style={styles.offPrompt}>Or forget the prompt. Tell us what's really on your mind.</Text>
+                )}
+              </View>
             )}
+
+            {/* Two actions. After confessing, a short note replaces Spill. */}
+            {monthly.userHasSubmitted ? (
+              <Text style={styles.closedText}>You've shared your confession ✦</Text>
+            ) : monthly.submissionsOpen ? (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => router.push(`/(tabs)/lounge/monthly/submit?promptId=${monthly.promptId}` as any)}
+              >
+                <Text style={styles.primaryButtonText}>Spill Your Confession</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.closedText}>Confessions are closed for this month.</Text>
+            )}
+            <TouchableOpacity style={styles.outlineButton} onPress={() => readConfessions(monthly.promptId)}>
+              <Text style={styles.outlineButtonText}>Read the Confessions</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -302,14 +307,14 @@ const styles = StyleSheet.create({
   eyebrowDark: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: GOLD, fontFamily: 'Nunito_700Bold' },
   confessionalTitle: { fontSize: 34, lineHeight: 38, color: IVORY, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
   confessionalTagline: { fontSize: 14, color: IVORY_60, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
-  promptBox: { marginTop: spacing.md, padding: spacing.md, borderRadius: 14, backgroundColor: 'rgba(253,240,244,0.06)' },
+  promptBox: { marginTop: spacing.sm, padding: spacing.md, borderRadius: 14, backgroundColor: 'rgba(253,240,244,0.06)' },
   promptEmoji: { fontSize: 30, marginBottom: 4 },
   promptTitle: { fontSize: 20, lineHeight: 25, color: IVORY, fontFamily: 'Nunito_700Bold' },
   promptBody: { fontSize: 15, lineHeight: 22, color: IVORY_60, fontFamily: 'Nunito_400Regular', marginTop: 6 },
   offPrompt: { fontSize: 14, lineHeight: 20, color: GOLD_80, fontFamily: 'Nunito_400Regular_Italic', marginTop: spacing.md },
   closedText: { fontSize: 13, color: GOLD_80, fontFamily: 'Nunito_600SemiBold', marginTop: spacing.md },
-  yoursLabel: { fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: GOLD_80, fontFamily: 'Nunito_700Bold', marginTop: spacing.md },
-  yoursText: { fontSize: 15, lineHeight: 21, color: IVORY, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
+  promptToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, alignSelf: 'flex-start', paddingVertical: 4 },
+  promptToggleText: { fontSize: 13, color: GOLD, fontFamily: 'Nunito_700Bold' },
   primaryButton: { marginTop: spacing.md, borderRadius: 999, backgroundColor: ROSE, paddingVertical: 12, alignItems: 'center' },
   primaryButtonText: { fontSize: 14, color: '#fff', fontFamily: 'Nunito_700Bold' },
   outlineButton: { marginTop: spacing.sm, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(196,168,130,0.5)', paddingVertical: 11, alignItems: 'center' },

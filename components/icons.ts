@@ -16,6 +16,7 @@ export const BookOpen: Icon = require('phosphor-react-native/src/icons/BookOpen'
 export const CaretDown: Icon = require('phosphor-react-native/src/icons/CaretDown').default;
 export const CaretLeft: Icon = require('phosphor-react-native/src/icons/CaretLeft').default;
 export const CaretRight: Icon = require('phosphor-react-native/src/icons/CaretRight').default;
+export const CaretUp: Icon = require('phosphor-react-native/src/icons/CaretUp').default;
 export const ChatCircleText: Icon = require('phosphor-react-native/src/icons/ChatCircleText').default;
 export const Chats: Icon = require('phosphor-react-native/src/icons/Chats').default;
 export const ChatsCircle: Icon = require('phosphor-react-native/src/icons/ChatsCircle').default;
