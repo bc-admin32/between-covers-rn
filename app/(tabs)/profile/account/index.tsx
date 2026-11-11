@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert, Switch,
+  StyleSheet, ActivityIndicator, Alert, Switch, Linking, Platform,
 } from 'react-native';
-import { CaretLeft } from '../../../../components/icons';
+import * as Device from 'expo-device';
+import { CaretDown, CaretLeft } from '../../../../components/icons';
+import OptionSheet from '../../../../components/profile/OptionSheet';
+import { PF } from '../../../../lib/profileTheme';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +16,25 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import { ChurnFeedbackModal } from '../../../../components/ChurnFeedbackModal';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+
+type Country = 'US' | 'CA' | 'GB' | 'AU';
+const COUNTRIES: readonly { value: Country; label: string }[] = [
+  { value: 'US', label: '🇺🇸 United States' },
+  { value: 'CA', label: '🇨🇦 Canada' },
+  { value: 'GB', label: '🇬🇧 United Kingdom' },
+  { value: 'AU', label: '🇦🇺 Australia' },
+];
+
+// The store this copy of the app bills through, for the Delete note.
+function subscriptionStore(): { name: string; url: string } {
+  if (Platform.OS === 'ios') {
+    return { name: 'App Store', url: 'https://apps.apple.com/account/subscriptions' };
+  }
+  if (Device.manufacturer === 'Amazon') {
+    return { name: 'Amazon Appstore', url: 'https://www.amazon.com/gp/mas/your-account/myapps/yoursubscriptions' };
+  }
+  return { name: 'Google Play', url: 'https://play.google.com/store/account/subscriptions?package=com.betweencovers.app' };
+}
 
 function SectionCard({ title, children, danger }: {
   title: string; children: React.ReactNode; danger?: boolean;
@@ -47,7 +69,8 @@ export default function AccountSettingsScreen() {
   const [email, setEmail] = useState('');
   const [timeZone, setTimeZone] = useState('America/Chicago');
   const [timeZoneMode, setTimeZoneMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
-  const [country, setCountry] = useState<'US' | 'CA' | 'GB' | 'AU'>('US');
+  const [country, setCountry] = useState<Country>('US');
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
@@ -90,8 +113,10 @@ export default function AccountSettingsScreen() {
         const compatible = await LocalAuthentication.hasHardwareAsync();
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         const available = compatible && enrolled;
+        // "Face ID" / "Touch ID" whenever the phone has that sensor (even
+        // before it's set up, so the helper names it); "Biometric" otherwise.
         let label = 'Biometric';
-        if (available) {
+        if (compatible) {
           const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
           if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
             label = 'Face ID';
@@ -197,6 +222,12 @@ export default function AccountSettingsScreen() {
             setDeactivating(true);
             try {
               await apiPost('/account/deactivate', {});
+            } catch {
+              setDeactivating(false);
+              Alert.alert("Couldn't deactivate your account", 'Nothing was changed. Please check your connection and try again.');
+              return;
+            }
+            try {
               await signOut({ force: true });
               router.replace('/(auth)/login' as any);
             } finally {
@@ -226,6 +257,12 @@ export default function AccountSettingsScreen() {
             setDeleting(true);
             try {
               await apiPost('/account/delete', {});
+            } catch {
+              setDeleting(false);
+              Alert.alert("Couldn't delete your account", 'Nothing was changed. Please check your connection and try again.');
+              return;
+            }
+            try {
               await signOut({ force: true });
               router.replace('/(auth)/login' as any);
             } finally {
@@ -245,7 +282,7 @@ export default function AccountSettingsScreen() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <CaretLeft size={24} color="rgba(255,255,255,0.85)" weight="bold" />
+              <CaretLeft size={24} color={PF.text} weight="bold" />
             </TouchableOpacity>
             <Text
               style={styles.title}
@@ -284,7 +321,7 @@ export default function AccountSettingsScreen() {
                   setBirthdate(val.slice(0, 5));
                 }}
                 placeholder="MM/DD"
-                placeholderTextColor="#A9C0D4"
+                placeholderTextColor={PF.placeholder}
                 maxLength={5}
                 style={styles.input}
                 editable={!loadFailed}
@@ -292,25 +329,17 @@ export default function AccountSettingsScreen() {
               />
             </Field>
             <Field label="Country">
-              <View style={styles.countryGrid}>
-                {([
-                  { key: 'US', label: '🇺🇸 United States' },
-                  { key: 'CA', label: '🇨🇦 Canada' },
-                  { key: 'GB', label: '🇬🇧 United Kingdom' },
-                  { key: 'AU', label: '🇦🇺 Australia' },
-                ] as const).map((c) => (
-                  <TouchableOpacity
-                    key={c.key}
-                    style={[styles.countryOption, country === c.key && styles.countryOptionSelected]}
-                    onPress={() => setCountry(c.key)}
-                    disabled={loadFailed}
-                  >
-                    <Text style={[styles.countryOptionText, country === c.key && styles.countryOptionTextSelected]}>
-                      {c.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {/* One compact row; the choices open in a small menu. */}
+              <TouchableOpacity
+                style={[styles.select, loadFailed && styles.selectDisabled]}
+                onPress={() => setCountryMenuOpen(true)}
+                disabled={loadFailed}
+                accessibilityRole="button"
+                accessibilityLabel={`Country: ${COUNTRIES.find((c) => c.value === country)?.label ?? ''}. Tap to change`}
+              >
+                <Text style={styles.selectText}>{COUNTRIES.find((c) => c.value === country)?.label}</Text>
+                <CaretDown size={16} color={PF.icon} />
+              </TouchableOpacity>
             </Field>
             <TouchableOpacity
               style={[styles.saveButton, (saving || loadFailed) && styles.saveButtonDisabled]}
@@ -319,8 +348,8 @@ export default function AccountSettingsScreen() {
             >
               <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save Changes'}</Text>
             </TouchableOpacity>
-            {saveStatus === 'saved' && <Text style={[styles.notifStatusText, { color: '#2E9E68', textAlign: 'center' }]}>Saved ✓</Text>}
-            {saveStatus === 'error' && <Text style={[styles.notifStatusText, { color: '#B83255', textAlign: 'center' }]}>Failed to save — try again</Text>}
+            {saveStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success, textAlign: 'center' }]}>Saved ✓</Text>}
+            {saveStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent, textAlign: 'center' }]}>Failed to save — try again</Text>}
           </SectionCard>
 
           {/* TIME ZONE */}
@@ -336,7 +365,7 @@ export default function AccountSettingsScreen() {
                     setTimeZone(detected);
                   }
                 }}
-                trackColor={{ false: 'rgba(15,42,72,0.12)', true: '#6B9AB8' }}
+                trackColor={{ false: PF.switchOff, true: PF.accent }}
                 thumbColor="#fff"
               />
             </View>
@@ -371,14 +400,14 @@ export default function AccountSettingsScreen() {
               <View>
                 <Text style={styles.toggleLabel}>Receive messages from Iris</Text>
                 {notifStatus === 'saving' && <Text style={styles.notifStatusText}>Saving…</Text>}
-                {notifStatus === 'saved' && <Text style={[styles.notifStatusText, { color: '#2E9E68' }]}>Saved ✓</Text>}
-                {notifStatus === 'error' && <Text style={[styles.notifStatusText, { color: '#B83255' }]}>Failed to save</Text>}
+                {notifStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success }]}>Saved ✓</Text>}
+                {notifStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent }]}>Failed to save</Text>}
               </View>
               <Switch
                 value={notificationsEnabled}
                 onValueChange={handleNotificationToggle}
                 disabled={savingNotifications}
-                trackColor={{ false: 'rgba(15,42,72,0.12)', true: '#6B9AB8' }}
+                trackColor={{ false: PF.switchOff, true: PF.accent }}
                 thumbColor="#fff"
               />
             </View>
@@ -393,14 +422,14 @@ export default function AccountSettingsScreen() {
                   <Text style={styles.biometricHelper}>Set up {biometricLabel} in your device settings to use this feature.</Text>
                 )}
                 {biometricStatus === 'saving' && <Text style={styles.notifStatusText}>Saving…</Text>}
-                {biometricStatus === 'saved' && <Text style={[styles.notifStatusText, { color: '#2E9E68' }]}>Saved ✓</Text>}
-                {biometricStatus === 'error' && <Text style={[styles.notifStatusText, { color: '#B83255' }]}>Failed to save</Text>}
+                {biometricStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success }]}>Saved ✓</Text>}
+                {biometricStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent }]}>Failed to save</Text>}
               </View>
               <Switch
                 value={biometricEnabled}
                 onValueChange={handleBiometricToggle}
                 disabled={!biometricAvailable || !biometricReady || savingBiometric}
-                trackColor={{ false: 'rgba(15,42,72,0.12)', true: '#6B9AB8' }}
+                trackColor={{ false: PF.switchOff, true: PF.accent }}
                 thumbColor="#fff"
               />
             </View>
@@ -426,12 +455,31 @@ export default function AccountSettingsScreen() {
                 {deleting ? 'Deleting…' : 'Permanently Delete Account'}
               </Text>
             </TouchableOpacity>
+            <Text style={styles.subscriptionNote}>
+              Deleting your account doesn't cancel your {subscriptionStore().name} subscription.{' '}
+              <Text
+                style={styles.subscriptionLink}
+                onPress={() => Linking.openURL(subscriptionStore().url).catch(() => {})}
+                accessibilityRole="link"
+              >
+                Manage subscription
+              </Text>
+            </Text>
           </SectionCard>
 
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      <OptionSheet
+        visible={countryMenuOpen}
+        title="Country"
+        options={COUNTRIES}
+        selected={country}
+        onSelect={setCountry}
+        onClose={() => setCountryMenuOpen(false)}
+      />
 
       <ChurnFeedbackModal
         visible={churnModalVisible}
@@ -451,9 +499,9 @@ export default function AccountSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F4F8' },
+  container: { flex: 1, backgroundColor: PF.page },
   scrollContent: { paddingBottom: spacing.xl },
-  header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
+  header: { backgroundColor: PF.header, padding: spacing.lg, paddingTop: spacing.md },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 8 },
   backButton: { padding: 2, flexShrink: 0 },
   // flex:1 bounds the title to the remaining row width so it can shrink-to-fit
@@ -461,43 +509,42 @@ const styles = StyleSheet.create({
   // multiplied by the device fontScale, so a fixed value clips glyphs vertically
   // when the system font is enlarged. adjustsFontSizeToFit keeps the rendered
   // size within bounds on both axes.
-  title: { flex: 1, fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4' },
-  titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 4 },
-  curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
+  title: { flex: 1, fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: PF.text },
+  titleDivider: { width: 40, height: 1, backgroundColor: PF.accent, marginTop: 4 },
+  curve: { height: 20, backgroundColor: PF.page, borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.06)' },
+  card: { backgroundColor: PF.card, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: PF.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg },
-  cardHeaderLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.08)' },
-  cardHeaderTitle: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
-  cardHeaderTitleDanger: { color: '#B83255' },
+  cardHeaderLine: { flex: 1, height: 1, backgroundColor: PF.border },
+  cardHeaderTitle: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: PF.label },
+  cardHeaderTitleDanger: { color: PF.accent },
   cardContent: { gap: spacing.md },
   field: { gap: 6 },
-  fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: '#A9C0D4' },
-  input: { height: 46, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff', paddingHorizontal: 14, fontSize: 14, color: '#0F2A48' },
-  inputDisabled: { backgroundColor: '#F1F4F8', color: '#A9C0D4' },
-  countryRow: { flexDirection: 'row', gap: spacing.sm },
-  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  countryOption: { width: '47%', paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', alignItems: 'center', backgroundColor: '#fff' },
-  countryOptionSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
-  countryOptionText: { fontSize: 13, color: '#0F2A48' },
-  countryOptionTextSelected: { color: '#fff', fontWeight: '600' },
-  saveButton: { height: 48, borderRadius: 12, backgroundColor: '#0F2A48', alignItems: 'center', justifyContent: 'center' },
-  saveButtonDisabled: { backgroundColor: '#A9C0D4' },
+  fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: PF.label },
+  input: { height: 46, borderRadius: 10, borderWidth: 1, borderColor: PF.inputBorder, backgroundColor: '#FFFFFF', paddingHorizontal: 14, fontSize: 14, color: PF.text },
+  inputDisabled: { backgroundColor: PF.readOnly, color: PF.label },
+  select: { height: 46, borderRadius: 10, borderWidth: 1, borderColor: PF.inputBorder, backgroundColor: '#FFFFFF', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectDisabled: { backgroundColor: PF.readOnly },
+  selectText: { fontSize: 14, color: PF.text },
+  saveButton: { height: 48, borderRadius: 12, backgroundColor: PF.text, alignItems: 'center', justifyContent: 'center' },
+  saveButtonDisabled: { backgroundColor: PF.pill },
   saveButtonText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toggleLabel: { fontSize: 13, color: '#0F2A48' },
-  notifStatusText: { fontSize: 11, color: '#A9C0D4', marginTop: 2 },
+  toggleLabel: { fontSize: 13, color: PF.text },
+  notifStatusText: { fontSize: 11, color: PF.label, marginTop: 2 },
   tzOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tzOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff' },
-  tzOptionSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
-  tzOptionDisabled: { backgroundColor: '#F1F4F8' },
-  tzOptionText: { fontSize: 12, color: '#0F2A48' },
+  tzOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: PF.inputBorder, backgroundColor: '#FFFFFF' },
+  tzOptionSelected: { backgroundColor: PF.accent, borderColor: PF.accent },
+  tzOptionDisabled: { backgroundColor: PF.readOnly },
+  tzOptionText: { fontSize: 12, color: PF.text },
   tzOptionTextSelected: { color: '#fff', fontWeight: '600' },
-  tzOptionTextDisabled: { color: '#A9C0D4' },
+  tzOptionTextDisabled: { color: PF.label },
   biometricLabelWrap: { flex: 1, marginRight: spacing.md },
-  biometricHelper: { fontSize: 11, color: '#A9C0D4', marginTop: 4, lineHeight: 15 },
-  deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(184,50,85,0.3)', alignItems: 'center', justifyContent: 'center' },
-  deactivateButtonText: { fontSize: 13, color: '#8A5A58' },
-  deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#B83255', alignItems: 'center', justifyContent: 'center' },
-  deleteButtonText: { fontSize: 13, fontWeight: '700', color: '#B83255' },
+  biometricHelper: { fontSize: 11, color: PF.secondary, marginTop: 4, lineHeight: 15 },
+  deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: PF.inputBorder, alignItems: 'center', justifyContent: 'center' },
+  deactivateButtonText: { fontSize: 13, color: PF.secondary },
+  deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: PF.accent, alignItems: 'center', justifyContent: 'center' },
+  deleteButtonText: { fontSize: 13, fontWeight: '700', color: PF.accent },
+  subscriptionNote: { fontSize: 12, lineHeight: 17, color: PF.secondary, textAlign: 'center' },
+  subscriptionLink: { color: PF.text, fontWeight: '700', textDecorationLine: 'underline' },
 });
