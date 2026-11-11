@@ -210,6 +210,15 @@ export default function CozyBooksScreen() {
         ) : (
           <>
             {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
+            {/* PlayRoom: the personal pick comes right after the Book of the Month. */}
+            {isBetweenTheSheets && spotlight && (
+              <View style={styles.section}>
+                <Text style={[styles.playroomHeading, prStyles.heading]}>I Saw This Book and Thought of You</Text>
+                <View style={styles.gridInner}>
+                  <BookCard book={toCard(spotlight)} style={styles.bookCard} />
+                </View>
+              </View>
+            )}
             {isBetweenTheSheets && sections.length > 0 && (
               <Text style={[styles.playroomHeading, prStyles.heading]}>Iris's Shelf</Text>
             )}
@@ -231,15 +240,7 @@ export default function CozyBooksScreen() {
               </View>
             ))}
 
-            {/* BETWEEN THE SHEETS: the personal pick, then Keep Me Guessing */}
-            {isBetweenTheSheets && spotlight && (
-              <View style={styles.section}>
-                <Text style={[styles.playroomHeading, prStyles.heading]}>I Saw This Book and Thought of You</Text>
-                <View style={styles.gridInner}>
-                  <BookCard book={toCard(spotlight)} style={styles.bookCard} />
-                </View>
-              </View>
-            )}
+            {/* BETWEEN THE SHEETS: Keep Me Guessing after the shelf */}
             {isBetweenTheSheets && offShelf && (
               <View style={styles.section}>
                 <View style={styles.playroomHeadingRow}>
