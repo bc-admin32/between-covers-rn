@@ -15,8 +15,7 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import { getPlatform } from '../../../../lib/platforms';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
 import RatingInfoButton from '../../../../components/rating/RatingInfoButton';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 const openSpotify = async (url: string) => {
   const spotifyUri = url

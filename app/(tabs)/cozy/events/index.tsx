@@ -12,8 +12,7 @@ import { apiGet, apiPost, hasSession } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import QuickRatingModal from '../../../../components/QuickRatingModal';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type PlayerState = 'live' | 'replay' | 'offline' | 'loading';
 

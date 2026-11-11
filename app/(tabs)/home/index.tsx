@@ -18,6 +18,7 @@ import { FeedbackModal } from '../../../components/FeedbackModal';
 import GuestPreferencesPrompt from '../../../components/GuestPreferencesPrompt';
 import LiveEventBanner from '../../../components/live/LiveEventBanner';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Device-local date key — client-side "already shown today" guard only.
 function todayKey(): string { return new Date().toLocaleDateString('en-CA'); }
@@ -441,14 +442,14 @@ export default function HomeScreen() {
                   onPress={() => router.push('/iris/chat' as any)}
                 >
                   <Image
-                    source={{ uri: iris.staticImageUrl ?? 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
+                    source={{ uri: iris.staticImageUrl ?? IRIS_AVATAR }}
                     style={[styles.irisAvatar, styles.irisAvatarRing]}
                   />
                   <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
                 </TouchableOpacity>
               ) : (
                 <IrisPulseAvatar
-                  uri={iris.staticImageUrl ?? 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png'}
+                  uri={iris.staticImageUrl ?? IRIS_AVATAR}
                   onPress={openVideo}
                 />
               )}
@@ -462,7 +463,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/iris/chat' as any)}
             >
               <Image
-                source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
+                source={{ uri: IRIS_AVATAR }}
                 style={[styles.irisAvatar, styles.irisAvatarRing]}
               />
               <Text style={styles.irisLabel}>Chat with Iris ✦</Text>

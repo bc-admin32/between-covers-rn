@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { apiPost } from '../lib/api';
+import { IRIS_AVATAR } from '../lib/irisAvatar';
 
 // QuickRatingModal — post-event rating prompt.
 // Mounted conditionally by the host (`{showRatingModal && <QuickRatingModal ... />}`).
@@ -21,7 +22,6 @@ import { apiPost } from '../lib/api';
 // picking ≥1 star) or "Maybe later" (when onSkip is provided). Backdrop taps,
 // swipe-down, and Android back are all no-ops by design.
 
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 const MAX_COMMENT = 200;
 
 type Props = {

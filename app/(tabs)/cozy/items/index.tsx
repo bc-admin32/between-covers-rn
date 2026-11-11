@@ -17,8 +17,7 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../../components/AffiliateDisclosure';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type LifestyleItem = {
   sk?: string;

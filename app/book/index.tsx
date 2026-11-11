@@ -28,6 +28,7 @@ import {
   type RetailerCTAFields,
 } from '../../lib/retailerCta';
 import { TRIGGERS, prettifyEnum, type RatingKey } from '../../lib/tagTaxonomy';
+import { IRIS_AVATAR } from '../../lib/irisAvatar';
 
 const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: string }> = {
   trash:      { emoji: '🗑️', phrase: 'they say skip it',       color: '#E57373' },
@@ -574,7 +575,7 @@ export default function BookDetailsScreen() {
         onPress={() => router.push(`/iris/chat?from=library/details&bookTitle=${encodeURIComponent(work.title)}&author=${encodeURIComponent(work.primaryAuthor)}` as any)}
       >
         <Image
-          source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
+          source={{ uri: IRIS_AVATAR }}
           style={[styles.irisFabImage, styles.irisFabRing]}
         />
       </TouchableOpacity>

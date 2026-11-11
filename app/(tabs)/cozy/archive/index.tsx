@@ -11,8 +11,7 @@ import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PlayRoomHome from '../../../../components/playroom/PlayRoomHome';
 import { resolveLayout } from '../../../../lib/cozyLayout';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type BookItem = {
   workId: string;

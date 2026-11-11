@@ -18,6 +18,7 @@ import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
 import PlayRoomHome from '../../../components/playroom/PlayRoomHome';
 import { resolveLayout, setActiveCozyLayout } from '../../../lib/cozyLayout';
+import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Home payload cache (also read by cozy/author for its first paint). Bumped
 // for the scroll-row payload (?rows=scroll) so an old 3-item response is
@@ -34,7 +35,6 @@ const ROW_GAP = 14;
 const ROW_VISIBLE_CARDS = 2.5;
 // Off The Shelf isn't capped server-side (unlike the ?rows=scroll rows).
 const OFF_SHELF_HOME_CAP = 12;
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
 
 /* ─── TYPES ─── */
 

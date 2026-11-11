@@ -12,8 +12,7 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../../components/cozy/BookOfMonthCard';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type BookItem = {
   workId: string;

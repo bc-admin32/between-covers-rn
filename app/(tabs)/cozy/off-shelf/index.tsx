@@ -10,8 +10,7 @@ import { apiGet } from '../../../../lib/api';
 import { titleParam } from '../../../../lib/cozyLayout';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
-
-const IRIS_AVATAR = 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type OffShelfData = {
   enabled: boolean;

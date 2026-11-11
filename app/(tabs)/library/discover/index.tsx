@@ -14,6 +14,7 @@ import { spacing, radius, colors } from '../../../../lib/theme';
 import { PRIMARY_SUBGENRES, TROPES } from '../../../../lib/tagTaxonomy';
 import BookCardMeta from '../../../../components/cozy/BookCardMeta';
 import { BookCardData } from '../../../../components/cozy/BookCard';
+import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type DiscoverItem = {
   workId: string;
@@ -382,7 +383,7 @@ export default function LibraryDiscoverScreen() {
           onPress={() => router.push('/iris/chat?from=library/discover' as any)}
         >
           <Image
-            source={{ uri: 'https://mvdesign-app-assets.s3.us-east-1.amazonaws.com/Iris/avatar.png' }}
+            source={{ uri: IRIS_AVATAR }}
             style={styles.irisAvatar}
           />
         </TouchableOpacity>
