@@ -9,19 +9,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch, ApiError } from '../../../../lib/api';
 import { TROPES, prettifyEnum } from '../../../../lib/tagTaxonomy';
-import { spacing, radius, colors } from '../../../../lib/theme';
+import { spacing, colors } from '../../../../lib/theme';
+import { PF } from '../../../../lib/profileTheme';
 import {
   getFinishedBookPromptEnabled,
   setFinishedBookPromptEnabled,
 } from '../../../../lib/finishedBookPromptPreference';
 import { SPICE_OPTIONS, TRIGGER_OPTIONS } from '../../../../lib/guestPreferences';
 
-const READING_TIME_OPTIONS = [
-  { key: 'Morning Light', label: 'Morning Light' },
-  { key: 'Afternoon Energy', label: 'Afternoon Energy' },
-  { key: 'Nighttime Calm', label: 'Nighttime Calm' },
-  { key: 'Flexible', label: 'Flexible' },
-];
+// Reading time, drinks and snacks are no longer asked here, and the reading
+// location moved to Account & Settings (My Escape). Saving leaves those
+// profile fields as they are on the server.
 
 const TROPE_OPTIONS = [
   { key: 'CONTEMPORARY_ROMANCE', label: '✨ Contemporary Romance' },
@@ -69,42 +67,14 @@ const LGBTQ_PREFERENCE_OPTIONS = [
   { key: 'NOT_FOR_ME', label: 'Not for me' },
 ];
 
-const SNACK_OPTIONS = [
-  { key: 'POPCORN', label: '🍿 Popcorn' },
-  { key: 'CHOCOLATE', label: '🍫 Chocolate' },
-  { key: 'CHIPS', label: '🥨 Pretzel / Chips' },
-  { key: 'FRUIT', label: '🍇 Fruit' },
-  { key: 'CANDY', label: '🍬 Candy' },
-  { key: 'PASTRY', label: '🍪 Cookies / Pastry' },
-  { key: 'NONE', label: '✨ No Snack' },
-];
-
-const DRINK_OPTIONS = [
-  { key: 'TEA', label: '🍵 Tea' },
-  { key: 'COFFEE', label: '☕ Coffee' },
-  { key: 'HOT_CHOCOLATE', label: '🍫 Hot Chocolate' },
-  { key: 'WATER', label: '💧 Water' },
-  { key: 'SODA', label: '🥤 Soda' },
-  { key: 'WINE', label: '🍷 Wine' },
-  { key: 'COCKTAIL', label: '🍹 Cocktail / Mocktail' },
-];
-
-const READING_LOCATION_OPTIONS = [
-  { key: 'SOFA', label: '🛋️ Curled up on the sofa with a blanket' },
-  { key: 'FIREPLACE', label: '🔥 Reading by a cozy fireplace' },
-  { key: 'OUTSIDE', label: '🌅 Relaxing outside on a warm summer evening' },
-  { key: 'BEACH', label: '🏖️ Reading by the ocean on a sunny day' },
-  { key: 'NOOK', label: '✨ Cozy reading nook with pillows & fairy lights' },
-  { key: 'CAFE', label: '☕ Local café with pastries' },
-  { key: 'BED', label: '🛏️ Snuggled in bed with soft lighting' },
-];
-
-function PrefCard({ label, children }: { label: string; children: React.ReactNode }) {
+// `count` sits right after the title (e.g. "Favorite Tropes · 3 of 5").
+function PrefCard({ label, count, children }: { label: string; count?: string; children: React.ReactNode }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.cardLine} />
         <Text style={styles.cardLabel}>{label}</Text>
+        {!!count && <Text style={styles.cardCount}>· {count}</Text>}
         <View style={styles.cardLine} />
       </View>
       {children}
@@ -124,6 +94,8 @@ function ChipGroup({ options, selected, onSelect }: {
           key={key}
           style={[styles.chip, selected === key && styles.chipSelected]}
           onPress={() => onSelect(key)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: selected === key }}
         >
           <Text style={[styles.chipText, selected === key && styles.chipTextSelected]}>
             {label}
@@ -155,6 +127,8 @@ function MultiChipGroup({ options, value, onChange, danger, max }: {
             disabled={disabled}
             style={[styles.chip, active && (danger ? styles.chipDanger : styles.chipSelected), disabled && styles.chipDisabled]}
             onPress={() => onChange(active ? value.filter((v) => v !== key) : [...value, key])}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active, disabled }}
           >
             <Text style={[styles.chipText, active && styles.chipTextSelected]}>
               {label}
@@ -173,13 +147,9 @@ export default function ReadingPreferencesScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(true);
 
-  const [readingTime, setReadingTime] = useState<string | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
   const [comfortBoundaries, setComfortBoundaries] = useState<string[]>([]);
   const [spiceLevel, setSpiceLevel] = useState<string | null>(null);
-  const [snacks, setSnacks] = useState<string[]>([]);
-  const [drinks, setDrinks] = useState<string[]>([]);
-  const [readingLocation, setReadingLocation] = useState<string | null>(null);
   const [favoriteTropes, setFavoriteTropes] = useState<string[]>([]);
   const [extraTropeOptions, setExtraTropeOptions] = useState<TropeOption[]>(EXTRA_TROPE_FALLBACK);
   const [showMoreTropes, setShowMoreTropes] = useState(false);
@@ -194,13 +164,9 @@ export default function ReadingPreferencesScreen() {
   useEffect(() => {
     const load = async () => {
       const data = await apiGet('/profile');
-      setReadingTime(data.readingTime?.preferredWindow ?? null);
       setGenres(Array.isArray(data.genres) ? data.genres : []);
       setComfortBoundaries(Object.keys(data.comfortBoundaries ?? {}));
       setSpiceLevel(data.spiceLevel ?? null);
-      setSnacks(data.snacks ?? []);
-      setDrinks(data.drinks ?? []);
-      setReadingLocation(data.readingLocation ?? null);
       const savedTropes: string[] = Array.isArray(data.tropes) ? data.tropes : [];
       setFavoriteTropes(savedTropes);
       // A saved pick outside the 10 starts the "Explore more" group open so
@@ -246,13 +212,9 @@ export default function ReadingPreferencesScreen() {
     comfortBoundaries.forEach((k) => (comfortMap[k] = true));
     try {
       await apiPatch('/profile', {
-        readingTime: readingTime ? { preferredWindow: readingTime } : null,
         genres,
         comfortBoundaries: comfortMap,
         spiceLevel,
-        snacks,
-        drinks,
-        readingLocation,
         tropes: favoriteTropes,
         lgbtqPreference,
       });
@@ -285,8 +247,8 @@ export default function ReadingPreferencesScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <CaretLeft size={24} color="rgba(255,255,255,0.85)" weight="bold" />
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
+              <CaretLeft size={24} color={PF.text} weight="bold" />
             </TouchableOpacity>
             <Text style={styles.title}>Reading Preferences</Text>
           </View>
@@ -295,16 +257,11 @@ export default function ReadingPreferencesScreen() {
         <View style={styles.curve} />
 
         <View style={styles.content}>
-          <PrefCard label="Reading Time">
-            <ChipGroup options={READING_TIME_OPTIONS} selected={readingTime} onSelect={(v) => { Haptics.selectionAsync(); setReadingTime(v); markUnsaved(); }} />
-          </PrefCard>
-
           <PrefCard label="Favorite Genres">
             <MultiChipGroup options={TROPE_OPTIONS} value={genres} onChange={(v) => { Haptics.selectionAsync(); setGenres(v); markUnsaved(); }} />
           </PrefCard>
 
-          <PrefCard label="Favorite Tropes">
-            <Text style={styles.tropeCount}>{favoriteTropes.length} of {MAX_FAVORITE_TROPES}</Text>
+          <PrefCard label="Favorite Tropes" count={`${favoriteTropes.length} of ${MAX_FAVORITE_TROPES}`}>
             {/* Both groups share one selection, so the max of 5 and the count
                 apply across them combined. */}
             <MultiChipGroup
@@ -328,48 +285,36 @@ export default function ReadingPreferencesScreen() {
             )}
           </PrefCard>
 
+          <PrefCard label="Spice Level">
+            <ChipGroup options={SPICE_OPTIONS} selected={spiceLevel} onSelect={(v) => { Haptics.selectionAsync(); setSpiceLevel(v); markUnsaved(); }} />
+          </PrefCard>
+
           <PrefCard label="LGBTQ+ Romance">
             <ChipGroup
               options={LGBTQ_PREFERENCE_OPTIONS}
               selected={lgbtqPreference}
               onSelect={(v) => { Haptics.selectionAsync(); setLgbtqPreference((prev) => (prev === v ? null : v)); markUnsaved(); }}
             />
-            <Text style={styles.prefNote}>
-              {"This only shapes Iris's personal pick for you — you'll still see every book."}
-            </Text>
+            <Text style={styles.prefNote}>This only affects Iris's personal recommendations.</Text>
           </PrefCard>
 
           <PrefCard label="Comfort Boundaries">
             <Text style={styles.boundaryNote}>
-              We'll do our best to avoid these themes. Not every book description tells the full story, so we can't guarantee every trigger is caught.
+              We'll do our best to avoid these themes in your personalized picks, but not every book description includes complete warnings.
             </Text>
             <MultiChipGroup options={TRIGGER_OPTIONS} value={comfortBoundaries} onChange={(v) => { Haptics.selectionAsync(); setComfortBoundaries(v); markUnsaved(); }} danger />
-          </PrefCard>
-
-          <PrefCard label="Spice Level">
-            <ChipGroup options={SPICE_OPTIONS} selected={spiceLevel} onSelect={(v) => { Haptics.selectionAsync(); setSpiceLevel(v); markUnsaved(); }} />
-          </PrefCard>
-
-          <PrefCard label="Favorite Snacks">
-            <MultiChipGroup options={SNACK_OPTIONS} value={snacks} onChange={(v) => { Haptics.selectionAsync(); setSnacks(v); markUnsaved(); }} />
-          </PrefCard>
-
-          <PrefCard label="Favorite Drinks">
-            <MultiChipGroup options={DRINK_OPTIONS} value={drinks} onChange={(v) => { Haptics.selectionAsync(); setDrinks(v); markUnsaved(); }} />
-          </PrefCard>
-
-          <PrefCard label="Reading Location">
-            <ChipGroup options={READING_LOCATION_OPTIONS} selected={readingLocation} onSelect={(v) => { Haptics.selectionAsync(); setReadingLocation(v); markUnsaved(); }} />
           </PrefCard>
 
           {/* Local-only setting, not part of the batched Save below — it
               writes immediately on toggle. */}
           <PrefCard label="Book Ratings">
             <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Ask me to rate books when I finish them</Text>
+              <Text style={styles.toggleLabel}>Remind me to rate books when I finish</Text>
               <Switch
                 value={finishedBookPromptEnabled}
                 onValueChange={handleFinishedBookPromptToggle}
+                trackColor={{ false: PF.switchOff, true: PF.accent }}
+                thumbColor="#fff"
               />
             </View>
           </PrefCard>
@@ -385,45 +330,44 @@ export default function ReadingPreferencesScreen() {
           </TouchableOpacity>
           {saveError && <Text style={styles.saveError}>{saveError}</Text>}
         </View>
-
-        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F4F8' },
+  container: { flex: 1, backgroundColor: PF.page },
   scrollContent: { paddingBottom: spacing.xl },
-  header: { backgroundColor: '#6B9AB8', padding: spacing.lg, paddingTop: spacing.md },
+  header: { backgroundColor: PF.header, padding: spacing.lg, paddingTop: spacing.md },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 8 },
   backButton: { padding: 2 },
-  title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 38 },
-  titleDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)', marginTop: 10 },
-  curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
+  title: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: PF.text, lineHeight: 38 },
+  titleDivider: { width: 40, height: 1, backgroundColor: PF.accent, marginTop: 10 },
+  curve: { height: 20, backgroundColor: PF.page, borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.06)' },
+  card: { backgroundColor: PF.card, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: PF.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.md },
-  cardLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.08)' },
-  cardLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
-  boundaryNote: { fontSize: 12, color: '#A9C0D4', lineHeight: 18, marginBottom: spacing.md },
+  cardLine: { flex: 1, height: 1, backgroundColor: PF.border },
+  cardLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: PF.label },
+  cardCount: { fontSize: 10, fontFamily: 'Lato_700Bold', color: PF.label, marginLeft: -4 },
+  boundaryNote: { fontSize: 12, color: PF.secondary, lineHeight: 18, marginBottom: spacing.md },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  toggleLabel: { flex: 1, fontSize: 14, color: '#0F2A48' },
+  toggleLabel: { flex: 1, fontSize: 14, color: PF.text },
   chipGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)', backgroundColor: '#fff' },
-  chipSelected: { backgroundColor: '#6B9AB8', borderColor: '#6B9AB8' },
-  chipDanger: { backgroundColor: '#B83255', borderColor: '#B83255' },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: PF.inputBorder, backgroundColor: '#FFFFFF' },
+  // Selected: navy (white text 14.5:1); comfort boundaries: the accent (5.8:1).
+  chipSelected: { backgroundColor: PF.text, borderColor: PF.text },
+  chipDanger: { backgroundColor: PF.accent, borderColor: PF.accent },
   chipDisabled: { opacity: 0.4 },
   moreTropesLink: { alignSelf: 'flex-start', marginTop: spacing.md, marginBottom: spacing.sm },
-  moreTropesLinkText: { fontSize: 12, color: '#6B9AB8', fontFamily: 'Lato_700Bold' },
-  tropeCount: { fontSize: 11, color: '#A9C0D4', fontFamily: 'Lato_700Bold', marginBottom: spacing.sm, textAlign: 'right' },
-  prefNote: { fontSize: 12, color: '#A9C0D4', lineHeight: 18, marginTop: spacing.md },
-  saveError: { fontSize: 12, color: '#B83255', textAlign: 'center', marginTop: spacing.sm },
-  chipText: { fontSize: 12, color: '#0F2A48' },
+  moreTropesLinkText: { fontSize: 12, color: PF.label, fontFamily: 'Lato_700Bold' },
+  prefNote: { fontSize: 12, color: PF.secondary, lineHeight: 18, marginTop: spacing.md },
+  saveError: { fontSize: 12, color: PF.accent, textAlign: 'center', marginTop: spacing.sm },
+  chipText: { fontSize: 12, color: PF.text },
   chipTextSelected: { color: '#fff', fontWeight: '700' },
   saveButton: { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  saveButtonSaved: { backgroundColor: '#0F2A48' },
-  saveButtonUnsaved: { backgroundColor: '#B83255' },
+  saveButtonSaved: { backgroundColor: PF.text },
+  saveButtonUnsaved: { backgroundColor: PF.accent },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' },
 });
