@@ -25,9 +25,12 @@ const COUNTRIES: readonly { value: Country; label: string }[] = [
   { value: 'AU', label: '🇦🇺 Australia' },
 ];
 
-// My Escape: the Home background's reading atmosphere (saved as
-// `readingLocation`; same keys as before, new labels). The Monthly theme /
-// Choose my own switch waits for the backend, so the choices show directly.
+// My Escape: the Home background. "Monthly theme" (escapeMode THEME, the
+// default when missing; the server shows that month's theme image) or
+// "Choose my own" (escapeMode CUSTOM + one of the readingLocation keys below,
+// same keys as before with new labels). Switching back to the theme keeps
+// readingLocation for next time.
+type EscapeMode = 'THEME' | 'CUSTOM';
 const ESCAPES = [
   { value: 'SOFA', label: 'Cozy on the sofa' },
   { value: 'FIREPLACE', label: 'By the fireplace' },
@@ -91,6 +94,7 @@ export default function AccountSettingsScreen() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [escape, setEscape] = useState<string | null>(null);
+  const [escapeMode, setEscapeMode] = useState<EscapeMode>('THEME');
   const [escapeStatus, setEscapeStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // Home's My Escape button opens this screen with ?section=escape: scroll to the card.
   const params = useLocalSearchParams<{ section?: string }>();
@@ -120,6 +124,7 @@ export default function AccountSettingsScreen() {
         setCountry(data.country ?? 'US');
         setNotificationsEnabled(data.notificationsEnabled ?? false);
         setEscape(data.readingLocation ?? null);
+        setEscapeMode(data.escapeMode === 'CUSTOM' ? 'CUSTOM' : 'THEME');
       } catch {
         setLoadFailed(true);
       }
@@ -216,22 +221,41 @@ export default function AccountSettingsScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, contentY + escapeY - 12), animated: true });
   }, [params.section, contentY, escapeY]);
 
-  // Saved right away, like Notifications.
-  const chooseEscape = async (value: string) => {
-    if (value === escape) return;
-    await Haptics.selectionAsync();
-    const previous = escape;
-    setEscape(value);
+  // Saved right away, like Notifications; a failure puts everything back.
+  const saveEscape = async (next: { escapeMode: EscapeMode; readingLocation?: string }) => {
+    const before = { mode: escapeMode, location: escape };
+    setEscapeMode(next.escapeMode);
+    if (next.readingLocation) setEscape(next.readingLocation);
     setEscapeStatus('saving');
     try {
-      await apiPatch('/profile', { readingLocation: value });
+      await apiPatch('/profile', next);
       setEscapeStatus('saved');
       setTimeout(() => setEscapeStatus('idle'), 2000);
     } catch {
-      setEscape(previous);
+      setEscapeMode(before.mode);
+      setEscape(before.location);
       setEscapeStatus('error');
       setTimeout(() => setEscapeStatus('idle'), 3000);
     }
+  };
+  // Back to the monthly theme; readingLocation isn't sent, so it's kept.
+  const pickTheme = () => {
+    if (escapeMode === 'THEME') return;
+    Haptics.selectionAsync();
+    saveEscape({ escapeMode: 'THEME' });
+  };
+  // A saved location comes back right away; otherwise just show the choices
+  // (nothing is saved until one is picked).
+  const pickOwn = () => {
+    if (escapeMode === 'CUSTOM') return;
+    Haptics.selectionAsync();
+    if (escape) saveEscape({ escapeMode: 'CUSTOM', readingLocation: escape });
+    else setEscapeMode('CUSTOM');
+  };
+  const pickLocation = (value: string) => {
+    if (value === escape && escapeMode === 'CUSTOM') return;
+    Haptics.selectionAsync();
+    saveEscape({ escapeMode: 'CUSTOM', readingLocation: value });
   };
 
   const handleNotificationToggle = async (v: boolean) => {
@@ -404,6 +428,21 @@ export default function AccountSettingsScreen() {
           <View onLayout={(e) => setEscapeY(e.nativeEvent.layout.y)}>
             <SectionCard title="My Escape">
               <Text style={styles.escapeIntro}>Set the scene for your escape. Choose the monthly theme or a favorite reading atmosphere.</Text>
+              <View style={styles.segment} accessibilityRole="radiogroup">
+                {([['THEME', 'Monthly theme', pickTheme], ['CUSTOM', 'Choose my own', pickOwn]] as const).map(([mode, label, onPress]) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[styles.segmentOption, escapeMode === mode && styles.segmentOptionActive]}
+                    onPress={onPress}
+                    disabled={loadFailed}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: escapeMode === mode }}
+                  >
+                    <Text style={[styles.segmentText, escapeMode === mode && styles.segmentTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {escapeMode === 'CUSTOM' && (
               <View style={styles.tzOptions}>
                 {ESCAPES.map((e) => {
                   const active = escape === e.value;
@@ -411,7 +450,7 @@ export default function AccountSettingsScreen() {
                     <TouchableOpacity
                       key={e.value}
                       style={[styles.tzOption, active && styles.tzOptionSelected]}
-                      onPress={() => chooseEscape(e.value)}
+                      onPress={() => pickLocation(e.value)}
                       disabled={loadFailed}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
@@ -421,6 +460,7 @@ export default function AccountSettingsScreen() {
                   );
                 })}
               </View>
+              )}
               {escapeStatus === 'saving' && <Text style={styles.notifStatusText}>Saving…</Text>}
               {escapeStatus === 'saved' && <Text style={[styles.notifStatusText, { color: PF.success }]}>Saved ✓</Text>}
               {escapeStatus === 'error' && <Text style={[styles.notifStatusText, { color: PF.accent }]}>Failed to save</Text>}
@@ -621,6 +661,12 @@ const styles = StyleSheet.create({
   deleteButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: PF.accent, alignItems: 'center', justifyContent: 'center' },
   deleteButtonText: { fontSize: 13, fontWeight: '700', color: PF.accent },
   escapeIntro: { fontSize: 13, lineHeight: 19, color: PF.secondary },
+  // "Monthly theme" | "Choose my own": the chosen side in the accent (white text 5.8:1).
+  segment: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: PF.inputBorder, padding: 2, backgroundColor: '#FFFFFF' },
+  segmentOption: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  segmentOptionActive: { backgroundColor: PF.accent },
+  segmentText: { fontSize: 13, color: PF.text },
+  segmentTextActive: { color: '#FFFFFF', fontWeight: '700' },
   subscriptionNote: { fontSize: 12, lineHeight: 17, color: PF.secondary, textAlign: 'center' },
   subscriptionLink: { color: PF.text, fontWeight: '700', textDecorationLine: 'underline' },
 });
