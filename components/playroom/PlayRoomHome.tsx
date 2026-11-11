@@ -236,11 +236,10 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
               <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} variant="playroom" />
             ))}
 
-            {/* TILES — one wide card per row: photo left, icon + title + description right */}
+            {/* TILES — one wide card per row: photo left, title + description right */}
             <View style={styles.tileList}>
               {visibleTiles.map((t) => {
                 const tileLabel = label(t.key, t.label);
-                const TileIcon = t.icon;
                 return (
                   <TouchableOpacity
                     key={t.key}
@@ -267,7 +266,6 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                       )}
                     </View>
                     <View style={styles.tileText}>
-                      <TileIcon size={20} color={ROSE_GOLD} weight="light" />
                       <Text style={styles.tileTitle} numberOfLines={2}>{tileLabel}</Text>
                       <Text style={styles.tileDescription} numberOfLines={1}>{t.description}</Text>
                     </View>
@@ -318,8 +316,10 @@ const styles = StyleSheet.create({
   tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: TILE_FILL },
   tilePhoto: { height: '100%', overflow: 'hidden' },
   tileText: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
-  tileTitle: { fontSize: 22, lineHeight: 25, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center' },
-  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', opacity: 0.9 },
+  // One size on every tile: 19pt fits "Between the Sheets" and "September's
+  // Newbies" on one line down to 360pt-wide phones.
+  tileTitle: { fontSize: 19, lineHeight: 22, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center', includeFontPadding: false },
+  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', opacity: 0.9, includeFontPadding: false },
 
   empty: { ...shadow, textAlign: 'center', color: CHAMPAGNE, fontFamily: 'Nunito_400Regular', marginTop: spacing.xl, paddingHorizontal: spacing.lg },
 });
