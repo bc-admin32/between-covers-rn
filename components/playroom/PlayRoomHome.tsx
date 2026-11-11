@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensio
 import { Image } from 'expo-image';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { useLightStatusBarWhileFocused } from '../../lib/statusBarTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, HeartStraight } from '../icons';
 import { spacing } from '../../lib/theme';
@@ -84,6 +85,8 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   isArchive?: boolean;
 }) {
   const router = useRouter();
+  // Wine page: light status-bar icons.
+  useLightStatusBarWhileFocused();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const cardWidth = width - SIDE * 2;

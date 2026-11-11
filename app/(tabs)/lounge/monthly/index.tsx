@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
@@ -83,6 +84,8 @@ function ConfessionCard({ submission, onReact }: {
 
 export default function MonthlyWallScreen() {
   const router = useRouter();
+  // Midnight page: light status-bar icons.
+  useLightStatusBarWhileFocused();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const { promptId } = useLocalSearchParams<{ promptId: string }>();

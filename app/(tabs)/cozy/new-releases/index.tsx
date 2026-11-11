@@ -8,7 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
-import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
 import { spacing, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
@@ -33,9 +33,9 @@ export default function NewReleasesScreen() {
   // (YYYY-MM) opens a given month (last month, from the archive).
   const params = useLocalSearchParams<{ month?: string }>();
   const playroom = usePlayroom();
-  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
-  // light icons over the plum strip and header.
-  useDarkStatusBarWhileFocused(!playroom);
+  // PlayRoom: light status-bar icons over the plum strip and header. Classic
+  // keeps the app's dark icons on the light page.
+  useLightStatusBarWhileFocused(playroom);
   const startMonth = typeof params.month === 'string' && /^\d{4}-\d{2}$/.test(params.month) ? params.month : undefined;
 
   const load = async (month?: string) => {

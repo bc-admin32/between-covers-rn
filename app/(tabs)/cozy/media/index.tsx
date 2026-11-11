@@ -8,7 +8,7 @@ import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
-import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -323,9 +323,9 @@ export default function CozyMediaScreen() {
   // PlayRoom months make this Watch Me. month=previous → last month (archive).
   const playroom = usePlayroom();
   const params = useLocalSearchParams<{ month?: string }>();
-  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
-  // light icons over the plum strip and header.
-  useDarkStatusBarWhileFocused(!playroom);
+  // PlayRoom: light status-bar icons over the plum strip and header. Classic
+  // keeps the app's dark icons on the light page.
+  useLightStatusBarWhileFocused(playroom);
   const monthKey = cozyMonthKey(params.month);
 
   useEffect(() => {

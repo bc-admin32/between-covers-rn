@@ -10,7 +10,7 @@ import { apiGet } from '../../../../lib/api';
 import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
-import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { spacing, radius, colors } from '../../../../lib/theme';
@@ -58,9 +58,9 @@ export default function CozyBooksScreen() {
   // reader's personal pick ("I Saw This Book and Thought of You") and Keep Me
   // Guessing (Off The Shelf, this month only). month=previous → last month.
   const playroom = usePlayroom();
-  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
-  // light icons over the plum strip and header.
-  useDarkStatusBarWhileFocused(!playroom);
+  // PlayRoom: light status-bar icons over the plum strip and header. Classic
+  // keeps the app's dark icons on the light page.
+  useLightStatusBarWhileFocused(playroom);
   const isBetweenTheSheets = playroom;
   const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);

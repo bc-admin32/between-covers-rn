@@ -14,7 +14,7 @@ import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
 import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
-import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 
@@ -101,10 +101,9 @@ export default function AuthorDetailScreen() {
   const [spotlight, setSpotlight] = useState<AuthorSpotlight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  // Dark status-bar icons on the light page: Classic, and PlayRoom while loading
-  // or on an error (no plum header then). Otherwise the app's light icons over
-  // the plum strip and header.
-  useDarkStatusBarWhileFocused(!playroom || !spotlight || error);
+  // Light status-bar icons over the plum strip and header (PlayRoom, once the
+  // spotlight has loaded). Classic, loading and errors keep the app's dark icons.
+  useLightStatusBarWhileFocused(playroom && !!spotlight && !error);
 
   useEffect(() => {
     const load = async () => {

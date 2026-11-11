@@ -9,6 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useLightStatusBarWhileFocused } from '../../lib/statusBarTone';
 import * as Haptics from 'expo-haptics';
 import { useIAP, restorePurchases as doRestorePurchases, getResolvedPlatform } from '../../lib/iap-shim';
 import {
@@ -31,6 +32,8 @@ const PRIVACY_URL = 'https://betweencovers-legal-documents.s3.us-east-1.amazonaw
 
 export default function HardPaywallScreen() {
   const router = useRouter();
+  // Black page: light status-bar icons.
+  useLightStatusBarWhileFocused();
   const {
     connected,
     subscriptions,

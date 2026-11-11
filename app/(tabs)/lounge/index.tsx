@@ -12,7 +12,7 @@ import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
 import { hasLayoutField, setActiveCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
-import { useDarkStatusBarWhileFocused } from '../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../lib/statusBarTone';
 import PillowTalk from '../../../components/playroom/PillowTalk';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
@@ -169,7 +169,9 @@ export default function LoungeScreen() {
 
   // Dark status bar icons while the Lounge (Classic or Pillow Talk) is on
   // screen; its page is light. Off while the terms sheet's dark overlay is up.
-  useDarkStatusBarWhileFocused(!eulaModal);
+  // The Lounge and Pillow Talk are light (the app's dark icons); light icons
+  // only while the dark terms overlay is up.
+  useLightStatusBarWhileFocused(eulaModal);
 
   const handleEulaAccept = async () => {
     setEulaAccepting(true);

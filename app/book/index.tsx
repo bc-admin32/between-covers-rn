@@ -9,6 +9,7 @@ import RatingInfoButton from '../../components/rating/RatingInfoButton';
 import TagBookModal from '../../components/tag/TagBookModal';
 import AffiliateDisclosure from '../../components/AffiliateDisclosure';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLightStatusBarWhileFocused } from '../../lib/statusBarTone';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -102,6 +103,8 @@ function triggerLabel(key: string): string {
 
 export default function BookDetailsScreen() {
   const router = useRouter();
+  // Navy cover area at the top: light status-bar icons.
+  useLightStatusBarWhileFocused();
   const insets = useSafeAreaInsets();
   const { workId } = useLocalSearchParams<{ workId: string }>();
 

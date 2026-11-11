@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
-import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
@@ -27,9 +27,9 @@ export default function OffShelfScreen() {
   const [loaded, setLoaded] = useState(false);
   // PlayRoom months: "Keep Me Guessing" (opened from Between the Sheets).
   const playroom = usePlayroom();
-  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
-  // light icons over the plum strip and header.
-  useDarkStatusBarWhileFocused(!playroom);
+  // PlayRoom: light status-bar icons over the plum strip and header. Classic
+  // keeps the app's dark icons on the light page.
+  useLightStatusBarWhileFocused(playroom);
 
   useEffect(() => {
     async function load() {

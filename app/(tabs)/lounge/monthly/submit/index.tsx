@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { CaretLeft } from '../../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLightStatusBarWhileFocused } from '../../../../../lib/statusBarTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../../lib/api';
@@ -25,6 +26,8 @@ type Prompt = {
 
 export default function MonthlySubmitScreen() {
   const router = useRouter();
+  // Midnight page: light status-bar icons.
+  useLightStatusBarWhileFocused();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
   const { promptId } = useLocalSearchParams<{ promptId: string }>();

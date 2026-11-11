@@ -209,7 +209,9 @@ function RootLayout() {
 
   return (
     <HeyCatchProvider>
-      <StatusBar style="light" />
+      {/* Dark icons by default (most screens are light); dark screens switch
+          to light while focused (lib/statusBarTone.ts). */}
+      <StatusBar style="dark" />
       <Stack
         screenOptions={{
           headerShown: false,
