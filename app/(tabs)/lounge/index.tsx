@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Image, Modal, Pressable, Linking,
+  StyleSheet, ActivityIndicator, Image, Modal, Pressable, Linking, AppState,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,8 @@ import { apiGet, apiPost } from '../../../lib/api';
 import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
-import { resolveLayout } from '../../../lib/cozyLayout';
+import { setActiveCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
+import { useDarkStatusBarWhileFocused } from '../../../lib/statusBarTone';
 import PillowTalk from '../../../components/playroom/PillowTalk';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
@@ -92,32 +93,66 @@ export default function LoungeScreen() {
   const [pollResult, setPollResult] = useState<{ options: PollOption[]; totalVotes: number; selectedOptionId: string } | null>(null);
   const [eulaModal, setEulaModal] = useState(false);
   const [eulaAccepting, setEulaAccepting] = useState(false);
+  // The live month's switch, shared with every screen (lib/cozyLayout.ts).
+  const layout = useActiveCozyLayout();
+
+  // The poll on screen, so a new week's poll drops last week's vote state.
+  const pollIdRef = useRef<string | null>(null);
+  const applyPoll = useCallback((d: LoungeData) => {
+    const poll = d.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
+    const pollId = poll?.pollId ?? null;
+    if (pollId !== pollIdRef.current) {
+      pollIdRef.current = pollId;
+      setPollResult(null);
+      setSelectedOption(null);
+    }
+    if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
+  }, []);
+
+  // /lounge/resolve. Runs on mount, each time the Lounge tab regains focus and
+  // when the app comes back with the Lounge on screen, so a new week (or a
+  // Classic ↔ PlayRoom switch) shows without restarting the app. A failed
+  // refetch keeps what's on screen.
+  const fetchLounge = useCallback(async () => {
+    try {
+      const res = await apiGet<LoungeData>('/lounge/resolve');
+      // Keep a terms acceptance made while this request was in flight.
+      const acceptedAt = res.loungeTermsAcceptedAt ?? loungeCache?.loungeTermsAcceptedAt ?? null;
+      loungeCache = { ...res, loungeTermsAcceptedAt: acceptedAt };
+      setData(loungeCache);
+      setError(null);
+      if (res.active) setActiveCozyLayout(res.active.layout);
+      if (!acceptedAt && !res.isGuest) setEulaModal(true);
+      applyPoll(loungeCache);
+    } catch {
+      if (!loungeCache) setError("Couldn't load the lounge right now.");
+    } finally {
+      setLoading(false);
+    }
+  }, [applyPoll]);
 
   useEffect(() => {
-    const load = async () => {
-      // Show cached data immediately so the screen is never blank.
-      if (loungeCache) {
-        setData(loungeCache);
-        const cachedPoll = loungeCache.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
-        if (cachedPoll?.hasVoted && cachedPoll.selectedOptionId) setSelectedOption(cachedPoll.selectedOptionId);
-        setLoading(false);
-      }
-      try {
-        const res = await apiGet<LoungeData>('/lounge/resolve');
-        loungeCache = res;
-        setData(res);
-        console.log('[Lounge] loungeTermsAcceptedAt from API:', res.loungeTermsAcceptedAt);
-        if (!res.loungeTermsAcceptedAt && !res.isGuest) setEulaModal(true);
-        const poll = res.active?.sections.find((s) => s.type === 'POLL') as Extract<Section, { type: 'POLL' }> | undefined;
-        if (poll?.hasVoted && poll.selectedOptionId) setSelectedOption(poll.selectedOptionId);
-      } catch {
-        if (!loungeCache) setError("Couldn't load the lounge right now.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+    // Show cached data immediately so the screen is never blank.
+    if (loungeCache) {
+      setData(loungeCache);
+      applyPoll(loungeCache);
+      setLoading(false);
+    }
+    fetchLounge();
+  }, [fetchLounge, applyPoll]);
+
+  // The first focus is the mount, which the effect above already loads.
+  const hasFocusedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedRef.current) fetchLounge();
+      hasFocusedRef.current = true;
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') fetchLounge();
+      });
+      return () => sub.remove();
+    }, [fetchLounge])
+  );
 
   // The EULA Modal renders above the navigator stack, so pushing /legal/document
   // while it's visible would put the doc *behind* the modal. Instead we close
@@ -131,6 +166,10 @@ export default function LoungeScreen() {
       }
     }, [data])
   );
+
+  // Dark status bar icons while the Lounge (Classic or Pillow Talk) is on
+  // screen; its page is light. Off while the terms sheet's dark overlay is up.
+  useDarkStatusBarWhileFocused(!eulaModal);
 
   const handleEulaAccept = async () => {
     setEulaAccepting(true);
@@ -266,7 +305,7 @@ export default function LoungeScreen() {
   );
 
   // PlayRoom months get Pillow Talk; everything below is the classic Lounge.
-  if (resolveLayout(active.layout) === 'playroom') {
+  if (layout === 'playroom') {
     return (
       <PillowTalk
         gate={eulaGate}

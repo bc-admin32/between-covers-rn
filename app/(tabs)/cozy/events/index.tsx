@@ -13,6 +13,7 @@ import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import QuickRatingModal from '../../../../components/QuickRatingModal';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
+import { usePlayroom } from '../../../../lib/playroomPage';
 
 type PlayerState = 'live' | 'replay' | 'offline' | 'loading';
 
@@ -300,6 +301,7 @@ function EventModal({ event, initialTab, onClose }: {
 export default function CozyEventsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const playroom = usePlayroom();
   const [status, setStatus] = useState<EventStatus | null>(null);
   const [event, setEvent] = useState<BCEvent | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -402,7 +404,7 @@ export default function CozyEventsScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerLabel}>Live & Upcoming</Text>
-            <Text style={styles.headerTitle}>Cozy Events</Text>
+            <Text style={styles.headerTitle}>{playroom ? 'PlayRoom Events' : 'Cozy Events'}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/events' as any)}>
@@ -487,7 +489,7 @@ export default function CozyEventsScreen() {
               <View style={styles.emptyState}>
                 <Image source={{ uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c' }} style={styles.emptyImage} contentFit="cover" />
                 <Text style={styles.emptyTitle}>Between Covers Live</Text>
-                <Text style={styles.emptySubtitle}>A Cozy Community Event</Text>
+                <Text style={styles.emptySubtitle}>{playroom ? 'A PlayRoom Community Event' : 'A Cozy Community Event'}</Text>
                 <Text style={styles.emptyText}>Check back soon — Iris is always planning something good.</Text>
               </View>
             )}

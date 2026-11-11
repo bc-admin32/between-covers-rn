@@ -7,7 +7,9 @@ import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
-import { newbiesLabel, titleParam } from '../../../../lib/cozyLayout';
+import { newbiesLabel } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import { spacing, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
@@ -26,11 +28,12 @@ export default function NewReleasesScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<NewReleasesData | null>(null);
   const [loading, setLoading] = useState(true);
-  // From the PlayRoom's Newbies tile (`title` set): the heading becomes
-  // "[Month]'s Newbies" for the month shown, and `month` (YYYY-MM) opens a
-  // given month (last month, from the archive).
-  const params = useLocalSearchParams<{ title?: string; month?: string }>();
-  const isNewbies = !!titleParam(params.title);
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months: the heading becomes "[Month]'s Newbies" for the month
+  // shown. `month` (YYYY-MM) opens a given month (last month, from the archive).
+  const params = useLocalSearchParams<{ month?: string }>();
+  const playroom = usePlayroom();
+  const isNewbies = playroom;
   const startMonth = typeof params.month === 'string' && /^\d{4}-\d{2}$/.test(params.month) ? params.month : undefined;
 
   const load = async (month?: string) => {
@@ -63,18 +66,18 @@ export default function NewReleasesScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
       {/* MASTHEAD */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+          <TouchableOpacity style={[styles.backButton, playroom && prStyles.softButton]} onPress={() => router.back()}>
+            <CaretLeft size={20} color={playroom ? PR.heading : '#0F2A48'} weight="bold" />
           </TouchableOpacity>
-          <Text style={styles.masthead}>Between Covers</Text>
+          <Text style={[styles.masthead, playroom && prStyles.heading]}>Between Covers</Text>
         </View>
         {showPill && (
-          <TouchableOpacity style={styles.pill} onPress={handlePill}>
-            <Text style={styles.pillText}>
+          <TouchableOpacity style={[styles.pill, playroom && prStyles.roseOutline]} onPress={handlePill}>
+            <Text style={[styles.pillText, playroom && prStyles.eyebrow]}>
               {data?.isCurrent ? '← Last Month' : 'Current →'}
             </Text>
           </TouchableOpacity>
@@ -83,9 +86,9 @@ export default function NewReleasesScreen() {
 
       {/* TITLE BLOCK */}
       <View style={styles.titleBlock}>
-        <Text style={styles.eyebrow}>{isNewbies ? newbiesLabel(data?.monthLabel) : 'NEW RELEASES'}</Text>
-        {!!data?.monthLabel && <Text style={styles.monthLabel}>{data.monthLabel}</Text>}
-        <Text style={styles.subtitle}>Fresh arrivals, sorted by genre</Text>
+        <Text style={[styles.eyebrow, playroom && prStyles.eyebrow]}>{isNewbies ? newbiesLabel(data?.monthLabel) : 'NEW RELEASES'}</Text>
+        {!!data?.monthLabel && <Text style={[styles.monthLabel, playroom && prStyles.heading]}>{data.monthLabel}</Text>}
+        <Text style={[styles.subtitle, playroom && prStyles.body]}>Fresh arrivals, sorted by genre</Text>
       </View>
 
       {/* BODY */}
@@ -95,8 +98,8 @@ export default function NewReleasesScreen() {
         ) : sections.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📚</Text>
-            <Text style={styles.emptyTitle}>Nothing new yet</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Nothing new yet</Text>
+            <Text style={[styles.emptyText, playroom && prStyles.body]}>
               No new releases for this month. Check back soon.
             </Text>
           </View>
@@ -104,8 +107,8 @@ export default function NewReleasesScreen() {
           sections.map((section, i) => (
             <View key={`${section.genre}-${i}`} style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{section.genre}</Text>
-                <Text style={styles.sectionCount}>{section.books.length}</Text>
+                <Text style={[styles.sectionTitle, playroom && prStyles.eyebrow]}>{section.genre}</Text>
+                <Text style={[styles.sectionCount, playroom && prStyles.eyebrow]}>{section.books.length}</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
                 {section.books.map((book, j) => (

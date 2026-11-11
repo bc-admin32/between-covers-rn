@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { apiGet } from './api';
 
 // Per-month layout for the Cozy tab and the Lounge, set in the admin's Cozy
 // month editor. /cozy/home (active and previous) and /lounge/resolve (active)
@@ -40,19 +42,70 @@ export function resolveTiles(raw: unknown): PlayroomTiles {
   return tiles;
 }
 
-// ── The active Cozy month's layout, shared with the tab bar ─────────────────
-// The tab bar shows a Keyhole icon in PlayRoom months. Whoever loads
-// /cozy/home (the tab bar at launch, the Cozy screen on every load) reports
-// the active month's layout here.
+// ── The live month's layout: the one switch every screen reads ──────────────
+// Cozy home, the archive, the Lounge, the tab icon, the tile pages and the
+// Confessions title all render from useActiveCozyLayout(). Every fetch of the
+// live month reports here (/cozy/home and /lounge/resolve `active.layout`), so
+// whichever screen refreshed last switches all of them together. The value is
+// saved, so the next launch starts from it.
+
+const LAYOUT_KEY = 'bc_live_layout';
+// The Cozy screen's saved /cozy/home payload: the fallback on the first launch
+// after this update, before LAYOUT_KEY exists.
+const COZY_CACHE_KEY = 'bc_cozy_cache_v2';
 
 let activeLayout: CozyLayout = resolveLayout(undefined);
+let savedLayout: CozyLayout | null = null;
+// Set once the server has answered this launch; saved copies never override it.
+let haveServerValue = false;
 const listeners = new Set<(layout: CozyLayout) => void>();
 
-export function setActiveCozyLayout(raw: unknown): void {
-  const next = resolveLayout(raw);
+function apply(next: CozyLayout): void {
   if (next === activeLayout) return;
   activeLayout = next;
   listeners.forEach((l) => l(next));
+}
+
+// The server's value, from any fetch of the live month.
+export function setActiveCozyLayout(raw: unknown): void {
+  haveServerValue = true;
+  const next = resolveLayout(raw);
+  if (next !== savedLayout) {
+    savedLayout = next;
+    SecureStore.setItemAsync(LAYOUT_KEY, next).catch(() => {});
+  }
+  apply(next);
+}
+
+// A saved copy (at launch): used only until the server answers.
+export function setSavedCozyLayout(raw: unknown): void {
+  if (!haveServerValue) apply(resolveLayout(raw));
+}
+
+export async function loadSavedCozyLayout(): Promise<void> {
+  try {
+    const saved = await SecureStore.getItemAsync(LAYOUT_KEY);
+    if (saved) {
+      savedLayout = resolveLayout(saved);
+      setSavedCozyLayout(saved);
+      return;
+    }
+    const cozy = await SecureStore.getItemAsync(COZY_CACHE_KEY);
+    if (cozy) setSavedCozyLayout(JSON.parse(cozy)?.active?.layout);
+  } catch {}
+}
+
+// Fetches the live month's layout (at launch and when the app comes back).
+// Calls made while one is running share it.
+let inFlight: Promise<void> | null = null;
+export function refreshActiveCozyLayout(): Promise<void> {
+  if (!inFlight) {
+    inFlight = apiGet<{ active?: { layout?: string } }>('/cozy/home')
+      .then((res) => setActiveCozyLayout(res?.active?.layout))
+      .catch(() => {})
+      .finally(() => { inFlight = null; });
+  }
+  return inFlight;
 }
 
 export function useActiveCozyLayout(): CozyLayout {
@@ -65,16 +118,12 @@ export function useActiveCozyLayout(): CozyLayout {
   return layout;
 }
 
-// ── Link parameters for the Cozy pages a tile opens ─────────────────────────
+// ── Link parameter for the Cozy pages a tile opens ──────────────────────────
 // `month=previous` → last month (opened from the archive); otherwise this month.
-// `title` → the tile's name, shown instead of the page's classic title.
+// The pages' PlayRoom names and look come from the live layout, not the link.
 
 export function cozyMonthKey(raw?: string | string[]): 'active' | 'previous' {
   return raw === 'previous' ? 'previous' : 'active';
-}
-
-export function titleParam(raw?: string | string[]): string | undefined {
-  return typeof raw === 'string' && raw.trim() ? raw : undefined;
 }
 
 // "January" from "January 2027"; "" when unknown.

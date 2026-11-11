@@ -29,3 +29,8 @@ export const PLAYROOM_TILES: TileDef[] = [
   { key: 'pillowTalk',       label: 'Pillow Talk',        description: 'The Community',       icon: ChatsCircle, file: 'pillow-talk.jpg',        placeholder: '#6B4A6E' },
   { key: 'newbies',          label: 'Newbies',            description: 'New Releases',        icon: Sparkle,     file: 'newbies.jpg',            placeholder: '#B83255' },
 ];
+
+// A tile's name, for the page it opens. (Newbies pages use newbiesLabel().)
+export function tileLabel(key: TileKey): string {
+  return PLAYROOM_TILES.find((t) => t.key === key)?.label ?? '';
+}

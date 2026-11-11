@@ -9,7 +9,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import EventCard from '../../../../components/playroom/EventCard';
-import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
+import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { tileLabel } from '../../../../components/playroom/tiles';
 import { monthEvents, type CozyEvent } from '../../../../lib/cozyEvents';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
@@ -76,9 +79,10 @@ function PromoCode({ code }: { code: string }) {
 }
 
 function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => void }) {
+  const playroom = usePlayroom();
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={[styles.modalOverlay, playroom && prStyles.overlay]} activeOpacity={1} onPress={onClose} />
       <View style={styles.recipeSheet}>
         <View style={styles.sheetHandle} />
 
@@ -92,14 +96,14 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
             </View>
           )}
 
-          <Text style={styles.recipeLabel}>🍽️ Recipe</Text>
-          <Text style={styles.recipeTitle}>{item.title}</Text>
+          <Text style={[styles.recipeLabel, playroom && prStyles.eyebrow]}>🍽️ Recipe</Text>
+          <Text style={[styles.recipeTitle, playroom && prStyles.heading]}>{item.title}</Text>
           <View style={styles.recipeDivider} />
 
           {item.description ? (
-            <Text style={styles.recipeBody}>{item.description}</Text>
+            <Text style={[styles.recipeBody, playroom && prStyles.body]}>{item.description}</Text>
           ) : (
-            <Text style={styles.recipeEmpty}>Recipe details coming soon.</Text>
+            <Text style={[styles.recipeEmpty, playroom && prStyles.body]}>Recipe details coming soon.</Text>
           )}
 
           {item.promo?.discountCode && isPromoActive(item.promo?.endDate) && (
@@ -110,10 +114,10 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
 
           {item.affiliateLink && (
             <TouchableOpacity
-              style={styles.shopButton}
+              style={[styles.shopButton, playroom && prStyles.roseFill]}
               onPress={() => Linking.openURL(item.affiliateLink!).catch(() => {})}
             >
-              <Text style={styles.shopButtonText}>Shop Ingredients →</Text>
+              <Text style={[styles.shopButtonText, playroom && prStyles.onRose]}>Shop Ingredients →</Text>
             </TouchableOpacity>
           )}
 
@@ -121,8 +125,8 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
         </ScrollView>
 
         {/* Rendered after ScrollView so it sits on top in the hit-test order */}
-        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
-          <Text style={styles.sheetCloseText}>✕</Text>
+        <TouchableOpacity style={[styles.sheetClose, playroom && prStyles.softButton]} onPress={onClose}>
+          <Text style={[styles.sheetCloseText, playroom && prStyles.heading]}>✕</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -136,13 +140,14 @@ export default function CozyItemsScreen() {
   const [items, setItems] = useState<LifestyleItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<LifestyleItem | null>(null);
-  // Opened from the PlayRoom's Self Care tile: the month's events (and their
-  // recordings) go above the extras, the page takes the tile's name, and
-  // month=previous shows last month (from the archive).
-  const params = useLocalSearchParams<{ playroom?: string; month?: string; title?: string }>();
-  const isAftercare = params.playroom === '1';
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months make this Self Care: the month's events (and their
+  // recordings) go above the extras. month=previous shows last month (from
+  // the archive).
+  const playroom = usePlayroom();
+  const isAftercare = playroom;
+  const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
-  const tileTitle = titleParam(params.title);
   const [events, setEvents] = useState<CozyEvent[]>([]);
 
   useEffect(() => {
@@ -175,14 +180,14 @@ export default function CozyItemsScreen() {
     <View style={styles.countRow}>
       <View style={styles.countLine} />
       {loaded && items.length > 0 && (
-        <Text style={styles.countText}>{items.length} {items.length === 1 ? 'Pick' : 'Picks'}</Text>
+        <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{items.length} {items.length === 1 ? 'Pick' : 'Picks'}</Text>
       )}
       <View style={styles.countLine} />
     </View>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
       {activeRecipe && (
         <RecipeModal item={activeRecipe} onClose={() => setActiveRecipe(null)} />
       )}
@@ -190,23 +195,27 @@ export default function CozyItemsScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
-            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+          <TouchableOpacity style={[styles.backButton, playroom && prStyles.softButton]} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
+            <CaretLeft size={20} color={playroom ? PR.heading : '#0F2A48'} weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>The Little Things</Text>
-            <Text style={styles.headerTitle}>{tileTitle ?? 'Cozy Extras'}</Text>
+            <Text style={[styles.headerLabel, playroom && prStyles.eyebrow]}>The Little Things</Text>
+            <Text style={[styles.headerTitle, playroom && prStyles.heading]}>{playroom ? tileLabel('aftercare') : 'Cozy Extras'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/items' as any)}>
+        <TouchableOpacity style={[styles.irisButton, playroom && prStyles.cardBorder]} onPress={() => router.push('/iris/chat?from=cozy/items' as any)}>
           <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
         </TouchableOpacity>
       </View>
 
       {/* IRIS NOTE */}
-      <View style={styles.irisNote}>
+      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>Recipes, playlists, drinks & cozy extras inspired by this month's theme.</Text>
+        <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
+          {playroom
+            ? "Recipes, playlists, drinks & extras inspired by this month's theme."
+            : "Recipes, playlists, drinks & cozy extras inspired by this month's theme."}
+        </Text>
       </View>
 
       {/* COUNT */}
@@ -229,8 +238,8 @@ export default function CozyItemsScreen() {
         ) : items.length === 0 && countInScroll ? null : items.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🛍️</Text>
-            <Text style={styles.emptyTitle}>Coming soon</Text>
-            <Text style={styles.emptyText}>Iris is still pulling together this month's picks. Check back soon.</Text>
+            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
+            <Text style={[styles.emptyText, playroom && prStyles.body]}>Iris is still pulling together this month's picks. Check back soon.</Text>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -240,7 +249,7 @@ export default function CozyItemsScreen() {
               const isRecipe = item.category === 'recipe';
 
               return (
-                <View key={item.sk ?? i} style={styles.itemCard}>
+                <View key={item.sk ?? i} style={[styles.itemCard, playroom && prStyles.cardBorder]}>
                   <TouchableOpacity
                     style={styles.itemCoverWrapper}
                     onPress={isRecipe ? () => setActiveRecipe(item) : undefined}
@@ -264,13 +273,13 @@ export default function CozyItemsScreen() {
                   </TouchableOpacity>
 
                   <View style={styles.itemInfo}>
-                    <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={[styles.itemTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
                     {item.description && (
-                      <Text style={styles.itemDescription} numberOfLines={2}>{item.description}</Text>
+                      <Text style={[styles.itemDescription, playroom && prStyles.body]} numberOfLines={2}>{item.description}</Text>
                     )}
                     {showPromo && <PromoCode code={item.promo!.discountCode!} />}
                     <TouchableOpacity
-                      style={[styles.ctaButton, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
+                      style={[styles.ctaButton, playroom && prStyles.roseOutline, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
                       onPress={async () => {
                         if (isRecipe) { setActiveRecipe(item); return; }
                         if (!actionLink) return;
@@ -290,7 +299,7 @@ export default function CozyItemsScreen() {
                       }}
                       disabled={!isRecipe && !actionLink}
                     >
-                      <Text style={styles.ctaButtonText}>{ctaLabel(item.category)}</Text>
+                      <Text style={[styles.ctaButtonText, playroom && prStyles.eyebrow]}>{ctaLabel(item.category)}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

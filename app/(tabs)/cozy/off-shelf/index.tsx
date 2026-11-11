@@ -4,10 +4,11 @@ import {
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { CaretLeft } from '../../../../components/icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
-import { titleParam } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
@@ -23,8 +24,9 @@ export default function OffShelfScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<OffShelfData | null>(null);
   const [loaded, setLoaded] = useState(false);
-  // "Keep Me Guessing" when opened from Between the Sheets in a PlayRoom month.
-  const tileTitle = titleParam(useLocalSearchParams<{ title?: string }>().title);
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months: "Keep Me Guessing" (opened from Between the Sheets).
+  const playroom = usePlayroom();
 
   useEffect(() => {
     async function load() {
@@ -41,30 +43,30 @@ export default function OffShelfScreen() {
   const books = data?.enabled ? (data.books ?? []) : [];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, playroom && prStyles.softButton]}
             onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}
           >
-            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+            <CaretLeft size={20} color={playroom ? PR.heading : '#0F2A48'} weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>SUSPICIOUS BEHAVIOR</Text>
-            <Text style={styles.headerTitle}>{tileTitle ?? 'Off The Shelf'}</Text>
+            <Text style={[styles.headerLabel, playroom && prStyles.eyebrow]}>SUSPICIOUS BEHAVIOR</Text>
+            <Text style={[styles.headerTitle, playroom && prStyles.heading]}>{playroom ? 'Keep Me Guessing' : 'Off The Shelf'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/off-shelf' as any)}>
+        <TouchableOpacity style={[styles.irisButton, playroom && prStyles.cardBorder]} onPress={() => router.push('/iris/chat?from=cozy/off-shelf' as any)}>
           <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
         </TouchableOpacity>
       </View>
 
       {/* IRIS NOTE — tagline, same treatment as sibling View All pages */}
-      <View style={styles.irisNote}>
+      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>
+        <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
           If you weren't side-eyeing everyone already...you will be now. 💀📚
         </Text>
       </View>
@@ -73,7 +75,7 @@ export default function OffShelfScreen() {
       <View style={styles.countRow}>
         <View style={styles.countLine} />
         {loaded && books.length > 0 && (
-          <Text style={styles.countText}>{books.length} {books.length === 1 ? 'Book' : 'Books'}</Text>
+          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{books.length} {books.length === 1 ? 'Book' : 'Books'}</Text>
         )}
         <View style={styles.countLine} />
       </View>
@@ -85,8 +87,8 @@ export default function OffShelfScreen() {
         ) : books.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📚</Text>
-            <Text style={styles.emptyTitle}>Coming soon</Text>
-            <Text style={styles.emptyText}>Iris is still pulling together this month's picks. Check back soon.</Text>
+            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
+            <Text style={[styles.emptyText, playroom && prStyles.body]}>Iris is still pulling together this month's picks. Check back soon.</Text>
           </View>
         ) : (
           <View style={styles.grid}>

@@ -12,7 +12,10 @@ import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
-import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
+import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { tileLabel } from '../../../../components/playroom/tiles';
 
 // Same key Cozy home writes (cozy/index.tsx) — read here for first paint.
 const CACHE_KEY = 'bc_cozy_cache_v2';
@@ -72,11 +75,11 @@ function PromoCode({ code }: { code: string }) {
   );
 }
 
-function SitWithMeDivider() {
+function SitWithMeDivider({ playroom }: { playroom: boolean }) {
   return (
     <View style={styles.swmDivider}>
       <View style={styles.swmDividerLine} />
-      <Text style={styles.swmDividerText}>Sit With Me</Text>
+      <Text style={[styles.swmDividerText, playroom && prStyles.eyebrow]}>Sit With Me</Text>
       <View style={styles.swmDividerLine} />
     </View>
   );
@@ -86,11 +89,14 @@ export default function AuthorDetailScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  // From the PlayRoom's Beyond the Cover tile: its name, and month=previous
-  // for last month (from the archive).
-  const params = useLocalSearchParams<{ weekId?: string; month?: string; title?: string }>();
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months make this Beyond the Cover. month=previous → last month
+  // (from the archive).
+  const playroom = usePlayroom();
+  const params = useLocalSearchParams<{ weekId?: string; month?: string }>();
   const monthKey = cozyMonthKey(params.month);
-  const tileTitle = titleParam(params.title);
+  const backLabel = playroom ? '← Back to The PlayRoom' : '← Back to Cozy';
+  const socialIconColor = playroom ? PR.heading : '#0F2A48';
 
   const [spotlight, setSpotlight] = useState<AuthorSpotlight | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +137,7 @@ export default function AuthorDetailScreen() {
 
   if (loading && !spotlight) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -139,10 +145,10 @@ export default function AuthorDetailScreen() {
 
   if (error || !spotlight) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl }]}>
-        <Text style={styles.errorText}>Spotlight not available</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back to Cozy</Text>
+      <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl }]}>
+        <Text style={[styles.errorText, playroom && prStyles.body]}>Spotlight not available</Text>
+        <TouchableOpacity style={[styles.backButton, playroom && prStyles.roseOutline]} onPress={() => router.back()}>
+          <Text style={[styles.backButtonText, playroom && prStyles.eyebrow]}>{backLabel}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -154,7 +160,7 @@ export default function AuthorDetailScreen() {
   const hasBooks = spotlight.featuredBooks.length > 0;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, playroom && prStyles.page]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 + spacing.xl }}
@@ -166,30 +172,30 @@ export default function AuthorDetailScreen() {
 
         {/* HEADER */}
         <View style={styles.headerBlock}>
-          <Text style={styles.eyebrow}>{tileTitle ?? 'The Mind Behind the Magic'}</Text>
-          <Text style={styles.name}>{spotlight.name}</Text>
-          <Text style={styles.typeLabel}>{typeLabel}</Text>
+          <Text style={[styles.eyebrow, playroom && prStyles.eyebrow]}>{playroom ? tileLabel('talkDirtyToMe') : 'The Mind Behind the Magic'}</Text>
+          <Text style={[styles.name, playroom && prStyles.heading]}>{spotlight.name}</Text>
+          <Text style={[styles.typeLabel, playroom && prStyles.body]}>{typeLabel}</Text>
         </View>
 
         {/* SIT WITH ME */}
         {spotlight.sitWithMe && (
           <View style={styles.swmSection}>
-            <SitWithMeDivider />
-            <Text style={styles.swmText}>"{spotlight.sitWithMe}"</Text>
+            <SitWithMeDivider playroom={playroom} />
+            <Text style={[styles.swmText, playroom && prStyles.body]}>"{spotlight.sitWithMe}"</Text>
           </View>
         )}
 
         {/* FULL BIO */}
         {spotlight.bio && (
           <View style={styles.bodySection}>
-            <Text style={styles.bioText}>{spotlight.bio}</Text>
+            <Text style={[styles.bioText, playroom && prStyles.body]}>{spotlight.bio}</Text>
           </View>
         )}
 
         {/* BOOKS */}
         {hasBooks && (
           <View style={styles.bodySection}>
-            <Text style={styles.sectionTitle}>{`Books by ${spotlight.name}`}</Text>
+            <Text style={[styles.sectionTitle, playroom && prStyles.eyebrow]}>{`Books by ${spotlight.name}`}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -198,14 +204,14 @@ export default function AuthorDetailScreen() {
               {spotlight.featuredBooks.map((book) => (
                 <TouchableOpacity
                   key={book.workId}
-                  style={styles.smallBookCard}
+                  style={[styles.smallBookCard, playroom && prStyles.cardBorder]}
                   onPress={() => router.push(`/book?workId=${book.workId}` as any)}
                 >
                   <View style={styles.smallBookCover}>
                     <Image source={{ uri: book.coverUrl }} style={styles.smallBookCoverImage} />
                   </View>
-                  <Text style={styles.smallBookTitle} numberOfLines={2}>{book.title}</Text>
-                  <Text style={styles.smallBookAuthor} numberOfLines={1}>{book.author}</Text>
+                  <Text style={[styles.smallBookTitle, playroom && prStyles.heading]} numberOfLines={2}>{book.title}</Text>
+                  <Text style={[styles.smallBookAuthor, playroom && prStyles.body]} numberOfLines={1}>{book.author}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -215,30 +221,30 @@ export default function AuthorDetailScreen() {
         {/* CONNECT */}
         {hasSocial && (
           <View style={styles.bodySection}>
-            <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>Connect</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleCentered, playroom && prStyles.eyebrow]}>Connect</Text>
             <View style={styles.socialRow}>
               {spotlight.instagramUrl && (
                 <TouchableOpacity
-                  style={styles.socialButton}
+                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
                   onPress={() => openLink(spotlight.instagramUrl!)}
                 >
-                  <Ionicons name="logo-instagram" size={22} color="#0F2A48" />
+                  <Ionicons name="logo-instagram" size={22} color={socialIconColor} />
                 </TouchableOpacity>
               )}
               {spotlight.tiktokUrl && (
                 <TouchableOpacity
-                  style={styles.socialButton}
+                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
                   onPress={() => openLink(spotlight.tiktokUrl!)}
                 >
-                  <FontAwesome5 name="tiktok" size={20} color="#0F2A48" />
+                  <FontAwesome5 name="tiktok" size={20} color={socialIconColor} />
                 </TouchableOpacity>
               )}
               {spotlight.websiteUrl && (
                 <TouchableOpacity
-                  style={styles.socialButton}
+                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
                   onPress={() => openLink(spotlight.websiteUrl!)}
                 >
-                  <Ionicons name="globe-outline" size={22} color="#0F2A48" />
+                  <Ionicons name="globe-outline" size={22} color={socialIconColor} />
                 </TouchableOpacity>
               )}
             </View>
@@ -248,13 +254,13 @@ export default function AuthorDetailScreen() {
         {/* PROMO */}
         {hasPromo && (
           <View style={styles.bodySection}>
-            <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>Special Offer</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleCentered, playroom && prStyles.eyebrow]}>Special Offer</Text>
             {spotlight.promo!.label && (
-              <Text style={styles.promoHeadline}>{spotlight.promo!.label}</Text>
+              <Text style={[styles.promoHeadline, playroom && prStyles.body]}>{spotlight.promo!.label}</Text>
             )}
             <PromoCode code={spotlight.promo!.code!} />
             {spotlight.promo!.endDate && (
-              <Text style={styles.promoEndDate}>Through {formatEndDate(spotlight.promo!.endDate)}</Text>
+              <Text style={[styles.promoEndDate, playroom && prStyles.body]}>Through {formatEndDate(spotlight.promo!.endDate)}</Text>
             )}
           </View>
         )}
@@ -275,8 +281,8 @@ export default function AuthorDetailScreen() {
 
         {/* BACK */}
         <View style={styles.bodySection}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back to Cozy</Text>
+          <TouchableOpacity style={[styles.backButton, playroom && prStyles.roseOutline]} onPress={() => router.back()}>
+            <Text style={[styles.backButtonText, playroom && prStyles.eyebrow]}>{backLabel}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

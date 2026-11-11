@@ -6,7 +6,10 @@ import {
 import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
+import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { tileLabel } from '../../../../components/playroom/tiles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -106,6 +109,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingRating, setSavingRating] = useState(false);
   const { isGuest, requireAccount } = useGuest();
+  const playroom = usePlayroom();
 
   useEffect(() => {
     if (!visible || !item.movieId) return;
@@ -150,8 +154,8 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={styles.sheet}>
+      <TouchableOpacity style={[styles.sheetOverlay, playroom && prStyles.overlay]} activeOpacity={1} onPress={onClose} />
+      <View style={[styles.sheet, playroom && prStyles.page]}>
         <View style={styles.sheetHandle} />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
@@ -167,18 +171,18 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
               )}
             </View>
             <View style={styles.sheetInfo}>
-              <Text style={styles.sheetTitle}>{item.title}</Text>
+              <Text style={[styles.sheetTitle, playroom && prStyles.heading]}>{item.title}</Text>
               <View style={styles.sheetMeta}>
-                {year && <Text style={styles.sheetYear}>{year}</Text>}
+                {year && <Text style={[styles.sheetYear, playroom && prStyles.body]}>{year}</Text>}
                 <View style={styles.sheetTypeBadge}>
-                  <Text style={styles.sheetTypeText}>{type === 'SHOW' ? 'TV Show' : 'Movie'}</Text>
+                  <Text style={[styles.sheetTypeText, playroom && prStyles.eyebrow]}>{type === 'SHOW' ? 'TV Show' : 'Movie'}</Text>
                 </View>
               </View>
               {genres.length > 0 && (
                 <View style={styles.tagRow}>
                   {genres.map((g) => (
                     <View key={g} style={styles.genreTag}>
-                      <Text style={styles.genreTagText}>{g}</Text>
+                      <Text style={[styles.genreTagText, playroom && prStyles.heading]}>{g}</Text>
                     </View>
                   ))}
                 </View>
@@ -200,18 +204,18 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
           {/* SYNOPSIS */}
           {synopsis && (
             <View style={styles.sheetSection}>
-              <Text style={styles.sheetSectionLabel}>Synopsis</Text>
-              <Text style={styles.sheetSynopsis}>{synopsis}</Text>
+              <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Synopsis</Text>
+              <Text style={[styles.sheetSynopsis, playroom && prStyles.body]}>{synopsis}</Text>
             </View>
           )}
 
           {/* IRIS NOTE */}
           {irisNote && (
-            <View style={styles.irisNoteCard}>
+            <View style={[styles.irisNoteCard, playroom && prStyles.cardBorder]}>
               <Image source={{ uri: IRIS_AVATAR }} style={styles.irisNoteAvatar} />
               <View style={styles.irisNoteContent}>
-                <Text style={styles.irisNoteLabel}>Iris Says</Text>
-                <Text style={styles.irisNoteText}>"{irisNote}"</Text>
+                <Text style={[styles.irisNoteLabel, playroom && prStyles.eyebrow]}>Iris Says</Text>
+                <Text style={[styles.irisNoteText, playroom && prStyles.body]}>"{irisNote}"</Text>
               </View>
             </View>
           )}
@@ -219,7 +223,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
           {/* WHERE TO WATCH */}
           {platforms.length > 0 && (
             <View style={styles.sheetSection}>
-              <Text style={styles.sheetSectionLabel}>Where to Watch</Text>
+              <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Where to Watch</Text>
               <View style={styles.platformRow}>
                 {platforms.map((pl, i) => {
                   const platform = getPlatform(pl.platformId);
@@ -227,14 +231,14 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                   return (
                     <TouchableOpacity
                       key={i}
-                      style={styles.platformButton}
+                      style={[styles.platformButton, playroom && prStyles.cardBorder]}
                       onPress={() => url && openSpotify(url)}
                       disabled={!url}
                     >
                       {platform?.logoUrl ? (
                         <Image source={{ uri: platform.logoUrl }} style={styles.platformLogo} contentFit="contain" />
                       ) : (
-                        <Text style={styles.platformName}>Watch</Text>
+                        <Text style={[styles.platformName, playroom && prStyles.heading]}>Watch</Text>
                       )}
                     </TouchableOpacity>
                   );
@@ -248,9 +252,9 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
           {/* COMMUNITY VERDICT */}
           <View style={styles.sheetSection}>
             <View style={styles.verdictHeader}>
-              <Text style={styles.sheetSectionLabel}>Community Verdict</Text>
+              <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Community Verdict</Text>
               {ratingSummary && (
-                <Text style={styles.ratingCount}>{ratingSummary.totalRatings} {ratingSummary.totalRatings === 1 ? 'rating' : 'ratings'}</Text>
+                <Text style={[styles.ratingCount, playroom && prStyles.body]}>{ratingSummary.totalRatings} {ratingSummary.totalRatings === 1 ? 'rating' : 'ratings'}</Text>
               )}
             </View>
 
@@ -264,14 +268,14 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                       <Text style={styles.verdictEmoji}>{emoji}</Text>
                       <View style={styles.verdictBarContainer}>
                         <View style={styles.verdictBarLabels}>
-                          <Text style={[styles.verdictLabel, isTop && styles.verdictLabelTop]}>{label}</Text>
-                          <Text style={[styles.verdictPct, isTop && { color }]}>{data.pct}%</Text>
+                          <Text style={[styles.verdictLabel, playroom && prStyles.body, isTop && styles.verdictLabelTop, isTop && playroom && prStyles.heading]}>{label}</Text>
+                          <Text style={[styles.verdictPct, playroom && prStyles.body, isTop && { color }]}>{data.pct}%</Text>
                         </View>
                         <View style={styles.verdictBarBg}>
                           <View style={[styles.verdictBarFill, { width: `${data.pct}%` as any, backgroundColor: isTop ? color : 'rgba(15,42,72,0.15)' }]} />
                         </View>
                       </View>
-                      <Text style={styles.verdictCount}>{data.count}</Text>
+                      <Text style={[styles.verdictCount, playroom && prStyles.body]}>{data.count}</Text>
                     </View>
                   );
                 })}
@@ -281,7 +285,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
             {item.movieId && (
               <View style={styles.userVerdictSection}>
                 <View style={styles.verdictHeadingRow}>
-                  <Text style={[styles.sheetSectionLabel, { marginBottom: 0 }]}>{userRating ? 'Your Verdict' : "What's Your Verdict?"}</Text>
+                  <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow, { marginBottom: 0 }]}>{userRating ? 'Your Verdict' : "What's Your Verdict?"}</Text>
                   <RatingInfoButton />
                 </View>
                 <VerdictRating
@@ -296,8 +300,8 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
         </ScrollView>
 
         {/* Rendered after ScrollView so it sits on top in the hit-test order */}
-        <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
-          <Text style={styles.sheetCloseText}>✕</Text>
+        <TouchableOpacity style={[styles.sheetClose, playroom && prStyles.softButton]} onPress={onClose}>
+          <Text style={[styles.sheetCloseText, playroom && prStyles.heading]}>✕</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -311,10 +315,11 @@ export default function CozyMediaScreen() {
   const [loaded, setLoaded] = useState(false);
   const [selectedItem, setSelectedItem] = useState<VisualItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Opened from a PlayRoom tile: its name, and last month when from the archive.
-  const params = useLocalSearchParams<{ month?: string; title?: string }>();
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months make this Watch Me. month=previous → last month (archive).
+  const playroom = usePlayroom();
+  const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
-  const tileTitle = titleParam(params.title);
 
   useEffect(() => {
     async function load() {
@@ -334,34 +339,34 @@ export default function CozyMediaScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
-            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+          <TouchableOpacity style={[styles.backButton, playroom && prStyles.softButton]} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/cozy' as any)}>
+            <CaretLeft size={20} color={playroom ? PR.heading : '#0F2A48'} weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>Watch & Unwind</Text>
-            <Text style={styles.headerTitle}>{tileTitle ?? 'Visual Escapes'}</Text>
+            <Text style={[styles.headerLabel, playroom && prStyles.eyebrow]}>Watch & Unwind</Text>
+            <Text style={[styles.headerTitle, playroom && prStyles.heading]}>{playroom ? tileLabel('watchMe') : 'Visual Escapes'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.irisButton} onPress={() => router.push('/iris/chat?from=cozy/media' as any)}>
+        <TouchableOpacity style={[styles.irisButton, playroom && prStyles.cardBorder]} onPress={() => router.push('/iris/chat?from=cozy/media' as any)}>
           <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
         </TouchableOpacity>
       </View>
 
       {/* IRIS NOTE */}
-      <View style={styles.irisNote}>
+      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>Grab your blanket and your snacks — let's get cozy.</Text>
+        <Text style={[styles.irisNoteText, playroom && prStyles.body]}>Grab your blanket and your snacks — let's get cozy.</Text>
       </View>
 
       {/* COUNT */}
       <View style={styles.countRow}>
         <View style={styles.countLine} />
         {loaded && watchItems.length > 0 && (
-          <Text style={styles.countText}>{watchItems.length} {watchItems.length === 1 ? 'Title' : 'Titles'}</Text>
+          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{watchItems.length} {watchItems.length === 1 ? 'Title' : 'Titles'}</Text>
         )}
         <View style={styles.countLine} />
       </View>
@@ -373,8 +378,8 @@ export default function CozyMediaScreen() {
         ) : watchItems.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🎬</Text>
-            <Text style={styles.emptyTitle}>Coming soon</Text>
-            <Text style={styles.emptyText}>Iris is still picking this month's watches. Check back soon.</Text>
+            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
+            <Text style={[styles.emptyText, playroom && prStyles.body]}>Iris is still picking this month's watches. Check back soon.</Text>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -384,7 +389,7 @@ export default function CozyMediaScreen() {
               return (
                 <TouchableOpacity
                   key={item.sk ?? `watch-${i}`}
-                  style={styles.watchCard}
+                  style={[styles.watchCard, playroom && prStyles.cardBorder]}
                   onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
                 >
                   <View style={styles.watchCover}>
@@ -397,8 +402,8 @@ export default function CozyMediaScreen() {
                     )}
                   </View>
                   <View style={styles.watchInfo}>
-                    <Text style={styles.watchTitle} numberOfLines={2}>{item.title}</Text>
-                    {item.status && <Text style={styles.watchStatus}>{item.status}</Text>}
+                    <Text style={[styles.watchTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
+                    {item.status && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{item.status}</Text>}
                     {verdict && rating && (
                       <View style={[styles.verdictBadge, { backgroundColor: `${verdict.color}18`, borderColor: `${verdict.color}40` }]}>
                         <Text style={styles.verdictBadgeEmoji}>{verdict.emoji}</Text>

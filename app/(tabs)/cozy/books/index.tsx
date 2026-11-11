@@ -7,7 +7,10 @@ import { CaretLeft, Funnel } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
-import { cozyMonthKey, titleParam } from '../../../../lib/cozyLayout';
+import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
+import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import { tileLabel } from '../../../../components/playroom/tiles';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
@@ -49,13 +52,15 @@ export default function CozyBooksScreen() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [bookOfMonth, setBookOfMonth] = useState<BookOfMonth | null>(null);
   const [loading, setLoading] = useState(true);
-  // Opened from the PlayRoom's Between the Sheets tile: after the shelf come
-  // the reader's personal pick ("I saw this and thought of you") and Keep Me
+  useDarkStatusBarWhileFocused();
+  // PlayRoom months make this Between the Sheets: after the shelf come the
+  // reader's personal pick ("I Saw This Book and Thought of You") and Keep Me
   // Guessing (Off The Shelf, this month only). month=previous → last month.
-  const params = useLocalSearchParams<{ playroom?: string; month?: string; title?: string }>();
-  const isBetweenTheSheets = params.playroom === '1';
+  const playroom = usePlayroom();
+  const isBetweenTheSheets = playroom;
+  const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
-  const tileTitle = titleParam(params.title);
+  const iconColor = playroom ? PR.heading : '#0F2A48';
   const [spotlight, setSpotlight] = useState<BookItem | null>(null);
   const [offShelf, setOffShelf] = useState<{ blurb?: string; books: BookCardData[] } | null>(null);
 
@@ -102,31 +107,31 @@ export default function CozyBooksScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, playroom && prStyles.softButton]}
             onPress={() => router.back()}
           >
-            <CaretLeft size={20} color="#0F2A48" weight="bold" />
+            <CaretLeft size={20} color={iconColor} weight="bold" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerLabel}>{monthKey === 'previous' ? "Last Month's Bookshelf" : "This Month's Bookshelf"}</Text>
-            <Text style={styles.headerTitle}>{tileTitle ?? "On Iris's Shelf"}</Text>
+            <Text style={[styles.headerLabel, playroom && prStyles.eyebrow]}>{monthKey === 'previous' ? "Last Month's Bookshelf" : "This Month's Bookshelf"}</Text>
+            <Text style={[styles.headerTitle, playroom && prStyles.heading]}>{playroom ? tileLabel('betweenTheSheets') : "On Iris's Shelf"}</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={styles.filterButton}
+            style={[styles.filterButton, playroom && prStyles.softButton]}
             onPress={() => router.push('/(tabs)/cozy/catalog' as any)}
             accessibilityLabel="Filter the catalog"
           >
-            <Funnel size={20} color="#0F2A48" weight="bold" />
+            <Funnel size={20} color={iconColor} weight="bold" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.irisButton}
+            style={[styles.irisButton, playroom && prStyles.cardBorder]}
             onPress={() => router.push('/iris/chat?from=cozy/books' as any)}
           >
             <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
@@ -135,9 +140,9 @@ export default function CozyBooksScreen() {
       </View>
 
       {/* IRIS NOTE */}
-      <View style={styles.irisNote}>
+      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>
+        <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
           Handpicked for this month's theme — find your next obsession.
         </Text>
       </View>
@@ -146,7 +151,7 @@ export default function CozyBooksScreen() {
       <View style={styles.countRow}>
         <View style={styles.countLine} />
         {!loading && books.length > 0 && (
-          <Text style={styles.countText}>
+          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>
             {books.length} {books.length === 1 ? 'Book' : 'Books'}
           </Text>
         )}
@@ -163,8 +168,8 @@ export default function CozyBooksScreen() {
         ) : books.length === 0 && !hasExtras ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📚</Text>
-            <Text style={styles.emptyTitle}>Coming soon</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
+            <Text style={[styles.emptyText, playroom && prStyles.body]}>
               Iris is still curating this month's picks. Check back soon.
             </Text>
           </View>
@@ -172,13 +177,13 @@ export default function CozyBooksScreen() {
           <>
             {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
             {isBetweenTheSheets && sections.length > 0 && (
-              <Text style={styles.playroomHeading}>Iris's Shelf</Text>
+              <Text style={[styles.playroomHeading, prStyles.heading]}>Iris's Shelf</Text>
             )}
             {sections.map((section) => (
               <View key={section.key} style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{section.label}</Text>
-                  <Text style={styles.sectionCount}>{section.books.length}</Text>
+                  <Text style={[styles.sectionTitle, playroom && prStyles.eyebrow]}>{section.label}</Text>
+                  <Text style={[styles.sectionCount, playroom && prStyles.eyebrow]}>{section.books.length}</Text>
                 </View>
                 <View style={styles.gridInner}>
                   {section.books.map((book, i) => (
@@ -195,7 +200,7 @@ export default function CozyBooksScreen() {
             {/* BETWEEN THE SHEETS: the personal pick, then Keep Me Guessing */}
             {isBetweenTheSheets && spotlight && (
               <View style={styles.section}>
-                <Text style={styles.playroomHeading}>I saw this and thought of you</Text>
+                <Text style={[styles.playroomHeading, prStyles.heading]}>I Saw This Book and Thought of You</Text>
                 <View style={styles.gridInner}>
                   <BookCard book={toCard(spotlight)} style={styles.bookCard} />
                 </View>
@@ -204,14 +209,12 @@ export default function CozyBooksScreen() {
             {isBetweenTheSheets && offShelf && (
               <View style={styles.section}>
                 <View style={styles.playroomHeadingRow}>
-                  <Text style={[styles.playroomHeading, { marginBottom: 0 }]}>Keep Me Guessing</Text>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/(tabs)/cozy/off-shelf?title=${encodeURIComponent('Keep Me Guessing')}` as any)}
-                  >
+                  <Text style={[styles.playroomHeading, prStyles.heading, { marginBottom: 0 }]}>Keep Me Guessing</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/cozy/off-shelf' as any)}>
                     <Text style={styles.viewAll}>View All →</Text>
                   </TouchableOpacity>
                 </View>
-                {!!offShelf.blurb && <Text style={styles.playroomBlurb}>{offShelf.blurb}</Text>}
+                {!!offShelf.blurb && <Text style={[styles.playroomBlurb, prStyles.body]}>{offShelf.blurb}</Text>}
                 <View style={styles.gridInner}>
                   {offShelf.books.slice(0, 6).map((book, i) => (
                     <BookCard key={book.bookId ?? i} book={book} style={styles.bookCard} />

@@ -61,7 +61,7 @@ export default function PillowTalk({
 
   const openThread = (threadId: string) => router.push(`/lounge/thread?id=${encodeURIComponent(threadId)}` as any);
   const readConfessions = (promptId: string) =>
-    router.push(`/(tabs)/lounge/monthly?promptId=${promptId}&title=${encodeURIComponent('Behind Closed Doors')}` as any);
+    router.push(`/(tabs)/lounge/monthly?promptId=${promptId}` as any);
 
   const prompt = monthly ? splitLeadingEmoji(monthly.title) : null;
   const discussions = [primary, secondary].filter((d): d is Of<'PRIMARY_THREAD'> | Of<'SECONDARY_THREAD'> => !!d);
@@ -85,7 +85,7 @@ export default function PillowTalk({
         {/* THE CONFESSIONAL */}
         {monthly && prompt && (
           <View style={[styles.card, styles.confessional]}>
-            <Text style={styles.eyebrow}>Pillow Talk presents</Text>
+            <Text style={styles.eyebrowDark}>Pillow Talk presents</Text>
             <Text style={styles.confessionalTitle}>The Confessional</Text>
             <Text style={styles.confessionalTagline}>Some things are too good to keep to yourself.</Text>
 
@@ -130,7 +130,7 @@ export default function PillowTalk({
         {/* IRIS HAS THOUGHTS */}
         {iris && (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, styles.irisCard]}
             activeOpacity={0.85}
             disabled={!iris.threadId}
             onPress={() => iris.threadId && router.push(
@@ -149,10 +149,10 @@ export default function PillowTalk({
           <>
             <Text style={styles.sectionHeading}>This Week's Pillow Talk</Text>
             {discussions.map((d, i) => (
-              <View key={d.threadId} style={styles.card}>
+              <View key={d.threadId} style={[styles.card, styles.threadCard]}>
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.eyebrow}>{`Discussion ${String(i + 1).padStart(2, '0')}`}</Text>
-                  {d.isHot && <Text style={styles.hot}>🔥 Hot</Text>}
+                  {d.isHot && <View style={styles.hotBadge}><Text style={styles.hot}>🔥 Hot</Text></View>}
                 </View>
                 <Text style={styles.cardTitle}>{d.title}</Text>
                 <Text style={styles.cardBody} numberOfLines={3}>{d.description}</Text>
@@ -169,10 +169,10 @@ export default function PillowTalk({
 
         {/* WEEKLY POLL */}
         {poll && (
-          <View style={styles.card}>
+          <View style={[styles.card, styles.pollCard]}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.eyebrow}>Weekly Poll</Text>
-              {poll.isHot && <Text style={styles.hot}>🔥 Hot</Text>}
+              {poll.isHot && <View style={styles.hotBadge}><Text style={styles.hot}>🔥 Hot</Text></View>}
             </View>
             <Text style={styles.cardTitle}>{poll.question}</Text>
             <View style={styles.pollOptions}>
@@ -188,7 +188,7 @@ export default function PillowTalk({
                         <Text style={[styles.pollLabel, isSelected && styles.pollLabelSelected]}>{pct}%</Text>
                       </View>
                       <View style={styles.pollBar}>
-                        <View style={{ flex: pct, backgroundColor: isSelected ? '#B83255' : '#8C5A6E', borderRadius: 4 }} />
+                        <View style={{ flex: pct, backgroundColor: isSelected ? ROSE : BODY, borderRadius: 4 }} />
                         <View style={{ flex: 100 - pct }} />
                       </View>
                     </View>
@@ -224,7 +224,7 @@ export default function PillowTalk({
         {/* COMMUNITY READ — last */}
         {bookClub?.threadId && bookClub.book && (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, styles.readCard]}
             activeOpacity={0.85}
             onPress={() => router.push(
               `/lounge/thread?id=${encodeURIComponent(bookClub.threadId)}&kind=book_club` +
@@ -255,51 +255,81 @@ export default function PillowTalk({
   );
 }
 
-const ROSE = '#B83255';
-const BLUSH = '#E8B4C3';
-const CREAM = '#FDF0F4';
+// Pillow Talk's colors. Kept here, not in playroomStyle.ts, so changing them
+// doesn't touch The PlayRoom. Text and border colors are the Classic Lounge's
+// (app/(tabs)/lounge/index.tsx).
+
+// Backgrounds
+const PAGE_BG = '#F0EDE4';
+const CONFESSIONAL_BG = '#1A1A2E'; // the Classic Lounge's anonymous prompt card
+const IRIS_BG = '#F5DDE3';
+const THREAD_BG = '#FFFCF9';
+const POLL_BG = '#E7E6EF';
+const READ_BG = '#E3E9DF';
+
+// Light page and cards
+const INK = '#1A1A2E'; // headings and titles
+const BODY = '#6A5550'; // body text, bylines, reply counts
+const POLL_TEXT = '#3A2C28';
+const ROSE = '#B83255'; // eyebrows, buttons, the picked poll option
+const CARD_BORDER = '#DDD5C4';
+const IRIS_BORDER = '#E8D5E5';
+const READ_BORDER = '#E8B4C3';
+
+// The Confessional (dark card)
+const GOLD = '#C4A882';
+const GOLD_80 = 'rgba(196,168,130,0.8)';
+const IVORY = '#FDFAF6';
+const IVORY_60 = 'rgba(253,250,246,0.6)';
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1E0F17' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   scrollContent: { paddingBottom: spacing.xl },
   header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
-  weekLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: BLUSH, fontFamily: 'Nunito_700Bold' },
-  heading: { fontSize: 46, lineHeight: 52, color: CREAM, fontFamily: 'Cormorant_700Bold_Italic', marginTop: spacing.sm },
-  pastButton: { marginTop: spacing.md, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(232,180,195,0.5)' },
-  pastButtonText: { fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: BLUSH, fontFamily: 'Nunito_700Bold' },
-  sectionHeading: { fontSize: 26, color: CREAM, fontFamily: 'Cormorant_700Bold_Italic', marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
-  card: { marginHorizontal: spacing.md, marginBottom: spacing.md, backgroundColor: '#2A1420', borderRadius: 20, padding: spacing.lg, borderWidth: 1, borderColor: 'rgba(232,180,195,0.25)' },
-  confessional: { borderColor: 'rgba(184,50,85,0.7)', backgroundColor: '#331624' },
-  eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: BLUSH, fontFamily: 'Nunito_700Bold' },
-  confessionalTitle: { fontSize: 34, lineHeight: 38, color: CREAM, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
-  confessionalTagline: { fontSize: 14, color: 'rgba(253,240,244,0.8)', fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
+  weekLabel: { fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: ROSE, fontFamily: 'Nunito_700Bold' },
+  heading: { fontSize: 46, lineHeight: 52, color: INK, fontFamily: 'Cormorant_700Bold_Italic', marginTop: spacing.sm },
+  pastButton: { marginTop: spacing.md, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7, borderWidth: 1, borderColor: GOLD },
+  pastButtonText: { fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: BODY, fontFamily: 'Nunito_700Bold' },
+  sectionHeading: { fontSize: 26, color: INK, fontFamily: 'Cormorant_700Bold_Italic', marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
+  card: { marginHorizontal: spacing.md, marginBottom: spacing.md, borderRadius: 20, padding: spacing.lg, borderWidth: 1, borderColor: CARD_BORDER },
+  // Each section's own background, layered on `card`.
+  confessional: { borderColor: GOLD, backgroundColor: CONFESSIONAL_BG },
+  irisCard: { borderColor: IRIS_BORDER, backgroundColor: IRIS_BG },
+  threadCard: { backgroundColor: THREAD_BG },
+  pollCard: { backgroundColor: POLL_BG },
+  readCard: { borderColor: READ_BORDER, backgroundColor: READ_BG },
+  eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: ROSE, fontFamily: 'Nunito_700Bold' },
+  eyebrowDark: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: GOLD, fontFamily: 'Nunito_700Bold' },
+  confessionalTitle: { fontSize: 34, lineHeight: 38, color: IVORY, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
+  confessionalTagline: { fontSize: 14, color: IVORY_60, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
   promptBox: { marginTop: spacing.md, padding: spacing.md, borderRadius: 14, backgroundColor: 'rgba(253,240,244,0.06)' },
   promptEmoji: { fontSize: 30, marginBottom: 4 },
-  promptTitle: { fontSize: 20, lineHeight: 25, color: CREAM, fontFamily: 'Nunito_700Bold' },
-  promptBody: { fontSize: 15, lineHeight: 22, color: 'rgba(253,240,244,0.9)', fontFamily: 'Nunito_400Regular', marginTop: 6 },
-  offPrompt: { fontSize: 14, lineHeight: 20, color: BLUSH, fontFamily: 'Nunito_400Regular_Italic', marginTop: spacing.md },
-  closedText: { fontSize: 13, color: BLUSH, fontFamily: 'Nunito_600SemiBold', marginTop: spacing.md },
-  yoursLabel: { fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: BLUSH, fontFamily: 'Nunito_700Bold', marginTop: spacing.md },
-  yoursText: { fontSize: 15, lineHeight: 21, color: CREAM, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
+  promptTitle: { fontSize: 20, lineHeight: 25, color: IVORY, fontFamily: 'Nunito_700Bold' },
+  promptBody: { fontSize: 15, lineHeight: 22, color: IVORY_60, fontFamily: 'Nunito_400Regular', marginTop: 6 },
+  offPrompt: { fontSize: 14, lineHeight: 20, color: GOLD_80, fontFamily: 'Nunito_400Regular_Italic', marginTop: spacing.md },
+  closedText: { fontSize: 13, color: GOLD_80, fontFamily: 'Nunito_600SemiBold', marginTop: spacing.md },
+  yoursLabel: { fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: GOLD_80, fontFamily: 'Nunito_700Bold', marginTop: spacing.md },
+  yoursText: { fontSize: 15, lineHeight: 21, color: IVORY, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
   primaryButton: { marginTop: spacing.md, borderRadius: 999, backgroundColor: ROSE, paddingVertical: 12, alignItems: 'center' },
   primaryButtonText: { fontSize: 14, color: '#fff', fontFamily: 'Nunito_700Bold' },
-  outlineButton: { marginTop: spacing.sm, borderRadius: 999, borderWidth: 1, borderColor: BLUSH, paddingVertical: 11, alignItems: 'center' },
-  outlineButtonText: { fontSize: 14, color: BLUSH, fontFamily: 'Nunito_700Bold' },
+  outlineButton: { marginTop: spacing.sm, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(196,168,130,0.5)', paddingVertical: 11, alignItems: 'center' },
+  outlineButtonText: { fontSize: 14, color: GOLD, fontFamily: 'Nunito_700Bold' },
   smallButton: { borderRadius: 999, backgroundColor: ROSE, paddingHorizontal: 16, paddingVertical: 9 },
   buttonDisabled: { opacity: 0.5 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, gap: spacing.sm },
-  cardTitle: { fontSize: 22, lineHeight: 27, color: CREAM, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
-  cardByline: { fontSize: 13, color: BLUSH, fontFamily: 'Nunito_600SemiBold', marginTop: 2 },
-  cardBody: { fontSize: 15, lineHeight: 22, color: 'rgba(253,240,244,0.85)', fontFamily: 'Nunito_400Regular', marginTop: spacing.sm },
-  cardFoot: { fontSize: 12, color: BLUSH, fontFamily: 'Nunito_600SemiBold', marginTop: spacing.sm },
-  hot: { fontSize: 11, color: '#FFB199', fontFamily: 'Nunito_700Bold' },
+  cardTitle: { fontSize: 22, lineHeight: 27, color: INK, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
+  cardByline: { fontSize: 13, color: BODY, fontFamily: 'Nunito_600SemiBold', marginTop: 2 },
+  cardBody: { fontSize: 15, lineHeight: 22, color: BODY, fontFamily: 'Nunito_400Regular', marginTop: spacing.sm },
+  cardFoot: { fontSize: 12, color: BODY, fontFamily: 'Nunito_600SemiBold', marginTop: spacing.sm },
+  hotBadge: { backgroundColor: '#FFE5E5', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+  hot: { fontSize: 11, color: ROSE, fontFamily: 'Nunito_700Bold' },
   pollOptions: { marginTop: spacing.md, gap: spacing.sm },
-  pollOption: { borderRadius: 12, borderWidth: 1, borderColor: 'rgba(232,180,195,0.35)', paddingVertical: 12, paddingHorizontal: spacing.md },
-  pollOptionSelected: { borderColor: ROSE, backgroundColor: 'rgba(184,50,85,0.2)' },
-  pollLabel: { fontSize: 15, color: CREAM, fontFamily: 'Nunito_600SemiBold', flexShrink: 1 },
-  pollLabelSelected: { color: '#FFB3C7', fontFamily: 'Nunito_700Bold' },
+  pollOption: { borderRadius: 12, borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: spacing.md },
+  pollOptionSelected: { borderColor: ROSE, backgroundColor: 'rgba(184,50,85,0.06)' },
+  pollLabel: { fontSize: 15, color: POLL_TEXT, fontFamily: 'Nunito_600SemiBold', flexShrink: 1 },
+  pollLabelSelected: { color: ROSE, fontFamily: 'Nunito_700Bold' },
   pollResult: { gap: 6 },
   pollResultHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  pollBar: { flexDirection: 'row', height: 8, borderRadius: 4, backgroundColor: 'rgba(253,240,244,0.1)', overflow: 'hidden' },
+  pollBar: { flexDirection: 'row', height: 8, borderRadius: 4, backgroundColor: PAGE_BG, overflow: 'hidden' },
 });

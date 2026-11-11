@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import PlayRoomHome from '../../../../components/playroom/PlayRoomHome';
-import { resolveLayout } from '../../../../lib/cozyLayout';
+import { useActiveCozyLayout } from '../../../../lib/cozyLayout';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
 type BookItem = {
@@ -64,6 +64,7 @@ export default function CozyArchiveScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<CozyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const layout = useActiveCozyLayout();
 
   useEffect(() => {
     async function load() {
@@ -93,8 +94,9 @@ export default function CozyArchiveScreen() {
     );
   }
 
-  // Last month in its own layout; everything below is the classic archive.
-  if (data && resolveLayout(data.layout) === 'playroom') {
+  // Last month in the live month's layout (the switch every screen shares);
+  // everything below is the classic archive.
+  if (data && layout === 'playroom') {
     return <PlayRoomHome month={data} isArchive />;
   }
 

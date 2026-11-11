@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, AppState } from 'react-native';
 import { useEffect, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../lib/api';
 import { registerForPushNotifications } from '../../lib/pushNotifications';
 import { useGuest } from '../../lib/useGuest';
-import { setActiveCozyLayout, useActiveCozyLayout } from '../../lib/cozyLayout';
+import { loadSavedCozyLayout, refreshActiveCozyLayout, useActiveCozyLayout } from '../../lib/cozyLayout';
 import { useLightTabIcons } from '../../lib/tabIconTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -16,9 +15,6 @@ import {
   Chats,
   User,
 } from '../../components/icons';
-
-// The Cozy tab's cached /cozy/home payload (written by the Cozy screen).
-const COZY_CACHE_KEY = 'bc_cozy_cache_v2';
 
 const ACTIVE_COLOR = '#B83255';
 const INACTIVE_COLOR = '#6A5550';
@@ -63,20 +59,13 @@ export default function TabLayout() {
   const { isGuest, requireAccount } = useGuest();
   const cozyLayout = useActiveCozyLayout();
 
-  // Cozy tab icon: the active month's layout, from the cached payload right
-  // away, then from /cozy/home at launch and each time the app comes back
-  // (so it flips on the 1st even if Cozy isn't opened).
+  // The live month's layout (lib/cozyLayout.ts), for every screen: the saved
+  // value right away, then /cozy/home at launch and each time the app comes
+  // back (so everything flips on the 1st even if Cozy isn't opened).
   useEffect(() => {
-    SecureStore.getItemAsync(COZY_CACHE_KEY)
-      .then((cached) => { if (cached) setActiveCozyLayout(JSON.parse(cached)?.active?.layout); })
-      .catch(() => {});
-    const refresh = () => {
-      apiGet<{ active?: { layout?: string } }>('/cozy/home')
-        .then((res) => setActiveCozyLayout(res?.active?.layout))
-        .catch(() => {});
-    };
-    refresh();
-    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
+    loadSavedCozyLayout();
+    refreshActiveCozyLayout();
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') refreshActiveCozyLayout(); });
     return () => sub.remove();
   }, []);
 

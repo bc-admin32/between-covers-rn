@@ -18,7 +18,8 @@ import {
 
 // The PlayRoom: the Cozy tab's page in "playroom" months. It shows the month
 // from /cozy/home (active, or previous for the archive). The tiles open the
-// existing Cozy pages, titled with the tile's name.
+// existing Cozy pages, which take the tile's name and look from the same
+// layout switch (lib/playroomPage.ts).
 
 type AnyItem = { category?: string };
 
@@ -129,23 +130,22 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
 
   const visibleTiles = PLAYROOM_TILES.filter((t) => tiles[t.key] && hasContent[t.key]);
 
-  const openTile = (key: TileKey, tileLabel: string) => {
+  const openTile = (key: TileKey) => {
     track('playroom_tile_opened', { tile: key });
-    const title = encodeURIComponent(tileLabel);
     switch (key) {
       case 'betweenTheSheets':
-        router.push(`/(tabs)/cozy/books?playroom=1&month=${monthKey}&title=${title}` as any); return;
+        router.push(`/(tabs)/cozy/books?month=${monthKey}` as any); return;
       case 'watchMe':
-        router.push(`/(tabs)/cozy/media?month=${monthKey}&title=${title}` as any); return;
+        router.push(`/(tabs)/cozy/media?month=${monthKey}` as any); return;
       case 'aftercare':
-        router.push(`/(tabs)/cozy/items?playroom=1&month=${monthKey}&title=${title}` as any); return;
+        router.push(`/(tabs)/cozy/items?month=${monthKey}` as any); return;
       case 'talkDirtyToMe':
-        router.push(`/(tabs)/cozy/author?weekId=${encodeURIComponent(month?.weekId ?? '')}&month=${monthKey}&title=${title}` as any); return;
+        router.push(`/(tabs)/cozy/author?weekId=${encodeURIComponent(month?.weekId ?? '')}&month=${monthKey}` as any); return;
       case 'pillowTalk':
         router.navigate('/(tabs)/lounge' as any); return;
       case 'newbies': {
         const m = isArchive ? monthFromWeekId(month?.weekId) : null;
-        router.push(`/(tabs)/cozy/new-releases?title=${title}${m ? `&month=${m}` : ''}` as any); return;
+        router.push(`/(tabs)/cozy/new-releases${m ? `?month=${m}` : ''}` as any); return;
       }
     }
   };
@@ -249,7 +249,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                     key={t.key}
                     style={[styles.tile, { height: tileHeight }]}
                     activeOpacity={0.85}
-                    onPress={() => openTile(t.key, tileLabel)}
+                    onPress={() => openTile(t.key)}
                     accessibilityRole="button"
                     accessibilityLabel={tileLabel}
                     accessibilityHint={t.description}

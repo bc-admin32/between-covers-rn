@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal, FlatList,
-  StyleSheet, ActivityIndicator, Image, Linking, useWindowDimensions,
+  StyleSheet, ActivityIndicator, Image, Linking, useWindowDimensions, AppState,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
 import PlayRoomHome from '../../../components/playroom/PlayRoomHome';
-import { resolveLayout, setActiveCozyLayout } from '../../../lib/cozyLayout';
+import { setActiveCozyLayout, setSavedCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Home payload cache (also read by cozy/author for its first paint). Bumped
@@ -285,6 +285,7 @@ export default function CozyScreen() {
   const [activeRecipe, setActiveRecipe] = useState<VisualItem | null>(null);
   const [activeMovie, setActiveMovie] = useState<VisualItem | null>(null);
   const [movieSheetOpen, setMovieSheetOpen] = useState(false);
+  const layout = useActiveCozyLayout();
 
   // Last /cozy/home body we rendered, so a focus refetch that returns the
   // same payload doesn't re-render (or re-fire section analytics).
@@ -302,7 +303,7 @@ export default function CozyScreen() {
         if (cached) {
           const parsed = JSON.parse(cached);
           setData(parsed?.active ?? null);
-          setActiveCozyLayout(parsed?.active?.layout);
+          setSavedCozyLayout(parsed?.active?.layout);
           setLoading(false);
         }
         const response = await apiGet(COZY_HOME_PATH);
@@ -320,25 +321,30 @@ export default function CozyScreen() {
 
   // Refetch whenever the Cozy tab regains focus (tabs stay mounted), so a
   // change on Profile → Preferences — e.g. the personalized "I Saw This Book
-  // and Thought of You" pick — shows right away. The first focus is the
-  // mount, which the effect above already loads.
+  // and Thought of You" pick — shows right away, and when the app comes back
+  // with Cozy on screen, so a new month's content arrives with its layout.
+  // The first focus is the mount, which the effect above already loads.
   useFocusEffect(
     useCallback(() => {
-      if (!hasFocusedRef.current) { hasFocusedRef.current = true; return; }
       let cancelled = false;
-      apiGet(COZY_HOME_PATH)
-        .then(async (response) => {
-          if (cancelled) return;
-          const body = JSON.stringify(response);
-          if (body === lastBodyRef.current) return;
-          lastBodyRef.current = body;
-          skipSectionTrackRef.current = true;
-          setData(response?.active ?? null);
-          setActiveCozyLayout(response?.active?.layout);
-          await SecureStore.setItemAsync(CACHE_KEY, body);
-        })
-        .catch(() => {});
-      return () => { cancelled = true; };
+      const refetch = () => {
+        apiGet(COZY_HOME_PATH)
+          .then(async (response) => {
+            if (cancelled) return;
+            const body = JSON.stringify(response);
+            if (body === lastBodyRef.current) return;
+            lastBodyRef.current = body;
+            skipSectionTrackRef.current = true;
+            setData(response?.active ?? null);
+            setActiveCozyLayout(response?.active?.layout);
+            await SecureStore.setItemAsync(CACHE_KEY, body);
+          })
+          .catch(() => {});
+      };
+      if (hasFocusedRef.current) refetch();
+      hasFocusedRef.current = true;
+      const sub = AppState.addEventListener('change', (state) => { if (state === 'active') refetch(); });
+      return () => { cancelled = true; sub.remove(); };
     }, [])
   );
 
@@ -408,8 +414,9 @@ export default function CozyScreen() {
     );
   }
 
-  // PlayRoom months get The PlayRoom; everything below is the classic page.
-  if (resolveLayout(data?.layout) === 'playroom') {
+  // PlayRoom months get The PlayRoom (the live month's switch, shared with
+  // every screen); everything below is the classic page.
+  if (layout === 'playroom') {
     return (
       <PlayRoomHome
         month={data}

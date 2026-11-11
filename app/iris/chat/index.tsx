@@ -16,6 +16,7 @@ import { spacing, radius, colors } from '../../../lib/theme';
 import { needsIrisVoiceTerms } from '../../../lib/irisVoiceTerms';
 import IrisVoiceTermsModal from '../../../components/iris/IrisVoiceTermsModal';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
+import { usePlayroom } from '../../../lib/playroomPage';
 
 // Loaded on first switch to voice, so text chat never loads the audio libraries.
 // If loading throws, VoiceErrorBoundary gets the real error and drops back to
@@ -32,6 +33,9 @@ const CONTEXT_GREETINGS: Record<string, string> = {
   'cozy/items': "Hey there! Browsing the lifestyle picks? If you're looking for a specific vibe or have questions about any of the items, I'm here.",
   'library/discover': "Hi! Looking for your next great read? Tell me what you've loved lately — a genre, a feeling, an author — and I'll help you find something perfect.",
 };
+
+// From Watch Me in PlayRoom months (the same page as Visual Escapes).
+const WATCH_ME_GREETING = "Hello! Were you just looking through Watch Me? I'd love to hear your thoughts — or help you find something to watch tonight.";
 
 const DEFAULT_GREETING = "Hi! I'm here to help you find your next great read, talk through this month's theme, or just have a cozy conversation. What's on your mind?";
 
@@ -99,6 +103,7 @@ export default function IrisChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ from?: string; bookTitle?: string; author?: string }>();
+  const playroom = usePlayroom();
 
   const from = params.from ?? '';
   const bookTitle = params.bookTitle ?? '';
@@ -108,7 +113,8 @@ export default function IrisChatScreen() {
     ? `Hi! Looks like you're reading ${bookTitle}${author ? ` by ${author}` : ''}. Would you like to talk about it, get similar recommendations, or is there something else I can help with?`
     : null;
 
-  const openingMessage = bookGreeting ?? CONTEXT_GREETINGS[from] ?? DEFAULT_GREETING;
+  const contextGreeting = playroom && from === 'cozy/media' ? WATCH_ME_GREETING : CONTEXT_GREETINGS[from];
+  const openingMessage = bookGreeting ?? contextGreeting ?? DEFAULT_GREETING;
 
   const [messages, setMessages] = useState<Message[]>([
     { id: 'iris-0', role: 'iris', text: openingMessage },

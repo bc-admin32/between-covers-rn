@@ -10,6 +10,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { useLightTabIconsWhileFocused } from '../../../../lib/tabIconTone';
+import { usePlayroom } from '../../../../lib/playroomPage';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 
@@ -87,8 +88,9 @@ export default function MonthlyWallScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  // `title`: "Behind Closed Doors" when opened from Pillow Talk.
-  const { promptId, title } = useLocalSearchParams<{ promptId: string; title?: string }>();
+  const { promptId } = useLocalSearchParams<{ promptId: string }>();
+  // PlayRoom months (Pillow Talk) call the wall "Behind Closed Doors".
+  const title = usePlayroom() ? 'Behind Closed Doors' : 'Confession Wall';
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -124,7 +126,7 @@ export default function MonthlyWallScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <CaretLeft size={20} color="#C4A882" weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.title}>{typeof title === 'string' && title.trim() ? title : 'Confession Wall'}</Text>
+            <Text style={styles.title}>{title}</Text>
           </View>
         </View>
 
