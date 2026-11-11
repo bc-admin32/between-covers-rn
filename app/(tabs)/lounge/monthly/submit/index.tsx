@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { useGuest } from '../../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../../lib/theme';
+import { useLightTabIconsWhileFocused } from '../../../../../lib/tabIconTone';
 
 type Prompt = {
   promptId: string;
@@ -24,6 +25,8 @@ type Prompt = {
 };
 
 export default function MonthlySubmitScreen() {
+  // Dark page: light inactive tab icons while this is on screen.
+  useLightTabIconsWhileFocused();
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();

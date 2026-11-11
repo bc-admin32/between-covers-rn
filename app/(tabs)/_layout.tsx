@@ -6,6 +6,7 @@ import { apiGet } from '../../lib/api';
 import { registerForPushNotifications } from '../../lib/pushNotifications';
 import { useGuest } from '../../lib/useGuest';
 import { setActiveCozyLayout, useActiveCozyLayout } from '../../lib/cozyLayout';
+import { useLightTabIcons } from '../../lib/tabIconTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   HouseSimple,
@@ -20,13 +21,20 @@ import {
 const COZY_CACHE_KEY = 'bc_cozy_cache_v2';
 
 const ACTIVE_COLOR = '#B83255';
-const INACTIVE_COLOR = '#8C7B8C';
+const INACTIVE_COLOR = '#6A5550';
+// Inactive icons on dark screens (PlayRoom, Read the Confessions, Submit);
+// see lib/tabIconTone.ts.
+const INACTIVE_COLOR_ON_DARK = '#FDFAF6';
+const PILL_COLOR = '#EBC2CD';
 const ICON_SIZE = 22;
+// Room for the icon row above the bottom safe area.
+const BAR_CONTENT_HEIGHT = 56;
 
 type IconName = 'home' | 'cozy' | 'library' | 'lounge' | 'profile';
 
 function TabIcon({ name, focused, playroom = false }: { name: IconName; focused: boolean; playroom?: boolean }) {
-  const color = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
+  const lightIcons = useLightTabIcons();
+  const color = focused ? ACTIVE_COLOR : lightIcons ? INACTIVE_COLOR_ON_DARK : INACTIVE_COLOR;
   const weight = focused ? 'fill' : 'regular';
 
   const icon = {
@@ -40,8 +48,10 @@ function TabIcon({ name, focused, playroom = false }: { name: IconName; focused:
     profile: <User          size={ICON_SIZE} color={color} weight={weight} />,
   }[name];
 
+  // Every icon sits in the same pill-sized box, so they line up; only the
+  // active one fills it.
   return (
-    <View style={[styles.iconContainer, focused && styles.iconActive]}>
+    <View style={[styles.iconPill, focused && styles.iconPillActive]}>
       {icon}
     </View>
   );
@@ -82,11 +92,13 @@ export default function TabLayout() {
     if (isGuest === false) registerForPushNotifications();
   }, [isGuest]);
 
+  const bottomPad = insets.bottom > 0 ? insets.bottom : 8;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }],
+        tabBarStyle: [styles.tabBar, { height: BAR_CONTENT_HEIGHT + bottomPad, paddingBottom: bottomPad }],
         tabBarShowLabel: false,
         tabBarItemStyle: styles.tabBarItem,
         tabBarBackground: () => null,
@@ -161,31 +173,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     elevation: 0,
-    height: 88,
   },
   tabBarItem: {
     overflow: 'visible',
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.65)',
+  iconPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  iconActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#B83255',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 6,
+  iconPillActive: {
+    backgroundColor: PILL_COLOR,
   },
   loungeWrapper: {
     position: 'relative',

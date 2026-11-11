@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
+import { useLightTabIconsWhileFocused } from '../../../../lib/tabIconTone';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
 
@@ -81,6 +82,8 @@ function ConfessionCard({ submission, onReact }: {
 }
 
 export default function MonthlyWallScreen() {
+  // Dark page: light inactive tab icons while this is on screen.
+  useLightTabIconsWhileFocused();
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
