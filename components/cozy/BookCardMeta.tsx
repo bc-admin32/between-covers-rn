@@ -23,7 +23,8 @@ function toStringList(value: unknown): string[] {
  * instead of reimplementing the pepper/pill logic per screen.
  *
  * - spice 1–5 → 🌶️ repeated (nothing when null/0)
- * - tropes[]  → prettified pills, capped at `maxTropes` (default 2)
+ * - tropes[]  → prettified pills, capped at `maxTropes` (default 2); with
+ *   `showMoreCount`, a "+N" pill counts the hidden ones
  * - triggers[] → quieter CW badges, only when the array is passed & non-empty
  *
  * Renders a Fragment (stacked Text/View blocks) so the parent card owns layout.
@@ -34,11 +35,13 @@ export default function BookCardMeta({
   tropes,
   triggers,
   maxTropes = 2,
+  showMoreCount = false,
 }: {
   spice?: number | null;
   tropes?: string[];
   triggers?: string[];
   maxTropes?: number;
+  showMoreCount?: boolean;
 }) {
   // Guard the actual value reaching String.repeat(): a non-integer truncates,
   // but Infinity/NaN or a negative/corrupted value would throw a RangeError.
@@ -48,7 +51,9 @@ export default function BookCardMeta({
       ? Math.min(Math.max(Math.trunc(spice), 0), 5)
       : 0;
   const hasSpice = spiceCount > 0;
-  const shownTropes = toStringList(tropes).slice(0, maxTropes);
+  const allTropes = toStringList(tropes);
+  const shownTropes = allTropes.slice(0, maxTropes);
+  const hiddenTropes = allTropes.length - shownTropes.length;
   const shownTriggers = toStringList(triggers);
 
   return (
@@ -66,6 +71,11 @@ export default function BookCardMeta({
               <Text style={styles.tropePillText} numberOfLines={1}>{prettifyEnum(t)}</Text>
             </View>
           ))}
+          {showMoreCount && hiddenTropes > 0 && (
+            <View style={styles.morePill}>
+              <Text style={styles.tropePillText}>+{hiddenTropes}</Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -85,8 +95,11 @@ export default function BookCardMeta({
 const styles = StyleSheet.create({
   spice: { marginTop: 5, fontSize: 11, letterSpacing: 1 },
   tropeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  tropePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '100%' },
-  tropePillText: { fontSize: 8, fontWeight: '700', color: '#6A5969', textTransform: 'uppercase', letterSpacing: 0.5 },
+  // flexShrink lets a long trope end in "…" inside its column instead of
+  // running off the screen edge (Android doesn't shorten it otherwise).
+  tropePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '100%', flexShrink: 1 },
+  tropePillText: { fontSize: 9, fontWeight: '700', color: '#6E6255', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1 }, // 4.5:1 on the pill
+  morePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0 },
   cwRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
   cwPill: { backgroundColor: 'rgba(15,42,72,0.03)', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 1, maxWidth: '100%' },
   cwPillText: { fontSize: 7, fontWeight: '500', color: '#A9A0A6', letterSpacing: 0.3 },

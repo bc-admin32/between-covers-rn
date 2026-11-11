@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Image, ActivityIndicator,
+  StyleSheet, Image, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,6 +73,19 @@ function guestItems(books: GuestBook[], status: LibraryItem['status'] | null, as
     }));
 }
 
+// The query for the current filter and sort. Used for both the reload when
+// the screen comes back into view and the reload when the filter or sort changes.
+function libraryQuery(status: LibraryItem['status'] | null, asc: boolean): string {
+  const p = new URLSearchParams({ sort: 'title', order: asc ? 'asc' : 'desc' });
+  if (status) p.set('status', status);
+  return p.toString();
+}
+
+// Grid: three equal columns that fill the row, with room between rows so a
+// book's details never run into the next row.
+const COL_GAP = 12;
+const ROW_GAP = 20;
+
 export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -86,6 +99,15 @@ export default function LibraryScreen() {
   const [guestView, setGuestView] = useState(false);
   const guestBooksRef = useRef<GuestBook[]>([]);
   const { requireAccount } = useGuest();
+  const { width } = useWindowDimensions();
+  const cellWidth = Math.floor((width - spacing.md * 2 - COL_GAP * 2) / 3);
+  // The reload on focus reads these, so coming back to the Library keeps the
+  // filter and sort that are showing (it used to reload everything A–Z while
+  // the old pill stayed selected).
+  const statusRef = useRef(statusFilter);
+  statusRef.current = statusFilter;
+  const sortRef = useRef(sortAsc);
+  sortRef.current = sortAsc;
 
   useFocusEffect(useCallback(() => {
     async function load() {
@@ -96,13 +118,13 @@ export default function LibraryScreen() {
           setGuestView(true);
           setSnapshot(guestSnapshot(books));
           setUserName(null);
-          setItems(guestItems(books, null, true));
+          setItems(guestItems(books, statusRef.current, sortRef.current));
           return;
         }
         setGuestView(false);
         const [snapshotRes, libraryRes] = await Promise.all([
           apiGet<LibrarySnapshotResponse>('/library/snapshot'),
-          apiGet<{ items: LibraryItem[] }>('/library?sort=title&order=asc'),
+          apiGet<{ items: LibraryItem[] }>(`/library?${libraryQuery(statusRef.current, sortRef.current)}`),
         ]);
         setSnapshot(snapshotRes.snapshot);
         setUserName(snapshotRes.displayName || null);
@@ -123,12 +145,8 @@ export default function LibraryScreen() {
       return;
     }
     async function reload() {
-      const params = new URLSearchParams();
-      if (statusFilter) params.set('status', statusFilter);
-      params.set('sort', 'title');
-      params.set('order', sortAsc ? 'asc' : 'desc');
       try {
-        const res = await apiGet<{ items: LibraryItem[] }>(`/library?${params.toString()}`);
+        const res = await apiGet<{ items: LibraryItem[] }>(`/library?${libraryQuery(statusFilter, sortAsc)}`);
         setItems(res.items || []);
       } catch {
         setItems([]);
@@ -150,7 +168,8 @@ export default function LibraryScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           {loaded && (
-            <Text style={styles.title}>
+            // Long names wrap to two lines, then shrink a little, never clipped.
+            <Text style={styles.title} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
               {userName ? `${userName}'s Library` : 'My Library'}
             </Text>
           )}
@@ -170,7 +189,14 @@ export default function LibraryScreen() {
 
         {/* FILTER PILLS */}
         {snapshot && (
-          <View style={styles.filterRow}>
+          // One row that scrolls sideways; it doesn't block the page's vertical scroll.
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            <FilterPill
+              label="All Books"
+              count={snapshot.reading + snapshot.wishlist + snapshot.finished + (snapshot.dnf ?? 0)}
+              active={statusFilter === null}
+              onPress={() => setStatusFilter(null)}
+            />
             <FilterPill
               label="Reading"
               count={snapshot.reading}
@@ -195,7 +221,7 @@ export default function LibraryScreen() {
               active={statusFilter === 'DNF'}
               onPress={() => setStatusFilter(statusFilter === 'DNF' ? null : 'DNF')}
             />
-          </View>
+          </ScrollView>
         )}
 
         {/* ACTION ROW */}
@@ -258,7 +284,7 @@ export default function LibraryScreen() {
                 {section.books.map((item) => (
                   <TouchableOpacity
                     key={item.workId}
-                    style={styles.gridItem}
+                    style={{ width: cellWidth }}
                     onPress={() => router.push(`/book?workId=${item.workId}` as any)}
                   >
                     <View style={styles.coverWrapper}>
@@ -269,12 +295,13 @@ export default function LibraryScreen() {
                           <Ionicons name="book" size={24} color="#A9C0D4" />
                         </View>
                       )}
+                      {/* Status on the cover's corner, so it never overlaps the title or details. */}
+                      {item.status === 'DNF' && <Text style={styles.coverBadge}>DNF</Text>}
                     </View>
                     <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.bookAuthor} numberOfLines={1}>{item.primaryAuthor}</Text>
-                    {item.status === 'DNF' && <Text style={styles.dnfLabel}>DNF</Text>}
-                    {/* Tighter 3-col card — keep it compact: peppers + 1 pill. */}
-                    <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={1} />
+                    <Text style={styles.bookAuthor} numberOfLines={2}>{item.primaryAuthor}</Text>
+                    {/* Tighter 3-col card: peppers, the first trope, and "+N" for the rest. */}
+                    <BookCardMeta spice={item.spice} tropes={item.tropes} maxTropes={1} showMoreCount />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -370,13 +397,15 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   container: { flex: 1, backgroundColor: '#F0EDE4' },
-  header: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg },
-  title: { fontSize: 38, color: '#B83255', fontFamily: 'DancingScript_700Bold' },
-  subtitle: { fontSize: 11, color: 'rgba(106,89,105,0.7)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
-  divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginVertical: spacing.sm },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
-  filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#D7E2E9' },
-  filterPillActive: { backgroundColor: '#0F2A48' },
+  header: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs, paddingHorizontal: spacing.lg },
+  // lineHeight keeps Dancing Script's tall letters from clipping.
+  title: { fontSize: 34, lineHeight: 42, color: '#B83255', fontFamily: 'DancingScript_700Bold', textAlign: 'center' },
+  subtitle: { fontSize: 11, color: '#6A5969', letterSpacing: 1.5, textTransform: 'uppercase' },
+  divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginTop: spacing.xs, marginBottom: spacing.xs },
+  filterRow: { gap: 8, paddingVertical: spacing.xs, paddingHorizontal: spacing.lg },
+  // The border gives the pill a 3:1 edge on the cream page.
+  filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: '#D7E2E9', borderWidth: 1, borderColor: '#8E8478' },
+  filterPillActive: { backgroundColor: '#0F2A48', borderColor: '#0F2A48' },
   filterPillText: { fontSize: 12, fontWeight: '700', color: '#0F2A48' },
   filterPillTextActive: { color: '#fff' },
   actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
@@ -396,13 +425,13 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: spacing.xs },
   sectionTitle: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62' },
   sectionCount: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  gridItem: { width: '30%' },
-  coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: COL_GAP, rowGap: ROW_GAP },
+  coverWrapper: { width: '100%', aspectRatio: 2 / 3, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3, marginBottom: 6 },
   coverImage: { width: '100%', height: '100%' },
   noCover: { alignItems: 'center', justifyContent: 'center' },
-  bookTitle: { fontSize: 10, fontWeight: '700', color: '#0F2A48', lineHeight: 14, marginBottom: 2 },
-  bookAuthor: { fontSize: 9, fontWeight: '400', color: '#9c8f7e' },
+  bookTitle: { fontSize: 11, fontWeight: '700', color: '#0F2A48', lineHeight: 14 },
+  bookAuthor: { fontSize: 10, fontWeight: '400', color: '#6E6255', lineHeight: 13, marginTop: 2 },
+  coverBadge: { position: 'absolute', top: 4, right: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: 'rgba(15,42,72,0.85)', color: '#FFFFFF', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   list: { gap: 1 },
   listItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff', paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 4 },
   listItemFirst: { borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
@@ -413,5 +442,4 @@ const styles = StyleSheet.create({
   listTitle: { fontSize: 13, fontWeight: '600', color: '#0F2A48', lineHeight: 18 },
   listAuthor: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', marginTop: 2 },
   listMeta: { fontSize: 10, fontWeight: '700', color: '#B83255', flexShrink: 0 },
-  dnfLabel: { fontSize: 10, fontWeight: '700', color: '#B83255', marginTop: 2 },
 });

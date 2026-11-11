@@ -349,13 +349,8 @@ export default function LibraryDiscoverScreen() {
         </View>
       );
     }
-    if (mode === 'search' && !hasSearched) {
-      return (
-        <View style={styles.emptyState}>
-          <Text style={styles.placeholderText}>Search for a title, author, or series</Text>
-        </View>
-      );
-    }
+    // Before a search the page stays clean: the placeholder already says what to type.
+    if (mode === 'search' && !hasSearched) return null;
     if (mode === 'filter') {
       return (
         <View style={styles.emptyState}>
@@ -375,11 +370,14 @@ export default function LibraryDiscoverScreen() {
           <CaretLeft size={20} color="#0F2A48" weight="bold" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerLabel}>Discover</Text>
+          <Text style={styles.headerLabel}>FIND MORE BOOKS</Text>
           <Text style={styles.headerTitle}>Find Your Next Read</Text>
         </View>
         <TouchableOpacity
           style={styles.irisButton}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Chat with Iris"
           onPress={() => router.push('/iris/chat?from=library/discover' as any)}
         >
           <Image
@@ -389,13 +387,10 @@ export default function LibraryDiscoverScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* IRIS NOTE */}
-      <View style={styles.irisNote}>
-        <Text style={styles.irisNoteIcon}>✦</Text>
-        <Text style={styles.irisNoteText}>
-          Not sure what to read next? Tap my avatar and I'll help you find something you'll love.
-        </Text>
-      </View>
+      {/* Iris, as supporting text under the heading: no card. */}
+      <Text style={styles.irisLine}>
+        Not sure what you're in the mood for? Ask me. I know a thing or two about finding your next obsession.
+      </Text>
 
       {/* MODE SWITCH */}
       <View style={styles.modeSwitch}>
@@ -545,18 +540,17 @@ function DiscoverBookCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0EDE4' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
   backButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
   backArrow: { fontSize: 18, color: '#0F2A48', fontWeight: '600' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4' },
-  headerTitle: { fontSize: 26, fontWeight: '600', color: '#0F2A48', fontStyle: 'italic' },
+  headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: '#B83255' },
+  // Wraps on small screens instead of crowding the back button or Iris.
+  headerTitle: { fontSize: 22, fontWeight: '600', color: '#0F2A48', fontStyle: 'italic', textAlign: 'center' },
   irisButton: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#C4A882', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 3 },
   irisAvatar: { width: 44, height: 44, borderRadius: 22 },
-  irisNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, backgroundColor: '#fff', borderRadius: radius.md, borderWidth: 1, borderColor: '#D7E2E9' },
-  irisNoteIcon: { fontSize: 14, marginTop: 1 },
-  irisNoteText: { flex: 1, fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 21 },
-  modeSwitch: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', padding: 3 },
+  irisLine: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.md },
+  modeSwitch: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', padding: 3 },
   modeTab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   modeTabActive: { backgroundColor: '#0F2A48' },
   modeTabText: { fontSize: 12, fontWeight: '700', color: '#9c8f7e' },
@@ -589,7 +583,7 @@ const styles = StyleSheet.create({
   tropeModeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: '#9c8f7e' },
   tropeModeTextActive: { color: '#0F2A48' },
   boundaryNote: { fontSize: 12, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center', marginBottom: spacing.md, lineHeight: 18 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', paddingHorizontal: spacing.md },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: 999, borderWidth: 1.5, borderColor: '#D7E2E9', paddingHorizontal: spacing.md },
   searchIcon: { fontSize: 14, marginRight: spacing.sm },
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: '#0F2A48' },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.md },
@@ -597,7 +591,6 @@ const styles = StyleSheet.create({
   resultsContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   emptyState: { paddingTop: 48, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300', lineHeight: 22, textAlign: 'center' },
-  placeholderText: { fontSize: 18, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center' },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: spacing.md },
   // SectionList's renderItem gets one pre-chunked row (NUM_COLUMNS items) at
   // a time — gap covers horizontal space between items, marginBottom the
