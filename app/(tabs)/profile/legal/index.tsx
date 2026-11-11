@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, CaretRight, FileText, LockSimple, ShieldWarning, UsersThree } from '../../../../components/icons';
@@ -47,10 +47,15 @@ export default function LegalScreen() {
           ))}
         </View>
 
-        <Text style={styles.support}>
-          Questions?{' '}
+        <Text style={styles.support}>Questions?</Text>
+        <TouchableOpacity
+          style={styles.supportLinkWrap}
+          onPress={() => Linking.openURL('mailto:support@betweencovers.app').catch(() => {})}
+          accessibilityRole="link"
+          hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+        >
           <Text style={styles.supportLink}>support@betweencovers.app</Text>
-        </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -69,6 +74,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'space-between', padding: spacing.lg },
   rowBorder: { borderTopWidth: 1, borderTopColor: PF.border },
   rowLabel: { flex: 1, fontSize: 14, color: PF.text },
-  support: { marginTop: spacing.xl, textAlign: 'center', fontSize: 12, color: PF.secondary, letterSpacing: 0.2 },
-  supportLink: { color: PF.text, fontWeight: '600' },
+  support: { marginTop: spacing.xl, textAlign: 'center', fontSize: 11, color: PF.secondary, letterSpacing: 0.2 },
+  // Quieter than before but clearly a link (5.4:1), and it opens Mail.
+  supportLinkWrap: { alignSelf: 'center', marginTop: 2 },
+  supportLink: { fontSize: 12, color: PF.label, textDecorationLine: 'underline' },
 });
