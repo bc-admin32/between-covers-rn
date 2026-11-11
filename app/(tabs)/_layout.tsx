@@ -21,8 +21,9 @@ const PILL_COLOR = '#EBC2CD';
 // One solid bar on every screen; inactive icons are 6.7:1 on it.
 const BAR_COLOR = '#FDFAF6';
 const BAR_BORDER = '#E0D8CC';
-const ICON_SIZE = 22;
-// Room for the icon row above the bottom safe area.
+const ICON_SIZE = 26;
+// The icon row above the bottom safe area: the 42pt pill (26pt icon + 8pt
+// padding top and bottom) with 7pt above and below.
 const BAR_CONTENT_HEIGHT = 56;
 
 type IconName = 'home' | 'cozy' | 'library' | 'lounge' | 'profile';
@@ -88,6 +89,10 @@ export default function TabLayout() {
         tabBarStyle: [styles.tabBar, { height: BAR_CONTENT_HEIGHT + bottomPad, paddingBottom: bottomPad }],
         tabBarShowLabel: false,
         tabBarItemStyle: styles.tabBarItem,
+        // React Navigation stacks tab items from the top (room for a label we
+        // hide), which put the icons at the top with an empty band below.
+        // Letting the icon box fill the item centers the pill.
+        tabBarIconStyle: { flex: 1 },
         tabBarHideOnKeyboard: true,
       }}
     >
