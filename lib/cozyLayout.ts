@@ -66,6 +66,14 @@ function apply(next: CozyLayout): void {
   listeners.forEach((l) => l(next));
 }
 
+// True when a live-month payload actually carries a `layout` field. Callers
+// only report a layout when it does: a response that leaves the field out
+// (an older endpoint or mirror) keeps the current value instead of flipping
+// every screen to Classic.
+export function hasLayoutField(active: unknown): active is { layout: unknown } {
+  return !!active && typeof active === 'object' && 'layout' in active;
+}
+
 // The server's value, from any fetch of the live month.
 export function setActiveCozyLayout(raw: unknown): void {
   haveServerValue = true;
@@ -91,7 +99,8 @@ export async function loadSavedCozyLayout(): Promise<void> {
       return;
     }
     const cozy = await SecureStore.getItemAsync(COZY_CACHE_KEY);
-    if (cozy) setSavedCozyLayout(JSON.parse(cozy)?.active?.layout);
+    const active = cozy ? JSON.parse(cozy)?.active : null;
+    if (hasLayoutField(active)) setSavedCozyLayout(active.layout);
   } catch {}
 }
 
@@ -101,7 +110,7 @@ let inFlight: Promise<void> | null = null;
 export function refreshActiveCozyLayout(): Promise<void> {
   if (!inFlight) {
     inFlight = apiGet<{ active?: { layout?: string } }>('/cozy/home')
-      .then((res) => setActiveCozyLayout(res?.active?.layout))
+      .then((res) => { if (hasLayoutField(res?.active)) setActiveCozyLayout(res.active.layout); })
       .catch(() => {})
       .finally(() => { inFlight = null; });
   }

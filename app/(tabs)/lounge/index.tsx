@@ -11,7 +11,7 @@ import { apiGet, apiPost } from '../../../lib/api';
 import { useGuest } from '../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../lib/theme';
 import { parseLocalDate, formatFullDate } from '../../../lib/dateUtils';
-import { setActiveCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
+import { hasLayoutField, setActiveCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
 import { useDarkStatusBarWhileFocused } from '../../../lib/statusBarTone';
 import PillowTalk from '../../../components/playroom/PillowTalk';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
@@ -121,7 +121,7 @@ export default function LoungeScreen() {
       loungeCache = { ...res, loungeTermsAcceptedAt: acceptedAt };
       setData(loungeCache);
       setError(null);
-      if (res.active) setActiveCozyLayout(res.active.layout);
+      if (hasLayoutField(res.active)) setActiveCozyLayout(res.active.layout);
       if (!acceptedAt && !res.isGuest) setEulaModal(true);
       applyPoll(loungeCache);
     } catch {
