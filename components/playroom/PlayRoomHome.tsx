@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, HeartStraight } from '../icons';
 import { spacing } from '../../lib/theme';
-import { useLightTabIconsWhileFocused } from '../../lib/tabIconTone';
 import { track } from '../../lib/analytics';
 import { resolveTiles, newbiesLabel, monthNameFromLabel, type TileKey } from '../../lib/cozyLayout';
 import { monthEvents } from '../../lib/cozyEvents';
@@ -86,8 +85,6 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   // Last month, opened from "← Last Month".
   isArchive?: boolean;
 }) {
-  // Dark page: light inactive tab icons while this is on screen.
-  useLightTabIconsWhileFocused();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -281,7 +278,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
           </>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );

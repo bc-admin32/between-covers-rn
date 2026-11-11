@@ -224,7 +224,7 @@ export default function CozyBooksScreen() {
             )}
           </>
         )}
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );

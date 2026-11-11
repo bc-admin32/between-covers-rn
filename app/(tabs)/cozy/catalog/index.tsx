@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   clearButton: { borderWidth: 1, borderColor: '#ddd4c8', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 4 },
   clearButtonText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
   list: { flex: 1 },
-  scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   filterLabel: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62', marginBottom: 12, paddingHorizontal: spacing.xs },
   // Spice — the prominent primary control: 5 tappable peppers.
   pepperRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg, paddingHorizontal: spacing.xs },

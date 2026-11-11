@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
-import { useLightTabIconsWhileFocused } from '../../../../lib/tabIconTone';
 import { usePlayroom } from '../../../../lib/playroomPage';
 
 const EMOJI_TRAY = ['❤️', '😂', '😭', '🔥', '👏', '✨', '😍', '💀', '🫶', '📚'];
@@ -83,8 +82,6 @@ function ConfessionCard({ submission, onReact }: {
 }
 
 export default function MonthlyWallScreen() {
-  // Dark page: light inactive tab icons while this is on screen.
-  useLightTabIconsWhileFocused();
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
@@ -150,7 +147,7 @@ export default function MonthlyWallScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1A1A2E' },
-  scrollContent: { paddingBottom: 100 },
+  scrollContent: { paddingBottom: spacing.xl },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(196,168,130,0.15)', alignItems: 'center', justifyContent: 'center' },

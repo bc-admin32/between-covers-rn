@@ -8,7 +8,6 @@ import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost, hasSession } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
@@ -154,7 +153,6 @@ export default function IrisThoughtsScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
   const { id, title: paramTitle, prompt: paramPrompt } = useLocalSearchParams<{ id: string; title: string; prompt: string }>();
   // Explicitly decode in case Expo Router leaves %23 etc. un-decoded — the
   // Lambda pk check does a literal startsWith("IRIS#CHAT#") and will reject
@@ -284,7 +282,7 @@ export default function IrisThoughtsScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={tabBarHeight + 50}
+      keyboardVerticalOffset={0}
     >
       {toast && (
         <View style={styles.toast} pointerEvents="none">
@@ -331,14 +329,14 @@ export default function IrisThoughtsScreen() {
 
       {/* CLOSED — replaces the composer once the discussion has closed */}
       {threadId && isClosed && (
-        <View style={[styles.closedBar, { paddingBottom: insets.bottom + 65 }]}>
+        <View style={[styles.closedBar, { paddingBottom: spacing.sm }]}>
           <Text style={styles.closedText}>🔒 {THREAD_CLOSED_MESSAGE}</Text>
         </View>
       )}
 
       {/* COMPOSER — show if threadId is available, even on replies error */}
       {threadId && !isClosed && (
-        <View style={[styles.composer, { paddingBottom: keyboardVisible ? insets.bottom + 8 : insets.bottom + 65 }]}>
+        <View style={[styles.composer, { paddingBottom: spacing.sm }]}>
           {showEmojiTray && (
             <View style={styles.emojiTray}>
               {EMOJI_TRAY.map((emoji) => (

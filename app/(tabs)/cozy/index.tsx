@@ -658,7 +658,7 @@ export default function CozyScreen() {
 
         <AffiliateDisclosure />
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );

@@ -331,7 +331,7 @@ export default function LibraryScreen() {
           ))}
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );

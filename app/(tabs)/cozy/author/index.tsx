@@ -163,7 +163,7 @@ export default function AuthorDetailScreen() {
     <View style={[styles.container, playroom && prStyles.page]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 + spacing.xl }}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
       >
         {/* HERO */}
         <View style={[styles.hero, { paddingTop: insets.top }]}>

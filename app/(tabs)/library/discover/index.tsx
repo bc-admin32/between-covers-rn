@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: '#0F2A48' },
   divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.md },
   results: { flex: 1 },
-  resultsContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
+  resultsContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   emptyState: { paddingTop: 48, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#6A5969', fontWeight: '300', lineHeight: 22, textAlign: 'center' },
   placeholderText: { fontSize: 18, fontStyle: 'italic', color: '#9c8f7e', textAlign: 'center' },

@@ -375,7 +375,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-      <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 88 + insets.bottom }]}>
+      <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: spacing.md }]}>
 
         {/* GREETING */}
         <Text style={styles.greeting}>{data.greeting.text}</Text>

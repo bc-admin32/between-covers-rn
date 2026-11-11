@@ -518,7 +518,7 @@ export default function LoungeThreadScreen() {
 
       {/* COMPOSER */}
       {isClosed ? (
-        <View style={[styles.closedBar, { paddingBottom: Math.max(insets.bottom, 0) + 64 }]}>
+        <View style={[styles.closedBar, { paddingBottom: spacing.sm }]}>
           <View style={styles.closedPill}>
             <Text style={styles.closedEmoji}>🔒</Text>
             <Text style={styles.closedText}>{thread.closed ? THREAD_CLOSED_MESSAGE : 'This conversation has closed'}</Text>
@@ -526,7 +526,7 @@ export default function LoungeThreadScreen() {
           <Text style={styles.closedSubtext}>Thanks for being part of it ✦</Text>
         </View>
       ) : (
-        <View style={[styles.composer, { paddingBottom: keyboardVisible ? Math.max(insets.bottom, 0) + 8 : Math.max(insets.bottom, 0) + 64 }]}>
+        <View style={[styles.composer, { paddingBottom: spacing.sm }]}>
           {replyingTo && (
             <View style={styles.replyingToBar}>
               <Text style={styles.replyingToText}>

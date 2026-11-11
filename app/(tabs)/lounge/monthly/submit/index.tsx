@@ -10,7 +10,6 @@ import * as Haptics from 'expo-haptics';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { useGuest } from '../../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../../lib/theme';
-import { useLightTabIconsWhileFocused } from '../../../../../lib/tabIconTone';
 
 type Prompt = {
   promptId: string;
@@ -25,8 +24,6 @@ type Prompt = {
 };
 
 export default function MonthlySubmitScreen() {
-  // Dark page: light inactive tab icons while this is on screen.
-  useLightTabIconsWhileFocused();
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
@@ -162,7 +159,7 @@ export default function MonthlySubmitScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1A1A2E' },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
   backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(196,168,130,0.15)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   title: { fontSize: 28, flex: 1, color: '#FDFAF6', fontStyle: 'italic', fontWeight: '700', lineHeight: 34 },

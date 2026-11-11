@@ -5,7 +5,6 @@ import { apiGet } from '../../lib/api';
 import { registerForPushNotifications } from '../../lib/pushNotifications';
 import { useGuest } from '../../lib/useGuest';
 import { loadSavedCozyLayout, refreshActiveCozyLayout, useActiveCozyLayout } from '../../lib/cozyLayout';
-import { useLightTabIcons } from '../../lib/tabIconTone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   HouseSimple,
@@ -18,10 +17,10 @@ import {
 
 const ACTIVE_COLOR = '#B83255';
 const INACTIVE_COLOR = '#6A5550';
-// Inactive icons on dark screens (PlayRoom, Read the Confessions, Submit);
-// see lib/tabIconTone.ts.
-const INACTIVE_COLOR_ON_DARK = '#FDFAF6';
 const PILL_COLOR = '#EBC2CD';
+// One solid bar on every screen; inactive icons are 6.7:1 on it.
+const BAR_COLOR = '#FDFAF6';
+const BAR_BORDER = '#E0D8CC';
 const ICON_SIZE = 22;
 // Room for the icon row above the bottom safe area.
 const BAR_CONTENT_HEIGHT = 56;
@@ -29,8 +28,7 @@ const BAR_CONTENT_HEIGHT = 56;
 type IconName = 'home' | 'cozy' | 'library' | 'lounge' | 'profile';
 
 function TabIcon({ name, focused, playroom = false }: { name: IconName; focused: boolean; playroom?: boolean }) {
-  const lightIcons = useLightTabIcons();
-  const color = focused ? ACTIVE_COLOR : lightIcons ? INACTIVE_COLOR_ON_DARK : INACTIVE_COLOR;
+  const color = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
   const weight = focused ? 'fill' : 'regular';
 
   const icon = {
@@ -90,7 +88,7 @@ export default function TabLayout() {
         tabBarStyle: [styles.tabBar, { height: BAR_CONTENT_HEIGHT + bottomPad, paddingBottom: bottomPad }],
         tabBarShowLabel: false,
         tabBarItemStyle: styles.tabBarItem,
-        tabBarBackground: () => null,
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
@@ -158,9 +156,11 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    position: 'absolute',
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
+    // Part of the layout, not floating: screens end at its top edge, so
+    // nothing scrolls underneath it.
+    backgroundColor: BAR_COLOR,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BAR_BORDER,
     elevation: 0,
   },
   tabBarItem: {

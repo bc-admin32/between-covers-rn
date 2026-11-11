@@ -230,7 +230,7 @@ export default function ProfileScreen() {
           <MenuRow icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
 
       <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

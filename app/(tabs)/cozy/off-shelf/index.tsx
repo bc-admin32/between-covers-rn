@@ -97,7 +97,7 @@ export default function OffShelfScreen() {
             ))}
           </View>
         )}
-        <View style={{ height: 100 }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </View>
   );
