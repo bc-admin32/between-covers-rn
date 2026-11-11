@@ -11,7 +11,7 @@ import { monthEvents } from '../../lib/cozyEvents';
 import EventCard from './EventCard';
 import { PLAYROOM_TILES, TILE_IMAGE_BASE } from './tiles';
 import {
-  PLAYROOM_BACKGROUND_URL, IRIS_PLAYROOM_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
+  PLAYROOM_BACKGROUND_URL, IRIS_AVATAR_URL, WINE, CHAMPAGNE, ROSE_GOLD, GOLD,
   TILE_FILL, CARD_BORDER, FONT_SCRIPT, FONT_CAPS, FONT_THEME, FONT_TILE, FONT_BODY,
 } from './playroomStyle';
 
@@ -51,13 +51,6 @@ const PHOTO_RATIO = 720 / 500;
 // Iris's circle: 92pt ring with a 1.5pt border and 3pt padding.
 const IRIS_RING = 92;
 const IRIS_INNER = IRIS_RING - 2 * (1.5 + 3);
-// The PlayRoom portrait (3:4, head and shoulders) is cropped to a square 80%
-// of its width, centered, starting 3% down: her whole head with the face
-// filling the circle, no blouse.
-const PORTRAIT_WIDTH = IRIS_INNER / 0.8;
-const PORTRAIT_HEIGHT = PORTRAIT_WIDTH * (4 / 3);
-const PORTRAIT_LEFT = -(PORTRAIT_WIDTH - IRIS_INNER) / 2;
-const PORTRAIT_TOP = -0.03 * PORTRAIT_HEIGHT;
 
 // Same lookup the classic Cozy page uses for Cozy Extras.
 function lifestyleCount(s: NonNullable<PlayRoomMonth['sections']>): number {
@@ -71,10 +64,6 @@ function monthFromWeekId(weekId?: string): string | null {
   return m ? m[1] : null;
 }
 
-// Set once the PlayRoom portrait of Iris fails to load, so later visits go
-// straight to the avatar. Resets on the next app launch, which picks up a
-// newly uploaded portrait.
-let irisPortraitMissing = false;
 // Tile photos that failed to load this launch (same idea, per tile).
 const tilePhotosMissing = new Set<TileKey>();
 
@@ -93,11 +82,6 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   const tileHeight = Math.round(photoWidth / PHOTO_RATIO);
   // Until the background is uploaded (or if it fails to load), the page is WINE.
   const [backgroundFailed, setBackgroundFailed] = useState(false);
-  const [irisPortraitFailed, setIrisPortraitFailed] = useState(irisPortraitMissing);
-  const onIrisPortraitError = () => {
-    irisPortraitMissing = true;
-    setIrisPortraitFailed(true);
-  };
   const [failedTilePhotos, setFailedTilePhotos] = useState<ReadonlySet<TileKey>>(() => new Set(tilePhotosMissing));
   const onTilePhotoError = (key: TileKey) => {
     tilePhotosMissing.add(key);
@@ -201,29 +185,14 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                   accessibilityRole="button"
                   accessibilityLabel="Chat with Iris"
                 >
-                  {!irisPortraitFailed ? (
-                    // Cropped to her face (see PORTRAIT_*). Kept in memory
-                    // only (not on disk), so a replaced iris.png shows up on
-                    // the next app launch.
-                    <View style={styles.irisClip}>
-                      <Image
-                        source={{ uri: IRIS_PLAYROOM_URL }}
-                        style={styles.irisPortrait}
-                        contentFit="cover"
-                        cachePolicy="memory"
-                        onError={onIrisPortraitError}
-                        accessibilityLabel="Iris"
-                      />
-                    </View>
-                  ) : (
-                    <Image
-                      source={{ uri: IRIS_AVATAR_URL }}
-                      style={styles.irisImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      accessibilityLabel="Iris"
-                    />
-                  )}
+                  {/* Square avatar in a round frame: shown whole, no extra zoom. */}
+                  <Image
+                    source={{ uri: IRIS_AVATAR_URL }}
+                    style={styles.irisImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    accessibilityLabel="Iris"
+                  />
                 </TouchableOpacity>
                 {/* No frame: a thin gold line above and below the theme. */}
                 <View style={styles.themeBlock}>
@@ -309,9 +278,7 @@ const styles = StyleSheet.create({
 
   themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SIDE, marginBottom: spacing.lg },
   irisRing: { width: IRIS_RING, height: IRIS_RING, borderRadius: IRIS_RING / 2, padding: 3, borderWidth: 1.5, borderColor: ROSE_GOLD },
-  irisImage: { width: '100%', height: '100%', borderRadius: 43 },
-  irisClip: { width: '100%', height: '100%', borderRadius: IRIS_INNER / 2, overflow: 'hidden' },
-  irisPortrait: { position: 'absolute', width: PORTRAIT_WIDTH, height: PORTRAIT_HEIGHT, left: PORTRAIT_LEFT, top: PORTRAIT_TOP },
+  irisImage: { width: '100%', height: '100%', borderRadius: IRIS_INNER / 2 },
   themeBlock: { flex: 1 },
   themeLine: { height: StyleSheet.hairlineWidth * 2, backgroundColor: GOLD, opacity: 0.9 },
   themeText: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },

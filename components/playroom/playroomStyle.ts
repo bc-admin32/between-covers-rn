@@ -7,12 +7,8 @@ import { IRIS_AVATAR } from '../../lib/irisAvatar';
 // images on the CDN; until it's uploaded (or if it fails) the page shows WINE.
 export const PLAYROOM_BACKGROUND_URL = 'https://cdn.betweencovers.app/playroom/background.jpg';
 
-// Iris beside the theme banner, in a rose-gold circle: the PlayRoom portrait
-// (3:4 head-and-shoulders PNG) on the CDN, cropped so her face fills the
-// circle, so she can be swapped without an app update. A replacement needs
-// the same framing. If it's missing or fails, the same circle shows the
-// current avatar.
-export const IRIS_PLAYROOM_URL = 'https://cdn.betweencovers.app/playroom/iris.png';
+// Iris beside the theme banner, in a rose-gold circle: her usual avatar, the
+// same image as everywhere else in the app.
 export const IRIS_AVATAR_URL = IRIS_AVATAR;
 
 export const WINE = '#3D0C1C';
