@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../lib/theme';
@@ -67,6 +68,17 @@ export default function PillowTalk({
     router.push(`/(tabs)/lounge/monthly?promptId=${promptId}` as any);
 
   const prompt = monthly ? splitLeadingEmoji(monthly.title) : null;
+  // The Community Read discussion: opened from the strip near the top and from the card at the bottom.
+  const openBookClub = () => {
+    if (!bookClub?.threadId || !bookClub.book) return;
+    router.push(
+      `/lounge/thread?id=${encodeURIComponent(bookClub.threadId)}&kind=book_club` +
+      `&bookWorkId=${encodeURIComponent(bookClub.book.workId)}` +
+      `&bookTitle=${encodeURIComponent(bookClub.book.title)}` +
+      `&bookAuthor=${encodeURIComponent(bookClub.book.author)}` +
+      `&bookCover=${encodeURIComponent(bookClub.book.coverUrl ?? '')}` as any
+    );
+  };
   const discussions = [primary, secondary].filter((d): d is Of<'PRIMARY_THREAD'> | Of<'SECONDARY_THREAD'> => !!d);
 
   return (
@@ -84,6 +96,28 @@ export default function PillowTalk({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* CURRENTLY READING TOGETHER: a compact strip; the full Community Read card stays below. */}
+        {bookClub?.threadId && bookClub.book && (
+          <TouchableOpacity
+            style={styles.readingStrip}
+            activeOpacity={0.85}
+            onPress={openBookClub}
+            accessibilityRole="button"
+            accessibilityLabel={`Currently reading together: ${bookClub.book.title}. Open the discussion`}
+          >
+            {bookClub.book.coverUrl ? (
+              <Image source={{ uri: bookClub.book.coverUrl }} style={styles.stripCover} contentFit="cover" cachePolicy="memory-disk" />
+            ) : (
+              <View style={[styles.stripCover, styles.stripCoverEmpty]} />
+            )}
+            <View style={styles.stripText}>
+              <Text style={styles.eyebrow}>Currently Reading Together</Text>
+              <Text style={styles.stripTitle} numberOfLines={1}>{bookClub.book.title}</Text>
+              <Text style={styles.stripLink}>{bookClub.isOpen ? 'Join the discussion →' : 'Read the discussion →'}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* THE CONFESSIONAL */}
         {monthly && prompt && (
@@ -231,13 +265,7 @@ export default function PillowTalk({
           <TouchableOpacity
             style={[styles.card, styles.readCard]}
             activeOpacity={0.85}
-            onPress={() => router.push(
-              `/lounge/thread?id=${encodeURIComponent(bookClub.threadId)}&kind=book_club` +
-              `&bookWorkId=${encodeURIComponent(bookClub.book.workId)}` +
-              `&bookTitle=${encodeURIComponent(bookClub.book.title)}` +
-              `&bookAuthor=${encodeURIComponent(bookClub.book.author)}` +
-              `&bookCover=${encodeURIComponent(bookClub.book.coverUrl ?? '')}` as any
-            )}
+            onPress={openBookClub}
           >
             <View style={styles.cardHeaderRow}>
               <Text style={styles.eyebrow}>Community Read</Text>
@@ -304,6 +332,12 @@ const styles = StyleSheet.create({
   pollCard: { backgroundColor: POLL_BG },
   readCard: { borderColor: READ_BORDER, backgroundColor: READ_BG },
   eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: ROSE, fontFamily: 'Nunito_700Bold' },
+  readingStrip: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: spacing.md, marginBottom: spacing.md, padding: 10, borderRadius: 14, backgroundColor: READ_BG, borderWidth: 1, borderColor: READ_BORDER },
+  stripCover: { width: 36, height: 54, borderRadius: 4 },
+  stripCoverEmpty: { backgroundColor: CARD_BORDER },
+  stripText: { flex: 1 },
+  stripTitle: { fontSize: 17, lineHeight: 21, color: INK, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 2 },
+  stripLink: { fontSize: 12, color: BODY, fontFamily: 'Nunito_700Bold', marginTop: 2 },
   eyebrowDark: { fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: GOLD, fontFamily: 'Nunito_700Bold' },
   confessionalTitle: { fontSize: 34, lineHeight: 38, color: IVORY, fontFamily: 'Cormorant_700Bold_Italic', marginTop: 6 },
   confessionalTagline: { fontSize: 14, color: IVORY_60, fontFamily: 'Nunito_400Regular_Italic', marginTop: 4 },
