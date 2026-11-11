@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, HeartStraight } from '../icons';
@@ -44,9 +45,17 @@ export type PlayRoomMonth = {
 
 const TILE_GAP = 12;
 const SIDE = spacing.md;
-// Tile photo: 42% of the card's width, at the photos' 720 x 500 shape.
+// Tile height (unchanged): what a 42%-wide photo at the 720 x 500 shape needs.
+// The text column starts at that same 42% mark.
 const PHOTO_SHARE = 0.42;
 const PHOTO_RATIO = 720 / 500;
+// The photo runs under the text: 60% of the card from the left, filling the
+// height (about 1.43x, trimming ~15% top and bottom). The tile fill fades in
+// over it from 25% to 55% of the tile, so there's no line between photo and text.
+const PHOTO_COVER_SHARE = 0.6;
+const FADE_START = 0.25;
+const FADE_MID = 0.4; // 60% opaque here
+const FADE_END = 0.55;
 
 // Iris's circle: 92pt ring with a 1.5pt border and 3pt padding.
 const IRIS_RING = 92;
@@ -80,6 +89,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
   const cardWidth = width - SIDE * 2;
   const photoWidth = Math.round(cardWidth * PHOTO_SHARE);
   const tileHeight = Math.round(photoWidth / PHOTO_RATIO);
+  const coverWidth = Math.round(cardWidth * PHOTO_COVER_SHARE);
   // Until the background is uploaded (or if it fails to load), the page is WINE.
   const [backgroundFailed, setBackgroundFailed] = useState(false);
   const [failedTilePhotos, setFailedTilePhotos] = useState<ReadonlySet<TileKey>>(() => new Set(tilePhotosMissing));
@@ -212,7 +222,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
               <EventCard key={e.eventId ?? e.sk ?? `${e.title}-${i}`} event={e} variant="playroom" />
             ))}
 
-            {/* TILES — one wide card per row: photo left, title + description right */}
+            {/* TILES — one wide card per row: photo from the left fading into the fill, title + description right */}
             <View style={styles.tileList}>
               {visibleTiles.map((t) => {
                 const tileLabel = label(t.key, t.label);
@@ -226,7 +236,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                     accessibilityLabel={tileLabel}
                     accessibilityHint={t.description}
                   >
-                    <View style={[styles.tilePhoto, { width: photoWidth, backgroundColor: t.placeholder }]}>
+                    <View style={[styles.tilePhoto, { width: coverWidth, backgroundColor: t.placeholder }]}>
                       {!failedTilePhotos.has(t.key) && (
                         // Kept in memory only, so a replaced photo shows up
                         // on the next app launch.
@@ -241,7 +251,18 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                         />
                       )}
                     </View>
-                    <View style={styles.tileText}>
+                    {/* The fill fades in over the photo. */}
+                    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                      <Defs>
+                        <LinearGradient id={`fade-${t.key}`} x1="0" y1="0" x2="1" y2="0">
+                          <Stop offset={FADE_START} stopColor={TILE_FILL} stopOpacity={0} />
+                          <Stop offset={FADE_MID} stopColor={TILE_FILL} stopOpacity={0.6} />
+                          <Stop offset={FADE_END} stopColor={TILE_FILL} stopOpacity={1} />
+                        </LinearGradient>
+                      </Defs>
+                      <Rect width="100%" height="100%" fill={`url(#fade-${t.key})`} />
+                    </Svg>
+                    <View style={[styles.tileText, { left: photoWidth }]}>
                       <Text style={styles.tileTitle} numberOfLines={2}>{tileLabel}</Text>
                       <Text style={styles.tileDescription} numberOfLines={1}>{t.description}</Text>
                     </View>
@@ -287,13 +308,14 @@ const styles = StyleSheet.create({
   themeTagline: { ...shadow, fontSize: 12, lineHeight: 17, letterSpacing: 1, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', marginTop: 4 },
 
   tileList: { paddingHorizontal: SIDE, gap: TILE_GAP, marginTop: spacing.sm },
-  tile: { flexDirection: 'row', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: TILE_FILL },
-  tilePhoto: { height: '100%', overflow: 'hidden' },
-  tileText: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
+  tile: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: TILE_FILL },
+  tilePhoto: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
+  // Same text column as before, now over the fill.
+  tileText: { position: 'absolute', top: 0, bottom: 0, right: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
   // One size on every tile: 19pt fits "Between the Sheets" and "September's
   // Newbies" on one line down to 360pt-wide phones.
-  tileTitle: { fontSize: 19, lineHeight: 22, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center', includeFontPadding: false },
-  tileDescription: { fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', opacity: 0.9, includeFontPadding: false },
+  tileTitle: { ...shadow, fontSize: 19, lineHeight: 22, color: CHAMPAGNE, fontFamily: FONT_TILE, textAlign: 'center', includeFontPadding: false },
+  tileDescription: { ...shadow, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: CHAMPAGNE, fontFamily: FONT_BODY, textAlign: 'center', opacity: 0.9, includeFontPadding: false },
 
   empty: { ...shadow, textAlign: 'center', color: CHAMPAGNE, fontFamily: 'Nunito_400Regular', marginTop: spacing.xl, paddingHorizontal: spacing.lg },
 });
