@@ -344,7 +344,7 @@ export default function LibraryDiscoverScreen() {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
-            No results found. Try a different title or author, or ask Iris for a recommendation ✦
+            No matches this time. Try another title, author, or series.
           </Text>
         </View>
       );
@@ -418,7 +418,7 @@ export default function LibraryDiscoverScreen() {
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search by title or author"
+              placeholder="Search titles, authors, or series"
               placeholderTextColor="#6E6255"
               style={styles.searchInput}
               returnKeyType="search"
