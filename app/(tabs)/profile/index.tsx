@@ -10,7 +10,9 @@ import * as Haptics from 'expo-haptics';
 import { signOut } from '../../../lib/signout';
 import { FeedbackModal } from '../../../components/FeedbackModal';
 import { OptimizedImage } from '../../../components/OptimizedImage';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import type { Icon } from 'phosphor-react-native';
+import { Camera, CaretRight, ChatCircleText, HeartStraight, Scales, SignOut, UserCircle } from '../../../components/icons';
+import { PF } from '../../../lib/profileTheme';
 import * as ImagePicker from 'expo-image-picker';
 import { apiGet, apiPost, apiPatch } from '../../../lib/api';
 import { spacing, colors } from '../../../lib/theme';
@@ -43,16 +45,16 @@ const SPICE_GLYPHS: Record<string, string> = {
   VERY_HOT: '🥵',
 };
 
-function MenuRow({ icon, label, onPress, danger }: {
-  icon: string; label: string; onPress: () => void; danger?: boolean;
+function MenuRow({ icon: RowIcon, label, onPress, danger }: {
+  icon: Icon; label: string; onPress: () => void; danger?: boolean;
 }) {
   return (
     <TouchableOpacity style={styles.menuRow} onPress={onPress}>
       <View style={styles.menuRowLeft}>
-        <Ionicons name={icon as any} size={16} color={danger ? '#B83255' : '#A9C0D4'} />
+        <RowIcon size={20} weight="regular" color={danger ? PF.accent : PF.icon} />
         <Text style={[styles.menuRowLabel, danger && styles.menuRowLabelDanger]}>{label}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={13} color={danger ? '#B83255' : 'rgba(15,42,72,0.25)'} />
+      <CaretRight size={14} weight="regular" color={danger ? PF.accent : PF.icon} />
     </TouchableOpacity>
   );
 }
@@ -190,7 +192,7 @@ export default function ProfileScreen() {
                 <OptimizedImage uri={photoToShow} style={styles.avatar} />
               </View>
               <View style={styles.cameraButton}>
-                <Text style={styles.cameraButtonText}>📷</Text>
+                <Camera size={16} weight="regular" color={PF.text} />
               </View>
             </TouchableOpacity>
             <Text style={styles.displayName}>{user.displayName ?? ''}</Text>
@@ -223,11 +225,11 @@ export default function ProfileScreen() {
         <View style={styles.divider} />
 
         <View style={styles.menu}>
-          <MenuRow icon="person-outline" label="Account & Settings" onPress={() => router.push('/(tabs)/profile/account' as any)} />
-          <MenuRow icon="heart-outline" label="Reading Preferences" onPress={() => router.push('/(tabs)/profile/preferences' as any)} />
-          <MenuRow icon="chatbubble-outline" label="Share Feedback" onPress={() => setFeedbackOpen(true)} />
-          <MenuRow icon="document-text-outline" label="Legal" onPress={() => router.push('/(tabs)/profile/legal' as any)} />
-          <MenuRow icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
+          <MenuRow icon={UserCircle} label="Account & Settings" onPress={() => router.push('/(tabs)/profile/account' as any)} />
+          <MenuRow icon={HeartStraight} label="Reading Preferences" onPress={() => router.push('/(tabs)/profile/preferences' as any)} />
+          <MenuRow icon={ChatCircleText} label="Share Feedback" onPress={() => setFeedbackOpen(true)} />
+          <MenuRow icon={Scales} label="Legal" onPress={() => router.push('/(tabs)/profile/legal' as any)} />
+          <MenuRow icon={SignOut} label="Log Out" onPress={handleLogout} danger />
         </View>
 
         <View style={{ height: spacing.xl }} />
@@ -239,34 +241,33 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F4F8' },
+  container: { flex: 1, backgroundColor: PF.page },
   scrollContent: { paddingBottom: spacing.xl },
-  hero: { backgroundColor: '#6B9AB8', paddingBottom: 64, position: 'relative', overflow: 'hidden' },
+  hero: { backgroundColor: PF.header, paddingBottom: 64, position: 'relative', overflow: 'hidden' },
   heroBg1: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(184,50,85,0.15)' },
   heroBg2: { position: 'absolute', bottom: -30, left: 10, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.12)' },
   heroContent: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
-  foundingBadge: { fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase', color: '#B83255' },
+  foundingBadge: { fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase', color: PF.accentOnHeader },
   avatarContainer: { alignItems: 'center', gap: spacing.sm },
-  avatarWrapper: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: '#C0C8D0', overflow: 'hidden' },
+  avatarWrapper: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: PF.card, overflow: 'hidden' },
   avatar: { width: 96, height: 96 },
-  cameraButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
-  cameraButtonText: { fontSize: 13 },
-  displayName: { fontSize: 42, fontFamily: 'Cormorant_700Bold_Italic', color: '#F0EDE4', lineHeight: 48 },
-  nameDivider: { width: 40, height: 1, backgroundColor: 'rgba(184,50,85,0.6)' },
-  curve: { height: 20, backgroundColor: '#F1F4F8', borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
-  vibeCard: { marginHorizontal: spacing.lg, backgroundColor: '#fff', borderRadius: 20, padding: spacing.lg, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: 'rgba(15,42,72,0.07)', marginBottom: spacing.lg },
+  cameraButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: PF.card, borderWidth: 1, borderColor: PF.inputBorder, alignItems: 'center', justifyContent: 'center' },
+  displayName: { fontSize: 42, fontFamily: 'Cormorant_700Bold_Italic', color: PF.text, lineHeight: 48 },
+  nameDivider: { width: 40, height: 1, backgroundColor: PF.accent },
+  curve: { height: 20, backgroundColor: PF.page, borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
+  vibeCard: { marginHorizontal: spacing.lg, backgroundColor: PF.card, borderRadius: 20, padding: spacing.lg, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: PF.border, marginBottom: spacing.lg },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg },
-  sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.1)' },
-  sectionLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: '#A9C0D4' },
+  sectionLine: { flex: 1, height: 1, backgroundColor: PF.border },
+  sectionLabel: { fontSize: 9, fontFamily: 'Lato_700Bold', letterSpacing: 1.6, textTransform: 'uppercase', color: PF.label },
   genreTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: spacing.lg },
-  genreTag: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: '#F1F4F8', borderWidth: 1, borderColor: 'rgba(15,42,72,0.1)' },
-  genreTagText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: '#0F2A48' },
-  emptyVibe: { fontSize: 16, fontStyle: 'italic', color: '#A9C0D4', textAlign: 'center', marginBottom: spacing.lg },
-  spiceLabel: { fontSize: 15, fontStyle: 'italic', fontWeight: '500', color: '#6A5969', textAlign: 'center' },
-  divider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.lg },
+  genreTag: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: PF.pill },
+  genreTagText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: PF.text },
+  emptyVibe: { fontSize: 16, fontStyle: 'italic', color: PF.secondary, textAlign: 'center', marginBottom: spacing.lg },
+  spiceLabel: { fontSize: 15, fontStyle: 'italic', fontWeight: '500', color: PF.secondary, textAlign: 'center' },
+  divider: { height: 1, backgroundColor: PF.border, marginHorizontal: spacing.lg, marginBottom: spacing.lg },
   menu: { paddingHorizontal: spacing.lg },
-  menuRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(15,42,72,0.08)' },
+  menuRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: PF.border },
   menuRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  menuRowLabel: { fontSize: 14, color: '#0F2A48' },
-  menuRowLabelDanger: { color: '#B83255' },
+  menuRowLabel: { fontSize: 14, color: PF.text },
+  menuRowLabelDanger: { color: PF.accent },
 });
