@@ -190,6 +190,74 @@ export default function CozyItemsScreen() {
     </View>
   );
 
+  // PlayRoom (Self Care): playlists come first, full width, above this
+  // month's events; everything else keeps the order it comes in.
+  const playlists = playroom ? items.filter((it) => it.category === 'playlist') : [];
+  const rest = playroom ? items.filter((it) => it.category !== 'playlist') : items;
+
+  const renderItem = (item: LifestyleItem, i: number, wide = false) => {
+  const showPromo = !!item.promo?.discountCode && isPromoActive(item.promo?.endDate);
+  const actionLink = ctaLink(item);
+  const isRecipe = item.category === 'recipe';
+
+  return (
+    <View key={item.sk ?? i} style={[styles.itemCard, playroom && prStyles.card, wide && styles.itemCardWide]}>
+      <TouchableOpacity
+        style={[styles.itemCoverWrapper, wide && styles.itemCoverWrapperWide]}
+        onPress={isRecipe ? () => setActiveRecipe(item) : undefined}
+      >
+        {item.imageUrl ? (
+          // Recipe items are community submissions (recipe-submissions/,
+          // a real upload); product/playlist items are admin-curated
+          // content with no optimized variant.
+          isRecipe ? (
+            <OptimizedImage uri={item.imageUrl} style={styles.itemCover} />
+          ) : (
+            <Image source={{ uri: item.imageUrl }} style={styles.itemCover} />
+          )
+        ) : (
+          <View style={[styles.itemCover, styles.itemCoverFallback, playroom && prStyles.coverBg]}>
+            <Text style={{ fontSize: 28 }}>
+              {item.category === 'recipe' ? '🍽️' : item.category === 'playlist' ? '🎵' : '🛍️'}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <View style={[styles.itemInfo, wide && styles.itemInfoWide]}>
+        <Text style={[styles.itemTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
+        {item.description && (
+          <Text style={[styles.itemDescription, playroom && prStyles.body]} numberOfLines={2}>{item.description}</Text>
+        )}
+        {showPromo && <PromoCode code={item.promo!.discountCode!} />}
+        <TouchableOpacity
+          style={[styles.ctaButton, playroom && prStyles.roseOutline, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
+          onPress={async () => {
+            if (isRecipe) { setActiveRecipe(item); return; }
+            if (!actionLink) return;
+            // Universal Links handle Spotify (and most other apps)
+            // directly from the https:// URL — no manual scheme
+            // conversion needed. WebBrowser is the fallback for
+            // the rare case Linking can't resolve a handler.
+            try {
+              await Linking.openURL(actionLink);
+            } catch {
+              try {
+                await WebBrowser.openBrowserAsync(actionLink);
+              } catch {
+                // Both failed — silently give up.
+              }
+            }
+          }}
+          disabled={!isRecipe && !actionLink}
+        >
+          <Text style={[styles.ctaButtonText, playroom && prStyles.eyebrow]}>{ctaLabel(item.category)}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+  };
+
   return (
     <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
       {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
@@ -239,6 +307,9 @@ export default function CozyItemsScreen() {
           <>
             <RoomHeader name={tileLabel('aftercare')} intro={ROOM_INTROS.aftercare} monthKey={monthKey} irisFrom="cozy/items" style={{ marginHorizontal: -spacing.md }} />
             {/* With events, the count sits above the extras further down. */}
+            {loaded && playlists.length > 0 && (
+              <View style={styles.playlistList}>{playlists.map((item, i) => renderItem(item, i, true))}</View>
+            )}
             {!countInScroll && <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>}
           </>
         )}
@@ -254,7 +325,7 @@ export default function CozyItemsScreen() {
         )}
         {!loaded ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : items.length === 0 && countInScroll ? null : items.length === 0 ? (
+        ) : rest.length === 0 && (countInScroll || playlists.length > 0) ? null : items.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🛍️</Text>
             <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
@@ -262,68 +333,7 @@ export default function CozyItemsScreen() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {items.map((item, i) => {
-              const showPromo = !!item.promo?.discountCode && isPromoActive(item.promo?.endDate);
-              const actionLink = ctaLink(item);
-              const isRecipe = item.category === 'recipe';
-
-              return (
-                <View key={item.sk ?? i} style={[styles.itemCard, playroom && prStyles.card]}>
-                  <TouchableOpacity
-                    style={styles.itemCoverWrapper}
-                    onPress={isRecipe ? () => setActiveRecipe(item) : undefined}
-                  >
-                    {item.imageUrl ? (
-                      // Recipe items are community submissions (recipe-submissions/,
-                      // a real upload); product/playlist items are admin-curated
-                      // content with no optimized variant.
-                      isRecipe ? (
-                        <OptimizedImage uri={item.imageUrl} style={styles.itemCover} />
-                      ) : (
-                        <Image source={{ uri: item.imageUrl }} style={styles.itemCover} />
-                      )
-                    ) : (
-                      <View style={[styles.itemCover, styles.itemCoverFallback, playroom && prStyles.coverBg]}>
-                        <Text style={{ fontSize: 28 }}>
-                          {item.category === 'recipe' ? '🍽️' : item.category === 'playlist' ? '🎵' : '🛍️'}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  <View style={styles.itemInfo}>
-                    <Text style={[styles.itemTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
-                    {item.description && (
-                      <Text style={[styles.itemDescription, playroom && prStyles.body]} numberOfLines={2}>{item.description}</Text>
-                    )}
-                    {showPromo && <PromoCode code={item.promo!.discountCode!} />}
-                    <TouchableOpacity
-                      style={[styles.ctaButton, playroom && prStyles.roseOutline, (!isRecipe && !actionLink) && styles.ctaButtonDisabled]}
-                      onPress={async () => {
-                        if (isRecipe) { setActiveRecipe(item); return; }
-                        if (!actionLink) return;
-                        // Universal Links handle Spotify (and most other apps)
-                        // directly from the https:// URL — no manual scheme
-                        // conversion needed. WebBrowser is the fallback for
-                        // the rare case Linking can't resolve a handler.
-                        try {
-                          await Linking.openURL(actionLink);
-                        } catch {
-                          try {
-                            await WebBrowser.openBrowserAsync(actionLink);
-                          } catch {
-                            // Both failed — silently give up.
-                          }
-                        }
-                      }}
-                      disabled={!isRecipe && !actionLink}
-                    >
-                      <Text style={[styles.ctaButtonText, playroom && prStyles.eyebrow]}>{ctaLabel(item.category)}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
+            {rest.map((item, i) => renderItem(item, i))}
           </View>
         )}
 
@@ -372,6 +382,11 @@ const styles = StyleSheet.create({
   itemCover: { width: '100%', height: '100%' },
   itemCoverFallback: { backgroundColor: '#E6EAF0', alignItems: 'center', justifyContent: 'center' },
   itemInfo: { padding: spacing.sm, gap: 4 },
+  // A playlist across the row: cover on the left, details beside it.
+  playlistList: { gap: 16, marginBottom: spacing.md },
+  itemCardWide: { width: '100%', flexDirection: 'row' },
+  itemCoverWrapperWide: { width: '38%' },
+  itemInfoWide: { flex: 1, justifyContent: 'center' },
   itemTitle: { fontSize: 15, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 20 },
   itemDescription: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', lineHeight: 16 },
   promoContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fde8ed', borderRadius: 8, padding: 6, marginTop: 4 },
