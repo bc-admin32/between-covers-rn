@@ -204,10 +204,10 @@ export default function AuthorDetailScreen() {
               {spotlight.featuredBooks.map((book) => (
                 <TouchableOpacity
                   key={book.workId}
-                  style={[styles.smallBookCard, playroom && prStyles.cardBorder]}
+                  style={[styles.smallBookCard, playroom && prStyles.card]}
                   onPress={() => router.push(`/book?workId=${book.workId}` as any)}
                 >
-                  <View style={styles.smallBookCover}>
+                  <View style={[styles.smallBookCover, playroom && prStyles.coverBg]}>
                     <Image source={{ uri: book.coverUrl }} style={styles.smallBookCoverImage} />
                   </View>
                   <Text style={[styles.smallBookTitle, playroom && prStyles.heading]} numberOfLines={2}>{book.title}</Text>
@@ -225,7 +225,7 @@ export default function AuthorDetailScreen() {
             <View style={styles.socialRow}>
               {spotlight.instagramUrl && (
                 <TouchableOpacity
-                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
+                  style={[styles.socialButton, playroom && prStyles.card]}
                   onPress={() => openLink(spotlight.instagramUrl!)}
                 >
                   <Ionicons name="logo-instagram" size={22} color={socialIconColor} />
@@ -233,7 +233,7 @@ export default function AuthorDetailScreen() {
               )}
               {spotlight.tiktokUrl && (
                 <TouchableOpacity
-                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
+                  style={[styles.socialButton, playroom && prStyles.card]}
                   onPress={() => openLink(spotlight.tiktokUrl!)}
                 >
                   <FontAwesome5 name="tiktok" size={20} color={socialIconColor} />
@@ -241,7 +241,7 @@ export default function AuthorDetailScreen() {
               )}
               {spotlight.websiteUrl && (
                 <TouchableOpacity
-                  style={[styles.socialButton, playroom && prStyles.cardBorder]}
+                  style={[styles.socialButton, playroom && prStyles.card]}
                   onPress={() => openLink(spotlight.websiteUrl!)}
                 >
                   <Ionicons name="globe-outline" size={22} color={socialIconColor} />

@@ -7,6 +7,8 @@ import { useActiveCozyLayout } from './cozyLayout';
 // only when usePlayroom() is true, so Classic months look as before.
 export const PR = {
   pageBg: '#F0EDE4',
+  card: '#FBF8F2', // cards and notes on the linen page: warm white, not blue-white
+  coverBg: '#E4DCCD', // empty covers and image placeholders
   heading: '#1A1A2E', // 14.6:1 on the page
   body: '#6A5550', // 5.9:1 on the page, 6.9:1 on white cards
   eyebrow: '#B83255', // labels, counts, section titles: 4.95:1 on the page
@@ -26,6 +28,8 @@ export function usePlayroom(): boolean {
 // `[styles.headerTitle, playroom && prStyles.heading]`.
 export const prStyles = StyleSheet.create({
   page: { backgroundColor: PR.pageBg },
+  card: { backgroundColor: PR.card, borderColor: PR.cardBorder },
+  coverBg: { backgroundColor: PR.coverBg },
   softButton: { backgroundColor: PR.softButton },
   heading: { color: PR.heading },
   body: { color: PR.body },

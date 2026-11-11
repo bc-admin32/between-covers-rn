@@ -209,7 +209,7 @@ export default function CozyItemsScreen() {
       </View>
 
       {/* IRIS NOTE */}
-      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
+      <View style={[styles.irisNote, playroom && prStyles.card]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
         <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
           {playroom
@@ -249,7 +249,7 @@ export default function CozyItemsScreen() {
               const isRecipe = item.category === 'recipe';
 
               return (
-                <View key={item.sk ?? i} style={[styles.itemCard, playroom && prStyles.cardBorder]}>
+                <View key={item.sk ?? i} style={[styles.itemCard, playroom && prStyles.card]}>
                   <TouchableOpacity
                     style={styles.itemCoverWrapper}
                     onPress={isRecipe ? () => setActiveRecipe(item) : undefined}
@@ -264,7 +264,7 @@ export default function CozyItemsScreen() {
                         <Image source={{ uri: item.imageUrl }} style={styles.itemCover} />
                       )
                     ) : (
-                      <View style={[styles.itemCover, styles.itemCoverFallback]}>
+                      <View style={[styles.itemCover, styles.itemCoverFallback, playroom && prStyles.coverBg]}>
                         <Text style={{ fontSize: 28 }}>
                           {item.category === 'recipe' ? '🍽️' : item.category === 'playlist' ? '🎵' : '🛍️'}
                         </Text>

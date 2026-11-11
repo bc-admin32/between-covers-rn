@@ -166,7 +166,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
               {item.imageUrl ? (
                 <Image source={{ uri: item.imageUrl }} style={styles.sheetCoverImage} />
               ) : (
-                <View style={[styles.sheetCoverImage, styles.sheetCoverFallback]}>
+                <View style={[styles.sheetCoverImage, styles.sheetCoverFallback, playroom && prStyles.coverBg]}>
                   <Text style={{ fontSize: 32 }}>🎬</Text>
                 </View>
               )}
@@ -212,7 +212,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
           {/* IRIS NOTE */}
           {irisNote && (
-            <View style={[styles.irisNoteCard, playroom && prStyles.cardBorder]}>
+            <View style={[styles.irisNoteCard, playroom && prStyles.card]}>
               {/* Iris's picture opens a chat with her (the sheet closes first). */}
               <TouchableOpacity onPress={() => { onClose(); router.push('/iris/chat?from=cozy/media' as any); }} accessibilityRole="button" accessibilityLabel="Chat with Iris">
                 <Image source={{ uri: IRIS_AVATAR }} style={styles.irisNoteAvatar} />
@@ -235,7 +235,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                   return (
                     <TouchableOpacity
                       key={i}
-                      style={[styles.platformButton, playroom && prStyles.cardBorder]}
+                      style={[styles.platformButton, playroom && prStyles.card]}
                       onPress={() => url && openSpotify(url)}
                       disabled={!url}
                     >
@@ -361,7 +361,7 @@ export default function CozyMediaScreen() {
       </View>
 
       {/* IRIS NOTE */}
-      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
+      <View style={[styles.irisNote, playroom && prStyles.card]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
         <Text style={[styles.irisNoteText, playroom && prStyles.body]}>Grab your blanket and your snacks — let's get cozy.</Text>
       </View>
@@ -393,10 +393,10 @@ export default function CozyMediaScreen() {
               return (
                 <TouchableOpacity
                   key={item.sk ?? `watch-${i}`}
-                  style={[styles.watchCard, playroom && prStyles.cardBorder]}
+                  style={[styles.watchCard, playroom && prStyles.card]}
                   onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
                 >
-                  <View style={styles.watchCover}>
+                  <View style={[styles.watchCover, playroom && prStyles.coverBg]}>
                     {item.imageUrl ? (
                       <Image source={{ uri: item.imageUrl }} style={styles.watchCoverImage} />
                     ) : (

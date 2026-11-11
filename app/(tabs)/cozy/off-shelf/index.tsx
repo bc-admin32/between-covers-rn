@@ -64,7 +64,7 @@ export default function OffShelfScreen() {
       </View>
 
       {/* IRIS NOTE — tagline, same treatment as sibling View All pages */}
-      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
+      <View style={[styles.irisNote, playroom && prStyles.card]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
         <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
           If you weren't side-eyeing everyone already...you will be now. 💀📚

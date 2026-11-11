@@ -140,7 +140,7 @@ export default function CozyBooksScreen() {
       </View>
 
       {/* IRIS NOTE */}
-      <View style={[styles.irisNote, playroom && prStyles.cardBorder]}>
+      <View style={[styles.irisNote, playroom && prStyles.card]}>
         <Text style={styles.irisNoteIcon}>✦</Text>
         <Text style={[styles.irisNoteText, playroom && prStyles.body]}>
           Handpicked for this month's theme — find your next obsession.

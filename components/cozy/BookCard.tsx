@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { prettifyEnum } from '../../lib/tagTaxonomy';
 import BookCardMeta from './BookCardMeta';
+import { prStyles, usePlayroom } from '../../lib/playroomPage';
 
 export type BookCardData = {
   bookId: string;
@@ -27,12 +28,14 @@ export default function BookCard({
   style?: ViewStyle;
 }) {
   const router = useRouter();
+  // PlayRoom months: warm card and cover colors on the linen tile pages.
+  const playroom = usePlayroom();
   const handlePress =
     onPress ?? (() => router.push(`/book?workId=${book.bookId}` as any));
 
   return (
-    <TouchableOpacity style={[styles.card, style]} onPress={handlePress} activeOpacity={0.85}>
-      <View style={styles.cover}>
+    <TouchableOpacity style={[styles.card, playroom && prStyles.card, style]} onPress={handlePress} activeOpacity={0.85}>
+      <View style={[styles.cover, playroom && prStyles.coverBg]}>
         {book.coverUrl ? (
           <Image
             source={{ uri: book.coverUrl }}
