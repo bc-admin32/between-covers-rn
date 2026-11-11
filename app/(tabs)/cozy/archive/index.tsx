@@ -121,9 +121,9 @@ export default function CozyArchiveScreen() {
             {/* IRIS CARD */}
             <View style={styles.irisCardOuter}>
               <View style={styles.irisCardInner}>
-                <View style={styles.irisAvatarWrapper}>
+                <TouchableOpacity style={styles.irisAvatarWrapper} onPress={() => router.push('/iris/chat?from=cozy/archive' as any)} accessibilityRole="button" accessibilityLabel="Chat with Iris">
                   <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
-                </View>
+                </TouchableOpacity>
                 <View style={styles.irisText}>
                   <Text style={styles.irisCardTitle}>Last Month's Cozy Picks</Text>
                   <Text style={styles.irisCardBody}>A look back at everything from last month</Text>

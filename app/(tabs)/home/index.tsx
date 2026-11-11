@@ -439,7 +439,7 @@ export default function HomeScreen() {
               ) : watched ? (
                 <TouchableOpacity
                   style={styles.irisButton}
-                  onPress={() => router.push('/iris/chat' as any)}
+                  onPress={() => router.push('/iris/chat?from=home' as any)}
                 >
                   <Image
                     source={{ uri: iris.staticImageUrl ?? IRIS_AVATAR }}
@@ -460,7 +460,7 @@ export default function HomeScreen() {
           {iris.mode === 'static' && !day6Active && (
             <TouchableOpacity
               style={styles.irisButton}
-              onPress={() => router.push('/iris/chat' as any)}
+              onPress={() => router.push('/iris/chat?from=home' as any)}
             >
               <Image
                 source={{ uri: IRIS_AVATAR }}

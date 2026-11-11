@@ -103,6 +103,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   item: VisualItem; visible: boolean; onClose: () => void;
   onRatingUpdate: (movieId: string, ratingSummary: RatingSummary | null) => void;
 }) {
+  const router = useRouter();
   const [detail, setDetail] = useState<MovieDetail | null>(null);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(item.ratingSummary ?? null);
   const [userRating, setUserRating] = useState<string | null>(null);
@@ -212,7 +213,10 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
           {/* IRIS NOTE */}
           {irisNote && (
             <View style={[styles.irisNoteCard, playroom && prStyles.cardBorder]}>
-              <Image source={{ uri: IRIS_AVATAR }} style={styles.irisNoteAvatar} />
+              {/* Iris's picture opens a chat with her (the sheet closes first). */}
+              <TouchableOpacity onPress={() => { onClose(); router.push('/iris/chat?from=cozy/media' as any); }} accessibilityRole="button" accessibilityLabel="Chat with Iris">
+                <Image source={{ uri: IRIS_AVATAR }} style={styles.irisNoteAvatar} />
+              </TouchableOpacity>
               <View style={styles.irisNoteContent}>
                 <Text style={[styles.irisNoteLabel, playroom && prStyles.eyebrow]}>Iris Says</Text>
                 <Text style={[styles.irisNoteText, playroom && prStyles.body]}>"{irisNote}"</Text>

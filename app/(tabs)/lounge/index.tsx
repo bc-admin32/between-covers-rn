@@ -453,7 +453,9 @@ export default function LoungeScreen() {
         {iris && (
           <View style={[styles.card, styles.irisCard]}>
             <View style={styles.irisHeader}>
-              <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
+              <TouchableOpacity onPress={() => router.push('/iris/chat?from=lounge' as any)} accessibilityRole="button" accessibilityLabel="Chat with Iris">
+                <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
+              </TouchableOpacity>
               <View style={styles.irisHeaderText}>
                 <Text style={styles.irisLabel}>Iris Has Thoughts</Text>
                 <Text style={styles.irisTitle} selectable>{iris.title}</Text>

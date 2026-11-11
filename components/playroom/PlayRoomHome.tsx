@@ -193,7 +193,14 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
             {/* IRIS + THEME BANNER */}
             {!!month.theme?.title && (
               <View style={styles.themeRow}>
-                <View style={styles.irisRing}>
+                {/* Tapping Iris opens a chat with her. */}
+                <TouchableOpacity
+                  style={styles.irisRing}
+                  activeOpacity={0.85}
+                  onPress={() => router.push('/iris/chat?from=playroom' as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chat with Iris"
+                >
                   {!irisPortraitFailed ? (
                     // Cropped to her face (see PORTRAIT_*). Kept in memory
                     // only (not on disk), so a replaced iris.png shows up on
@@ -217,7 +224,7 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
                       accessibilityLabel="Iris"
                     />
                   )}
-                </View>
+                </TouchableOpacity>
                 {/* No frame: a thin gold line above and below the theme. */}
                 <View style={styles.themeBlock}>
                   <View style={styles.themeLine} accessible={false} />

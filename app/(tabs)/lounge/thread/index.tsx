@@ -63,7 +63,13 @@ function getInitials(name: string): string {
 }
 
 function Avatar({ url, name, size = 34, isIris = false }: { url: string | null; name: string; size?: number; isIris?: boolean }) {
-  if (isIris) return <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />;
+  // Iris's picture opens a chat with her.
+  const router = useRouter();
+  if (isIris) return (
+    <TouchableOpacity onPress={() => router.push('/iris/chat?from=lounge/thread' as any)} accessibilityRole="button" accessibilityLabel="Chat with Iris">
+      <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />
+    </TouchableOpacity>
+  );
   // User's own avatar — a real upload (profile-photos/), unlike the static Iris asset above.
   if (url) return <OptimizedImage uri={url} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (

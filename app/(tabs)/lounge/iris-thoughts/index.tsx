@@ -53,7 +53,13 @@ function getInitials(name: string): string {
 }
 
 function Avatar({ url, name, size = 30, isIris = false }: { url: string | null; name: string; size?: number; isIris?: boolean }) {
-  if (isIris) return <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />;
+  // Iris's picture opens a chat with her.
+  const router = useRouter();
+  if (isIris) return (
+    <TouchableOpacity onPress={() => router.push('/iris/chat?from=lounge/iris-thoughts' as any)} accessibilityRole="button" accessibilityLabel="Chat with Iris">
+      <Image source={{ uri: IRIS_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', borderWidth: 2, borderColor: '#E8D5E5' }} />
+    </TouchableOpacity>
+  );
   // User's own avatar — a real upload (profile-photos/), unlike the static Iris asset above.
   if (url) return <OptimizedImage uri={url} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
@@ -296,7 +302,9 @@ export default function IrisThoughtsScreen() {
             <CaretLeft size={20} color="#C4A882" weight="bold" />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
-            <Image source={{ uri: IRIS_AVATAR }} style={styles.headerAvatar} />
+            <TouchableOpacity onPress={() => router.push('/iris/chat?from=lounge/iris-thoughts' as any)} accessibilityRole="button" accessibilityLabel="Chat with Iris">
+              <Image source={{ uri: IRIS_AVATAR }} style={styles.headerAvatar} />
+            </TouchableOpacity>
             <View>
               <Text style={styles.headerLabel}>Iris Has Thoughts</Text>
               <Text style={styles.headerTitle}>{thread?.topicLabel ?? paramTitle ?? "This week's mood"}</Text>
