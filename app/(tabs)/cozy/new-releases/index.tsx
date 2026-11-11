@@ -7,9 +7,9 @@ import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
-import { newbiesLabel } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
 import { spacing, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
@@ -28,12 +28,14 @@ export default function NewReleasesScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<NewReleasesData | null>(null);
   const [loading, setLoading] = useState(true);
-  useDarkStatusBarWhileFocused();
-  // PlayRoom months: the heading becomes "[Month]'s Newbies" for the month
-  // shown. `month` (YYYY-MM) opens a given month (last month, from the archive).
+  // PlayRoom months: the room header says "Newbies" with the month and theme
+  // of the month shown (it follows the Last Month / Current pill). `month`
+  // (YYYY-MM) opens a given month (last month, from the archive).
   const params = useLocalSearchParams<{ month?: string }>();
   const playroom = usePlayroom();
-  const isNewbies = playroom;
+  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
+  // light icons over the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom);
   const startMonth = typeof params.month === 'string' && /^\d{4}-\d{2}$/.test(params.month) ? params.month : undefined;
 
   const load = async (month?: string) => {
@@ -66,7 +68,12 @@ export default function NewReleasesScreen() {
   };
 
   return (
-    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
+      {/* Classic header (the PlayRoom header replaces it). */}
+      {!playroom && (
+      <>
       {/* MASTHEAD */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -86,21 +93,35 @@ export default function NewReleasesScreen() {
 
       {/* TITLE BLOCK */}
       <View style={styles.titleBlock}>
-        {isNewbies ? (
-          // "[Month]'s Newbies" is the title; it follows the Last Month /
-          // Current pill because each switch reloads data.monthLabel.
-          <Text style={[styles.monthLabel, prStyles.heading]}>{newbiesLabel(data?.monthLabel)}</Text>
-        ) : (
-          <>
-            <Text style={styles.eyebrow}>NEW RELEASES</Text>
-            {!!data?.monthLabel && <Text style={styles.monthLabel}>{data.monthLabel}</Text>}
-          </>
-        )}
-        <Text style={[styles.subtitle, playroom && prStyles.body]}>Fresh arrivals, sorted by genre</Text>
+        <Text style={styles.eyebrow}>NEW RELEASES</Text>
+        {!!data?.monthLabel && <Text style={styles.monthLabel}>{data.monthLabel}</Text>}
+        <Text style={styles.subtitle}>Fresh arrivals, sorted by genre</Text>
       </View>
+
+      </>
+      )}
 
       {/* BODY */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {playroom && (
+          <>
+            <RoomHeader
+              name="Newbies"
+              intro={ROOM_INTROS.newbies}
+              monthKey={data && !data.isCurrent ? 'previous' : 'active'}
+              irisFrom="cozy/new-releases"
+              style={{ marginHorizontal: -spacing.md, marginTop: -spacing.sm }}
+            />
+            <View style={styles.prSubRow}>
+              <Text style={[styles.subtitle, prStyles.body, styles.prSubtitle]}>Fresh arrivals, sorted by genre</Text>
+              {showPill && (
+                <TouchableOpacity style={[styles.pill, prStyles.roseOutline]} onPress={handlePill}>
+                  <Text style={[styles.pillText, prStyles.eyebrow]}>{data?.isCurrent ? '← Last Month' : 'Current →'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : sections.length === 0 ? (
@@ -141,6 +162,9 @@ const styles = StyleSheet.create({
   pill: { borderWidth: 1, borderColor: '#ddd4c8', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 4 },
   pillText: { fontSize: 11, fontWeight: '300', color: '#9c8f7e', letterSpacing: 0.2 },
   titleBlock: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  // PlayRoom: the subtitle and the Last Month / Current pill under the room header.
+  prSubRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xs, marginBottom: spacing.md },
+  prSubtitle: { flex: 1, marginTop: 0 },
   eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: '#B11E45', marginBottom: 4 },
   monthLabel: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#2a1f18', lineHeight: 38 },
   subtitle: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', color: '#8a7c6e', marginTop: 4 },

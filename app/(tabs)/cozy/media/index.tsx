@@ -6,9 +6,10 @@ import {
 import { Image } from 'expo-image';
 import { CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -319,16 +320,19 @@ export default function CozyMediaScreen() {
   const [loaded, setLoaded] = useState(false);
   const [selectedItem, setSelectedItem] = useState<VisualItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  useDarkStatusBarWhileFocused();
   // PlayRoom months make this Watch Me. month=previous → last month (archive).
   const playroom = usePlayroom();
   const params = useLocalSearchParams<{ month?: string }>();
+  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
+  // light icons over the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom);
   const monthKey = cozyMonthKey(params.month);
 
   useEffect(() => {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
+        setMonthThemes(response);
         const raw: VisualItem[] = response?.[monthKey]?.sections?.visual ?? [];
         setWatchItems(raw);
       } catch {} finally {
@@ -342,8 +346,23 @@ export default function CozyMediaScreen() {
     setWatchItems((prev) => prev.map((item) => item.movieId === movieId ? { ...item, ratingSummary } : item));
   }, []);
 
+  const countRow = (
+    <View style={styles.countRow}>
+      <View style={styles.countLine} />
+      {loaded && watchItems.length > 0 && (
+        <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{watchItems.length} {watchItems.length === 1 ? 'Title' : 'Titles'}</Text>
+      )}
+      <View style={styles.countLine} />
+    </View>
+  );
+
   return (
-    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
+      {/* Classic header and Iris note (the PlayRoom header's intro replaces the note). */}
+      {!playroom && (
+      <>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -366,17 +385,20 @@ export default function CozyMediaScreen() {
         <Text style={[styles.irisNoteText, playroom && prStyles.body]}>Grab your blanket and your snacks — let's get cozy.</Text>
       </View>
 
+      </>
+      )}
+
       {/* COUNT */}
-      <View style={styles.countRow}>
-        <View style={styles.countLine} />
-        {loaded && watchItems.length > 0 && (
-          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{watchItems.length} {watchItems.length === 1 ? 'Title' : 'Titles'}</Text>
-        )}
-        <View style={styles.countLine} />
-      </View>
+      {!playroom && countRow}
 
       {/* GRID */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
+        {playroom && (
+          <>
+            <RoomHeader name={tileLabel('watchMe')} intro={ROOM_INTROS.watchMe} monthKey={monthKey} irisFrom="cozy/media" style={{ marginHorizontal: -spacing.md }} />
+            <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>
+          </>
+        )}
         {!loaded ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : watchItems.length === 0 ? (

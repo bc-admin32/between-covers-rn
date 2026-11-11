@@ -17,7 +17,7 @@ import AffiliateDisclosure from '../../../components/AffiliateDisclosure';
 import BookCard, { BookCardData } from '../../../components/cozy/BookCard';
 import BookOfMonthCard, { type BookOfMonth } from '../../../components/cozy/BookOfMonthCard';
 import PlayRoomHome from '../../../components/playroom/PlayRoomHome';
-import { hasLayoutField, setActiveCozyLayout, setSavedCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
+import { hasLayoutField, setActiveCozyLayout, setMonthThemes, setSavedCozyLayout, useActiveCozyLayout } from '../../../lib/cozyLayout';
 import { IRIS_AVATAR } from '../../../lib/irisAvatar';
 
 // Home payload cache (also read by cozy/author for its first paint). Bumped
@@ -303,6 +303,7 @@ export default function CozyScreen() {
         if (cached) {
           const parsed = JSON.parse(cached);
           setData(parsed?.active ?? null);
+          setMonthThemes(parsed);
           if (hasLayoutField(parsed?.active)) setSavedCozyLayout(parsed.active.layout);
           setLoading(false);
         }
@@ -310,6 +311,7 @@ export default function CozyScreen() {
         const body = JSON.stringify(response);
         lastBodyRef.current = body;
         setData(response?.active ?? null);
+        setMonthThemes(response);
         if (hasLayoutField(response?.active)) setActiveCozyLayout(response.active.layout);
         await SecureStore.setItemAsync(CACHE_KEY, body);
       } catch {} finally {
@@ -336,6 +338,7 @@ export default function CozyScreen() {
             lastBodyRef.current = body;
             skipSectionTrackRef.current = true;
             setData(response?.active ?? null);
+            setMonthThemes(response);
             if (hasLayoutField(response?.active)) setActiveCozyLayout(response.active.layout);
             await SecureStore.setItemAsync(CACHE_KEY, body);
           })

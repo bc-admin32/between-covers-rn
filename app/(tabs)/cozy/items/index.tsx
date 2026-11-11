@@ -9,9 +9,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import EventCard from '../../../../components/playroom/EventCard';
-import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { monthEvents, type CozyEvent } from '../../../../lib/cozyEvents';
 import { apiGet } from '../../../../lib/api';
@@ -140,12 +141,14 @@ export default function CozyItemsScreen() {
   const [items, setItems] = useState<LifestyleItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<LifestyleItem | null>(null);
-  useDarkStatusBarWhileFocused();
   // PlayRoom months make this Self Care: the month's events (and their
   // recordings) go above the extras. month=previous shows last month (from
   // the archive).
   const playroom = usePlayroom();
   const isAftercare = playroom;
+  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
+  // light icons over the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom);
   const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
   const [events, setEvents] = useState<CozyEvent[]>([]);
@@ -154,6 +157,7 @@ export default function CozyItemsScreen() {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
+        setMonthThemes(response);
         const month = response?.[monthKey];
         const candidates = [
           month?.sections?.LIFESTYLE,
@@ -187,11 +191,16 @@ export default function CozyItemsScreen() {
   );
 
   return (
-    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
       {activeRecipe && (
         <RecipeModal item={activeRecipe} onClose={() => setActiveRecipe(null)} />
       )}
 
+      {/* Classic header and Iris note (the PlayRoom header's intro replaces the note). */}
+      {!playroom && (
+      <>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -218,11 +227,21 @@ export default function CozyItemsScreen() {
         </Text>
       </View>
 
+      </>
+      )}
+
       {/* COUNT */}
-      {!countInScroll && countRow}
+      {!playroom && !countInScroll && countRow}
 
       {/* GRID */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
+        {playroom && (
+          <>
+            <RoomHeader name={tileLabel('aftercare')} intro={ROOM_INTROS.aftercare} monthKey={monthKey} irisFrom="cozy/items" style={{ marginHorizontal: -spacing.md }} />
+            {/* With events, the count sits above the extras further down. */}
+            {!countInScroll && <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>}
+          </>
+        )}
         {/* AFTERCARE: the month's events and recordings, then the extras.
             EventCard brings its own side margin, so it cancels the grid's. */}
         {loaded && isAftercare && events.length > 0 && (

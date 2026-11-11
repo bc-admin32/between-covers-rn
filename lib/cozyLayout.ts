@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiGet } from './api';
 
@@ -110,7 +110,10 @@ let inFlight: Promise<void> | null = null;
 export function refreshActiveCozyLayout(): Promise<void> {
   if (!inFlight) {
     inFlight = apiGet<{ active?: { layout?: string } }>('/cozy/home')
-      .then((res) => { if (hasLayoutField(res?.active)) setActiveCozyLayout(res.active.layout); })
+      .then((res) => {
+        setMonthThemes(res);
+        if (hasLayoutField(res?.active)) setActiveCozyLayout(res.active.layout);
+      })
       .catch(() => {})
       .finally(() => { inFlight = null; });
   }
@@ -125,6 +128,44 @@ export function useActiveCozyLayout(): CozyLayout {
     return () => { listeners.delete(setLayout); };
   }, []);
   return layout;
+}
+
+// ── The month's name and theme, for the PlayRoom room headers ──────────────
+// Kept from every /cozy/home response the app already makes (launch,
+// foreground, the Cozy tab, the rooms), for this month and last month.
+
+export type MonthTheme = { monthLabel?: string; themeTitle?: string };
+let monthThemes: { active?: MonthTheme; previous?: MonthTheme } = {};
+const themeListeners = new Set<() => void>();
+
+function pickTheme(m: unknown): MonthTheme | undefined {
+  if (!m || typeof m !== 'object') return undefined;
+  const month = m as { monthLabel?: unknown; theme?: { title?: unknown } | null };
+  return {
+    monthLabel: typeof month.monthLabel === 'string' ? month.monthLabel : undefined,
+    themeTitle: typeof month.theme?.title === 'string' ? month.theme.title : undefined,
+  };
+}
+
+export function setMonthThemes(res: unknown): void {
+  const r = (res ?? {}) as { active?: unknown; previous?: unknown };
+  monthThemes = {
+    active: pickTheme(r.active) ?? monthThemes.active,
+    previous: pickTheme(r.previous) ?? monthThemes.previous,
+  };
+  themeListeners.forEach((l) => l());
+}
+
+function subscribeThemes(listener: () => void) {
+  themeListeners.add(listener);
+  return () => { themeListeners.delete(listener); };
+}
+
+export function useMonthTheme(key: 'active' | 'previous'): MonthTheme | undefined {
+  const value = useSyncExternalStore(subscribeThemes, () => monthThemes[key]);
+  // Nothing kept yet (e.g. a room opened before Cozy): fetch /cozy/home once.
+  useEffect(() => { if (!monthThemes[key]) refreshActiveCozyLayout(); }, [key]);
+  return value;
 }
 
 // ── Link parameter for the Cozy pages a tile opens ──────────────────────────

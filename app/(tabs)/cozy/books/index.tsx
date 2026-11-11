@@ -7,9 +7,11 @@ import { CaretLeft, Funnel } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
-import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
+import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
@@ -52,11 +54,13 @@ export default function CozyBooksScreen() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [bookOfMonth, setBookOfMonth] = useState<BookOfMonth | null>(null);
   const [loading, setLoading] = useState(true);
-  useDarkStatusBarWhileFocused();
   // PlayRoom months make this Between the Sheets: after the shelf come the
   // reader's personal pick ("I Saw This Book and Thought of You") and Keep Me
   // Guessing (Off The Shelf, this month only). month=previous → last month.
   const playroom = usePlayroom();
+  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
+  // light icons over the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom);
   const isBetweenTheSheets = playroom;
   const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
@@ -68,6 +72,7 @@ export default function CozyBooksScreen() {
     async function load() {
       try {
         const response = await apiGet('/cozy/home?view=full');
+        setMonthThemes(response);
         const month = response?.[monthKey];
         const data: BookItem[] =
           month?.sections?.BOOKS ??
@@ -106,8 +111,25 @@ export default function CozyBooksScreen() {
     [books, bookOfMonth],
   );
 
+  const countRow = (
+    <View style={styles.countRow}>
+      <View style={styles.countLine} />
+      {!loading && books.length > 0 && (
+        <Text style={[styles.countText, playroom && prStyles.eyebrow]}>
+          {books.length} {books.length === 1 ? 'Book' : 'Books'}
+        </Text>
+      )}
+      <View style={styles.countLine} />
+    </View>
+  );
+
   return (
-    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
+      {/* Classic header and Iris note (the PlayRoom header's intro replaces the note). */}
+      {!playroom && (
+      <>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -147,22 +169,34 @@ export default function CozyBooksScreen() {
         </Text>
       </View>
 
+      </>
+      )}
+
       {/* COUNT */}
-      <View style={styles.countRow}>
-        <View style={styles.countLine} />
-        {!loading && books.length > 0 && (
-          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>
-            {books.length} {books.length === 1 ? 'Book' : 'Books'}
-          </Text>
-        )}
-        <View style={styles.countLine} />
-      </View>
+      {!playroom && countRow}
 
       {/* GRID */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.grid}
       >
+        {playroom && (
+          <>
+            <RoomHeader
+              name={tileLabel('betweenTheSheets')}
+              intro={ROOM_INTROS.betweenTheSheets}
+              monthKey={monthKey}
+              irisFrom="cozy/books"
+              style={{ marginHorizontal: -spacing.md }}
+              right={
+                <TouchableOpacity style={roomHeaderButton} onPress={() => router.push('/(tabs)/cozy/catalog' as any)} accessibilityLabel="Filter the catalog">
+                  <Funnel size={20} color={CHAMPAGNE} weight="bold" />
+                </TouchableOpacity>
+              }
+            />
+            <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>
+          </>
+        )}
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : books.length === 0 && !hasExtras ? (

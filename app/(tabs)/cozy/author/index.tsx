@@ -12,9 +12,10 @@ import * as SecureStore from 'expo-secure-store';
 import { apiGet } from '../../../../lib/api';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, colors } from '../../../../lib/theme';
-import { cozyMonthKey } from '../../../../lib/cozyLayout';
+import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 
 // Same key Cozy home writes (cozy/index.tsx) — read here for first paint.
@@ -89,7 +90,6 @@ export default function AuthorDetailScreen() {
   const router = useRouter();
   const { requireAccount } = useGuest();
   const insets = useSafeAreaInsets();
-  useDarkStatusBarWhileFocused();
   // PlayRoom months make this Beyond the Cover. month=previous → last month
   // (from the archive).
   const playroom = usePlayroom();
@@ -101,6 +101,10 @@ export default function AuthorDetailScreen() {
   const [spotlight, setSpotlight] = useState<AuthorSpotlight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Dark status-bar icons on the light page: Classic, and PlayRoom while loading
+  // or on an error (no plum header then). Otherwise the app's light icons over
+  // the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom || !spotlight || error);
 
   useEffect(() => {
     const load = async () => {
@@ -119,6 +123,7 @@ export default function AuthorDetailScreen() {
         }
         type MonthSpotlight = { sections?: { authorSpotlight?: AuthorSpotlight | null } };
         const response = await apiGet<{ active?: MonthSpotlight; previous?: MonthSpotlight }>('/cozy/home');
+        setMonthThemes(response);
         const fresh = response?.[monthKey]?.sections?.authorSpotlight ?? null;
         if (fresh) {
           setSpotlight(fresh);
@@ -161,18 +166,30 @@ export default function AuthorDetailScreen() {
 
   return (
     <View style={[styles.container, playroom && prStyles.page]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing.xl }}
       >
+        {playroom && (
+          <RoomHeader
+            name={tileLabel('talkDirtyToMe')}
+            intro={ROOM_INTROS.talkDirtyToMe}
+            monthKey={monthKey}
+            irisFrom="cozy/author"
+            style={{ marginBottom: 0 }}
+          />
+        )}
         {/* HERO */}
-        <View style={[styles.hero, { paddingTop: insets.top }]}>
+        <View style={[styles.hero, { paddingTop: playroom ? 0 : insets.top }]}>
           <Image source={{ uri: spotlight.headshotUrl }} style={styles.heroImage} />
         </View>
 
         {/* HEADER */}
         <View style={styles.headerBlock}>
-          <Text style={[styles.eyebrow, playroom && prStyles.eyebrow]}>{playroom ? tileLabel('talkDirtyToMe') : 'The Mind Behind the Magic'}</Text>
+          {/* PlayRoom: the room header already names the room. */}
+          {!playroom && <Text style={styles.eyebrow}>The Mind Behind the Magic</Text>}
           <Text style={[styles.name, playroom && prStyles.heading]}>{spotlight.name}</Text>
           <Text style={[styles.typeLabel, playroom && prStyles.body]}>{typeLabel}</Text>
         </View>

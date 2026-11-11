@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useDarkStatusBarWhileFocused } from '../../../../lib/statusBarTone';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
@@ -24,9 +25,11 @@ export default function OffShelfScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<OffShelfData | null>(null);
   const [loaded, setLoaded] = useState(false);
-  useDarkStatusBarWhileFocused();
   // PlayRoom months: "Keep Me Guessing" (opened from Between the Sheets).
   const playroom = usePlayroom();
+  // Classic: dark status-bar icons on the light page. PlayRoom: the app's
+  // light icons over the plum strip and header.
+  useDarkStatusBarWhileFocused(!playroom);
 
   useEffect(() => {
     async function load() {
@@ -42,8 +45,23 @@ export default function OffShelfScreen() {
 
   const books = data?.enabled ? (data.books ?? []) : [];
 
+  const countRow = (
+    <View style={styles.countRow}>
+      <View style={styles.countLine} />
+      {loaded && books.length > 0 && (
+        <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{books.length} {books.length === 1 ? 'Book' : 'Books'}</Text>
+      )}
+      <View style={styles.countLine} />
+    </View>
+  );
+
   return (
-    <View style={[styles.container, playroom && prStyles.page, { paddingTop: insets.top }]}>
+    <View style={[styles.container, playroom && prStyles.page, { paddingTop: playroom ? 0 : insets.top }]}>
+      {/* PlayRoom: plum behind the status bar, pinned while the header scrolls away. */}
+      {playroom && <PlayRoomStatusStrip height={insets.top} />}
+      {/* Classic header and Iris note (the PlayRoom header's intro replaces the note). */}
+      {!playroom && (
+      <>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -71,17 +89,20 @@ export default function OffShelfScreen() {
         </Text>
       </View>
 
+      </>
+      )}
+
       {/* COUNT */}
-      <View style={styles.countRow}>
-        <View style={styles.countLine} />
-        {loaded && books.length > 0 && (
-          <Text style={[styles.countText, playroom && prStyles.eyebrow]}>{books.length} {books.length === 1 ? 'Book' : 'Books'}</Text>
-        )}
-        <View style={styles.countLine} />
-      </View>
+      {!playroom && countRow}
 
       {/* GRID */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
+        {playroom && (
+          <>
+            <RoomHeader name="Keep Me Guessing" intro={ROOM_INTROS.keepMeGuessing} irisFrom="cozy/off-shelf" style={{ marginHorizontal: -spacing.md }} />
+            <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>
+          </>
+        )}
         {!loaded ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : books.length === 0 ? (
