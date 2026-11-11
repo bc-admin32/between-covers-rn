@@ -13,6 +13,9 @@ import {
   Alert,
 } from 'react-native';
 import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { X } from './icons';
+import { PF } from '../lib/profileTheme';
 import { apiPost } from '../lib/api';
 
 const MAX_MESSAGE = 2000;
@@ -62,6 +65,7 @@ type Props = {
 // `source` defaults to 'profile' — profile home is the canonical caller and
 // omits the prop. Other call sites (e.g. home/index.tsx for trial flow) pass it.
 export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
+  const insets = useSafeAreaInsets();
   const [overall, setOverall] = useState<string | null>(null);
   const [frequency, setFrequency] = useState<string | null>(null);
   const [intent, setIntent] = useState<string | null>(null);
@@ -144,7 +148,7 @@ export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
         <View style={styles.header}>
           <Text style={styles.title}>Share Feedback</Text>
           <TouchableOpacity onPress={requestClose} style={styles.closeBtn} hitSlop={12}>
-            <Text style={styles.closeBtnText}>✕</Text>
+            <X size={18} color={PF.icon} />
           </TouchableOpacity>
         </View>
 
@@ -157,7 +161,8 @@ export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
         ) : (
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            // Room for the home indicator / system bar under the Send button.
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 + insets.bottom }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -217,7 +222,7 @@ export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
                 value={message}
                 onChangeText={(t) => setMessage(t.slice(0, MAX_MESSAGE))}
                 placeholder="…"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={PF.placeholder}
                 multiline
                 textAlignVertical="top"
               />
@@ -257,7 +262,7 @@ export function FeedbackModal({ visible, onClose, source = 'profile' }: Props) {
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.submitBtnText}>Send</Text>
+                <Text style={[styles.submitBtnText, !canSubmit && styles.submitBtnTextDisabled]}>Send</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -283,87 +288,87 @@ function OptionRow({ label, selected, onPress }: { label: string; selected: bool
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F4F8' },
+  container: { flex: 1, backgroundColor: PF.page },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(15,42,72,0.15)',
+    backgroundColor: PF.inputBorder,
     alignSelf: 'center', marginTop: 12, marginBottom: 4,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(15,42,72,0.08)',
+    borderBottomWidth: 1, borderBottomColor: PF.border,
   },
-  title: { fontSize: 18, fontWeight: '700', color: '#0F2A48' },
+  title: { fontSize: 18, fontWeight: '700', color: PF.text },
   closeBtn: { padding: 4 },
-  closeBtnText: { fontSize: 16, color: '#6b7280' },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, gap: 22 },
   intro: {
-    fontSize: 18, color: '#0F2A48',
+    fontSize: 18, color: PF.text,
     fontStyle: 'italic', textAlign: 'center',
   },
   question: { gap: 8 },
   qHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  qHeader: { fontSize: 15, fontWeight: '700', color: '#0F2A48', flexShrink: 1 },
-  qSubheader: { fontSize: 13, color: '#6A5969', fontStyle: 'italic' },
+  qHeader: { fontSize: 15, fontWeight: '700', color: PF.text, flexShrink: 1 },
+  qSubheader: { fontSize: 13, color: PF.secondary, fontStyle: 'italic' },
   required: {
     fontSize: 9, fontWeight: '700', letterSpacing: 1,
-    color: '#B83255', textTransform: 'uppercase',
+    color: PF.accent, textTransform: 'uppercase',
   },
   options: { gap: 8, marginTop: 4 },
   option: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)',
-    backgroundColor: '#fff',
+    borderRadius: 12, borderWidth: 1, borderColor: PF.inputBorder,
+    backgroundColor: PF.card,
   },
-  optionSelected: { borderColor: '#B83255', backgroundColor: 'rgba(184,50,85,0.06)' },
+  optionSelected: { borderColor: PF.accent, backgroundColor: 'rgba(184,50,85,0.06)' },
   radio: {
     width: 18, height: 18, borderRadius: 9, borderWidth: 1.5,
-    borderColor: '#B83255', alignItems: 'center', justifyContent: 'center',
+    borderColor: PF.accent, alignItems: 'center', justifyContent: 'center',
   },
-  radioSelected: { backgroundColor: '#B83255', borderColor: '#B83255' },
+  radioSelected: { backgroundColor: PF.accent, borderColor: PF.accent },
   radioDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  optionLabel: { flex: 1, fontSize: 14, color: '#0F2A48' },
-  optionLabelSelected: { color: '#B83255', fontWeight: '600' },
+  optionLabel: { flex: 1, fontSize: 14, color: PF.text },
+  optionLabelSelected: { color: PF.accent, fontWeight: '600' },
   textArea: {
     minHeight: 110,
     backgroundColor: '#fff',
     borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)',
-    padding: 14, fontSize: 14, color: '#0F2A48',
+    borderWidth: 1, borderColor: PF.inputBorder,
+    padding: 14, fontSize: 14, color: PF.text,
     lineHeight: 20,
   },
-  charCount: { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
+  charCount: { fontSize: 11, color: PF.label, textAlign: 'right' },
   recommendRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   recommendBtn: {
     flex: 1, height: 44, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(15,42,72,0.12)',
+    borderWidth: 1, borderColor: PF.inputBorder,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: PF.card,
   },
-  recommendBtnSelected: { backgroundColor: '#B83255', borderColor: '#B83255' },
-  recommendBtnText: { fontSize: 14, fontWeight: '600', color: '#0F2A48' },
+  recommendBtnSelected: { backgroundColor: PF.accent, borderColor: PF.accent },
+  recommendBtnText: { fontSize: 14, fontWeight: '600', color: PF.text },
   recommendBtnTextSelected: { color: '#fff' },
   closing: {
-    fontSize: 13, color: '#6A5969', fontStyle: 'italic',
+    fontSize: 13, color: PF.secondary, fontStyle: 'italic',
     textAlign: 'center', lineHeight: 20,
     marginTop: 8, marginBottom: 4,
   },
-  error: { fontSize: 13, color: '#ef4444', textAlign: 'center' },
+  error: { fontSize: 13, color: PF.accent, textAlign: 'center' },
   submitBtn: {
-    height: 52, borderRadius: 12, backgroundColor: '#B83255',
+    height: 52, borderRadius: 12, backgroundColor: PF.accent,
     alignItems: 'center', justifyContent: 'center',
   },
-  submitBtnDisabled: { backgroundColor: '#D4C4C4' },
+  submitBtnDisabled: { backgroundColor: PF.pill },
   submitBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  submitBtnTextDisabled: { color: PF.secondary }, // 4.9:1 on the pill
   successContainer: {
     flex: 1, padding: 32,
     alignItems: 'center', justifyContent: 'center',
   },
   successText: {
-    fontSize: 17, color: '#0F2A48',
+    fontSize: 17, color: PF.text,
     textAlign: 'center', lineHeight: 26, fontStyle: 'italic',
   },
 });
