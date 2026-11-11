@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { CaretLeft } from '../../../../components/icons';
+import { CaretLeft, Funnel } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet } from '../../../../lib/api';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
-import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS } from '../../../../components/playroom/RoomHeader';
+import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
+import NewbiesFilterSheet, {
+  EMPTY_FILTERS, filterCount, filterSections, pruneFilters, type NewbiesFilters,
+} from '../../../../components/playroom/NewbiesFilterSheet';
+import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { spacing, colors } from '../../../../lib/theme';
 import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
 
@@ -54,7 +58,17 @@ export default function NewReleasesScreen() {
     load(startMonth);
   }, [startMonth]);
 
-  const sections = data?.sections ?? [];
+  const sections = useMemo(() => data?.sections ?? [], [data]);
+
+  // PlayRoom: filter this month's Newbies in the app (genre, spice, tropes).
+  const [filters, setFilters] = useState<NewbiesFilters>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  // After Last Month / Current, keep only choices the shown month has.
+  useEffect(() => { setFilters((f) => pruneFilters(f, sections)); }, [sections]);
+  const filtering = playroom && filterCount(filters) > 0;
+  const shownSections = useMemo(() => (filtering ? filterSections(sections, filters) : sections), [filtering, sections, filters]);
+  const totalBooks = useMemo(() => sections.reduce((n, s) => n + s.books.length, 0), [sections]);
+  const shownBooks = shownSections.reduce((n, s) => n + s.books.length, 0);
 
   // Pill state is driven entirely by the backend flags.
   const showPill = data ? (data.hasPrevious || !data.isCurrent) : false;
@@ -111,6 +125,16 @@ export default function NewReleasesScreen() {
               monthKey={data && !data.isCurrent ? 'previous' : 'active'}
               irisFrom="cozy/new-releases"
               style={{ marginHorizontal: -spacing.md, marginTop: -spacing.sm }}
+              right={
+                <TouchableOpacity
+                  style={roomHeaderButton}
+                  onPress={() => setFilterOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={filtering ? 'Filter Newbies (filters on)' : 'Filter Newbies'}
+                >
+                  <Funnel size={20} color={CHAMPAGNE} weight={filtering ? 'fill' : 'bold'} />
+                </TouchableOpacity>
+              }
             />
             <View style={styles.prSubRow}>
               <Text style={[styles.subtitle, prStyles.body, styles.prSubtitle]}>Fresh arrivals, sorted by genre</Text>
@@ -120,6 +144,14 @@ export default function NewReleasesScreen() {
                 </TouchableOpacity>
               )}
             </View>
+            {filtering && (
+              <View style={styles.filterBar}>
+                <Text style={[styles.filterBarText, prStyles.body]}>Showing {shownBooks} of {totalBooks}</Text>
+                <TouchableOpacity onPress={() => setFilters(EMPTY_FILTERS)} accessibilityRole="button">
+                  <Text style={[styles.filterBarText, prStyles.eyebrow, styles.filterBarClear]}>Clear filters</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
         {loading ? (
@@ -132,8 +164,15 @@ export default function NewReleasesScreen() {
               No new releases for this month. Check back soon.
             </Text>
           </View>
+        ) : shownSections.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, prStyles.heading]}>No Newbies match these filters.</Text>
+            <TouchableOpacity onPress={() => setFilters(EMPTY_FILTERS)} accessibilityRole="button">
+              <Text style={[styles.filterBarText, prStyles.eyebrow, styles.filterBarClear]}>Clear filters</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          sections.map((section, i) => (
+          shownSections.map((section, i) => (
             <View key={`${section.genre}-${i}`} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, playroom && prStyles.eyebrow]}>{section.genre}</Text>
@@ -149,6 +188,16 @@ export default function NewReleasesScreen() {
         )}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {playroom && (
+        <NewbiesFilterSheet
+          visible={filterOpen}
+          sections={sections}
+          value={filters}
+          onChange={setFilters}
+          onClose={() => setFilterOpen(false)}
+        />
+      )}
     </View>
   );
 }
@@ -165,6 +214,10 @@ const styles = StyleSheet.create({
   // PlayRoom: the subtitle and the Last Month / Current pill under the room header.
   prSubRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xs, marginBottom: spacing.md },
   prSubtitle: { flex: 1, marginTop: 0 },
+  // PlayRoom: "Showing 23 of 175 · Clear filters" while a filter is on.
+  filterBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md },
+  filterBarText: { fontSize: 12 },
+  filterBarClear: { fontWeight: '700' },
   eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: '#B11E45', marginBottom: 4 },
   monthLabel: { fontSize: 34, fontFamily: 'Cormorant_700Bold_Italic', color: '#2a1f18', lineHeight: 38 },
   subtitle: { fontSize: 14, fontWeight: '300', fontStyle: 'italic', color: '#8a7c6e', marginTop: 4 },
