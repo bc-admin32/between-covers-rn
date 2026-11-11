@@ -183,16 +183,20 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.hero}>
-          <View style={styles.heroBg1} />
-          <View style={styles.heroBg2} />
           <View style={styles.heroContent}>
             {isFounding && <Text style={styles.foundingBadge}>✦ Founding Member</Text>}
-            <TouchableOpacity style={styles.avatarContainer} onPress={handlePhotoUpload}>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={handlePhotoUpload}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile photo"
+            >
               <View style={styles.avatarWrapper}>
                 <OptimizedImage uri={photoToShow} style={styles.avatar} />
               </View>
+              {/* Camera badge on the photo's lower-right edge, over the border. */}
               <View style={styles.cameraButton}>
-                <Camera size={16} weight="regular" color={PF.text} />
+                <Camera size={15} weight="regular" color={PF.text} />
               </View>
             </TouchableOpacity>
             <Text style={styles.displayName}>{user.displayName ?? ''}</Text>
@@ -243,16 +247,14 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PF.page },
   scrollContent: { paddingBottom: spacing.xl },
-  hero: { backgroundColor: PF.header, paddingBottom: 64, position: 'relative', overflow: 'hidden' },
-  heroBg1: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(184,50,85,0.15)' },
-  heroBg2: { position: 'absolute', bottom: -30, left: 10, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.12)' },
-  heroContent: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
+  hero: { backgroundColor: PF.header, paddingBottom: 32 },
+  heroContent: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: 6 },
   foundingBadge: { fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase', color: PF.accentOnHeader },
-  avatarContainer: { alignItems: 'center', gap: spacing.sm },
+  avatarContainer: { width: 96, height: 96 },
   avatarWrapper: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: PF.card, overflow: 'hidden' },
   avatar: { width: 96, height: 96 },
-  cameraButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: PF.card, borderWidth: 1, borderColor: PF.inputBorder, alignItems: 'center', justifyContent: 'center' },
-  displayName: { fontSize: 42, fontFamily: 'Cormorant_700Bold_Italic', color: PF.text, lineHeight: 48 },
+  cameraButton: { position: 'absolute', right: -4, bottom: -4, width: 30, height: 30, borderRadius: 15, backgroundColor: PF.card, borderWidth: 1.5, borderColor: PF.header, alignItems: 'center', justifyContent: 'center' },
+  displayName: { fontSize: 40, fontFamily: 'Cormorant_700Bold_Italic', color: PF.text, lineHeight: 46, marginTop: 4 },
   nameDivider: { width: 40, height: 1, backgroundColor: PF.accent },
   curve: { height: 20, backgroundColor: PF.page, borderTopLeftRadius: 999, borderTopRightRadius: 999, marginTop: -20 },
   vibeCard: { marginHorizontal: spacing.lg, backgroundColor: PF.card, borderRadius: 20, padding: spacing.lg, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: PF.border, marginBottom: spacing.lg },
