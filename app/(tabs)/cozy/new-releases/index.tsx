@@ -86,8 +86,16 @@ export default function NewReleasesScreen() {
 
       {/* TITLE BLOCK */}
       <View style={styles.titleBlock}>
-        <Text style={[styles.eyebrow, playroom && prStyles.eyebrow]}>{isNewbies ? newbiesLabel(data?.monthLabel) : 'NEW RELEASES'}</Text>
-        {!!data?.monthLabel && <Text style={[styles.monthLabel, playroom && prStyles.heading]}>{data.monthLabel}</Text>}
+        {isNewbies ? (
+          // "[Month]'s Newbies" is the title; it follows the Last Month /
+          // Current pill because each switch reloads data.monthLabel.
+          <Text style={[styles.monthLabel, prStyles.heading]}>{newbiesLabel(data?.monthLabel)}</Text>
+        ) : (
+          <>
+            <Text style={styles.eyebrow}>NEW RELEASES</Text>
+            {!!data?.monthLabel && <Text style={styles.monthLabel}>{data.monthLabel}</Text>}
+          </>
+        )}
         <Text style={[styles.subtitle, playroom && prStyles.body]}>Fresh arrivals, sorted by genre</Text>
       </View>
 
