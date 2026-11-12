@@ -20,6 +20,7 @@ import { getPlatform } from '../../../../lib/platforms';
 import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRating';
 import RatingInfoButton from '../../../../components/rating/RatingInfoButton';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
+import { ratingSummaryLine, type RatingSummary } from '../../../../lib/ratingSummary';
 
 const openSpotify = async (url: string) => {
   const spotifyUri = url
@@ -52,21 +53,6 @@ type VisualItem = {
   promo?: { discountCode?: string; endDate?: string };
 };
 
-type RatingBreakdown = { count: number; pct: number };
-
-type RatingSummary = {
-  totalRatings: number;
-  topVerdict: string;
-  topPct: number;
-  breakdown: {
-    trash: RatingBreakdown;
-    meh: RatingBreakdown;
-    cute: RatingBreakdown;
-    obsessed: RatingBreakdown;
-    chefs_kiss: RatingBreakdown;
-  };
-};
-
 type MovieDetail = {
   movieId: string;
   title: string;
@@ -82,14 +68,6 @@ type MovieDetail = {
   status: string | null;
 };
 
-const VERDICTS = [
-  { key: 'trash', emoji: '🗑️', label: 'Trash', color: '#E57373' },
-  { key: 'meh', emoji: '😐', label: 'Meh', color: '#B0BEC5' },
-  { key: 'cute', emoji: '😊', label: 'Cute', color: '#81C784' },
-  { key: 'obsessed', emoji: '😍', label: 'Obsessed', color: '#F06292' },
-  { key: 'chefs_kiss', emoji: '💋', label: "Chef's Kiss", color: '#B83255' },
-];
-
 const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: string }> = {
   trash: { emoji: '🗑️', label: 'say skip it', color: '#E57373' },
   meh: { emoji: '😐', label: "say it's just meh", color: '#B0BEC5' },
@@ -98,7 +76,7 @@ const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: str
   chefs_kiss: { emoji: '💋', label: "say Chef's Kiss", color: '#B83255' },
 };
 
-export { VisualItem, RatingSummary };
+export type { VisualItem, RatingSummary };
 
 export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   item: VisualItem; visible: boolean; onClose: () => void;
@@ -121,7 +99,7 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
       .then((res: any) => {
         console.log('[VisualEscapes] platforms from API:', JSON.stringify(res.movie?.platforms));
         setDetail(res.movie);
-        setRatingSummary(res.ratingSummary);
+        setRatingSummary(res.ratingSummary ?? null);
         setUserRating(res.userRating);
       })
       .catch(console.error)
@@ -140,13 +118,14 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
     try {
       const res: any = await apiPost(`/cozy/media/${item.movieId}/rate`, { verdict: verdictKey });
       setUserRating(verdictKey);
-      setRatingSummary(res.ratingSummary);
-      onRatingUpdate(item.movieId, res.ratingSummary);
+      setRatingSummary(res.ratingSummary ?? null);
+      onRatingUpdate(item.movieId, res.ratingSummary ?? null);
     } catch {}
     finally { setSavingRating(false); }
   }
 
   const platforms = detail?.platforms ?? item.platforms ?? [];
+  const ratingLine = ratingSummaryLine(ratingSummary);
   const synopsis = detail?.synopsis ?? item.description ?? null;
   const irisNote = detail?.irisNote ?? null;
   const genres = detail?.genres ?? [];
@@ -254,37 +233,16 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
           <View style={styles.sheetDivider} />
 
-          {/* COMMUNITY VERDICT */}
+          {/* COMMUNITY VERDICT: "😍 72% Obsessed · 14 ratings", or the prompt
+              (no heading) until the first rating. */}
           <View style={styles.sheetSection}>
-            <View style={styles.verdictHeader}>
-              <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Community Verdict</Text>
-              {ratingSummary && (
-                <Text style={[styles.ratingCount, playroom && prStyles.body]}>{ratingSummary.totalRatings} {ratingSummary.totalRatings === 1 ? 'rating' : 'ratings'}</Text>
-              )}
-            </View>
-
-            {ratingSummary && (
-              <View style={styles.verdictBars}>
-                {VERDICTS.map(({ key, emoji, label, color }) => {
-                  const data = ratingSummary.breakdown[key as keyof typeof ratingSummary.breakdown];
-                  const isTop = ratingSummary.topVerdict === key;
-                  return (
-                    <View key={key} style={styles.verdictRow}>
-                      <Text style={styles.verdictEmoji}>{emoji}</Text>
-                      <View style={styles.verdictBarContainer}>
-                        <View style={styles.verdictBarLabels}>
-                          <Text style={[styles.verdictLabel, playroom && prStyles.body, isTop && styles.verdictLabelTop, isTop && playroom && prStyles.heading]}>{label}</Text>
-                          <Text style={[styles.verdictPct, playroom && prStyles.body, isTop && { color }]}>{data.pct}%</Text>
-                        </View>
-                        <View style={styles.verdictBarBg}>
-                          <View style={[styles.verdictBarFill, { width: `${data.pct}%` as any, backgroundColor: isTop ? color : 'rgba(15,42,72,0.15)' }]} />
-                        </View>
-                      </View>
-                      <Text style={[styles.verdictCount, playroom && prStyles.body]}>{data.count}</Text>
-                    </View>
-                  );
-                })}
-              </View>
+            {ratingLine ? (
+              <>
+                <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Community Verdict</Text>
+                <Text style={[styles.ratingLine, playroom && prStyles.heading]}>{ratingLine}</Text>
+              </>
+            ) : (
+              <Text style={[styles.ratingEmpty, playroom && prStyles.body]}>Be the first to rate this ✨</Text>
             )}
 
             {item.movieId && (
@@ -524,18 +482,7 @@ const styles = StyleSheet.create({
   platformLogo: { height: 24, width: 80 },
   platformName: { fontSize: 12, fontWeight: '700', color: '#0F2A48' },
   sheetDivider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.lg },
-  verdictHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  ratingCount: { fontSize: 11, color: '#A9C0D4' },
-  verdictBars: { gap: spacing.sm, marginBottom: spacing.lg },
-  verdictRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  verdictEmoji: { fontSize: 16, width: 24, textAlign: 'center' },
-  verdictBarContainer: { flex: 1 },
-  verdictBarLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  verdictLabel: { fontSize: 11, color: '#6A7A8C' },
-  verdictLabelTop: { fontWeight: '700', color: '#0F2A48' },
-  verdictPct: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
-  verdictBarBg: { height: 5, borderRadius: 3, backgroundColor: 'rgba(15,42,72,0.08)', overflow: 'hidden' },
-  verdictBarFill: { height: 5, borderRadius: 3 },
-  verdictCount: { fontSize: 11, color: '#A9C0D4', width: 20, textAlign: 'right' },
+  ratingLine: { fontSize: 18, fontStyle: 'italic', color: '#0F2A48', lineHeight: 26 },
+  ratingEmpty: { fontSize: 18, fontStyle: 'italic', color: '#A9C0D4' },
   userVerdictSection: { marginTop: spacing.md },
 });

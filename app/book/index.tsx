@@ -30,21 +30,7 @@ import {
 } from '../../lib/retailerCta';
 import { TRIGGERS, prettifyEnum, type RatingKey } from '../../lib/tagTaxonomy';
 import { IRIS_AVATAR } from '../../lib/irisAvatar';
-
-const VERDICT_DISPLAY: Record<string, { emoji: string; phrase: string; color: string }> = {
-  trash:      { emoji: '🗑️', phrase: 'they say skip it',       color: '#E57373' },
-  meh:        { emoji: '😐', phrase: "they say it's just meh", color: '#B0BEC5' },
-  cute:       { emoji: '😊', phrase: "they say it's cute",     color: '#81C784' },
-  obsessed:   { emoji: '😍', phrase: "they're obsessed",       color: '#F06292' },
-  chefs_kiss: { emoji: '💋', phrase: "it's a Chef's Kiss",     color: '#B83255' },
-};
-
-type RatingSummary = {
-  totalRatings: number;
-  topVerdict: string;
-  topPct: number;
-  breakdown: Record<string, { count: number; pct: number }>;
-};
+import { ratingSummaryLine, type RatingSummary } from '../../lib/ratingSummary';
 
 type BookDetailResponse = {
   preferredRetailer: string | null;
@@ -74,26 +60,6 @@ type BookDetailResponse = {
   ratingSummary: RatingSummary | null;
   userCommunityRating: string | null;
 };
-
-function computeScore(ratingSummary: RatingSummary | null): number | null {
-  if (!ratingSummary || ratingSummary.totalRatings === 0) return null;
-  const { breakdown, totalRatings } = ratingSummary;
-  const weighted =
-    (breakdown.trash?.count ?? 0) * 1 +
-    (breakdown.meh?.count ?? 0) * 2 +
-    (breakdown.cute?.count ?? 0) * 3 +
-    (breakdown.obsessed?.count ?? 0) * 4 +
-    (breakdown.chefs_kiss?.count ?? 0) * 5;
-  return Math.round((weighted / totalRatings) * 10) / 10;
-}
-
-function scoreToVerdict(score: number): string {
-  if (score < 1.5) return 'trash';
-  if (score < 2.5) return 'meh';
-  if (score < 3.5) return 'cute';
-  if (score < 4.5) return 'obsessed';
-  return 'chefs_kiss';
-}
 
 // Work-level content warnings arrive as taxonomy keys. Prefer the TRIGGERS
 // taxonomy's human label; fall back to prettifying an unrecognized enum key.
@@ -353,10 +319,7 @@ export default function BookDetailsScreen() {
   const preferredRetailerKey =
     retailerCTAs.find((r) => RETAILER_PROFILE_ID[r.key] === data.preferredRetailer)?.key
     ?? retailerCTAs[0]?.key;
-  const score = computeScore(ratingSummary);
-  const verdictKey = score ? scoreToVerdict(score) : null;
-  const verdictInfo = verdictKey ? VERDICT_DISPLAY[verdictKey] : null;
-  const totalRatings = ratingSummary?.totalRatings ?? 0;
+  const ratingLine = ratingSummaryLine(ratingSummary);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -471,15 +434,9 @@ export default function BookDetailsScreen() {
           {/* COMMUNITY RATING */}
           <View style={styles.ratingSection}>
             <View style={styles.ratingCard}>
-              {score && verdictInfo ? (
-                <>
-                  <Text style={styles.ratingText}>
-                    The BC community gives this a{' '}
-                    <Text style={[styles.ratingScore, { color: verdictInfo.color }]}>{score}</Text>
-                    {' '}— {verdictInfo.phrase} {verdictInfo.emoji}
-                  </Text>
-                  <Text style={styles.ratingCount}>{totalRatings} {totalRatings === 1 ? 'reader' : 'readers'} rated this</Text>
-                </>
+              {/* "😍 72% Obsessed · 14 ratings"; the prompt until the first rating. */}
+              {ratingLine ? (
+                <Text style={styles.ratingText}>{ratingLine}</Text>
               ) : (
                 <Text style={styles.ratingEmpty}>Be the first to rate this ✨</Text>
               )}
@@ -644,8 +601,6 @@ const styles = StyleSheet.create({
   ratingSection: { marginBottom: spacing.md },
   ratingCard: { backgroundColor: 'rgba(15,42,72,0.04)', borderWidth: 1, borderColor: 'rgba(15,42,72,0.07)', borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md },
   ratingText: { fontSize: 18, color: '#0F2A48', lineHeight: 26, fontStyle: 'italic' },
-  ratingScore: { fontWeight: '600' },
-  ratingCount: { fontSize: 11, color: '#A9C0D4', marginTop: 6 },
   ratingEmpty: { fontSize: 18, fontStyle: 'italic', color: '#A9C0D4' },
   verdictRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   verdictButton: { height: 48, borderRadius: radius.md, backgroundColor: 'rgba(15,42,72,0.05)', alignItems: 'center', justifyContent: 'center' },
