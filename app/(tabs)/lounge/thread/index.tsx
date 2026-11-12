@@ -420,6 +420,8 @@ export default function LoungeThreadScreen() {
   }
 
   const isIrisChat = thread.type === 'IRIS_CHAT';
+  // Iris also authors non-chat threads (e.g. Book Club); show her photo and name style there too.
+  const authorIsIris = isIrisChat || thread.authorId === 'IRIS';
   const isClosed = thread.status === 'closed' || thread.closed === true;
 
   const visibleReplies = replies.filter((r) => !blockedUsers.includes(r.userId));
@@ -446,7 +448,8 @@ export default function LoungeThreadScreen() {
             <Text style={[styles.threadCardLabel, isIrisChat && styles.threadCardLabelIris]}>
               {isIrisChat ? 'Iris Has Thoughts' : isBookClub ? 'Community Read' : thread.topicLabel ?? 'Discussion'}
             </Text>
-            <Text style={styles.threadCardReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
+            {/* Kept (empty at 0) so the space-between header layout doesn't shift. */}
+            <Text style={styles.threadCardReplies}>{thread.replyCount > 0 ? `${thread.replyCount} ${thread.replyCount === 1 ? 'reply' : 'replies'}` : ''}</Text>
           </View>
           {clubBook && (
             <TouchableOpacity
@@ -467,10 +470,10 @@ export default function LoungeThreadScreen() {
             </TouchableOpacity>
           )}
           <View style={styles.threadCardAuthor}>
-            <Avatar url={thread.authorAvatar} name={thread.authorName} size={34} isIris={isIrisChat} />
+            <Avatar url={thread.authorAvatar} name={thread.authorName} size={34} isIris={authorIsIris} />
             <View>
-              <Text style={[styles.threadCardAuthorName, isIrisChat && styles.threadCardAuthorNameIris]}>
-                {isIrisChat ? 'Iris' : thread.authorName}
+              <Text style={[styles.threadCardAuthorName, authorIsIris && styles.threadCardAuthorNameIris]}>
+                {authorIsIris ? 'Iris' : thread.authorName}
               </Text>
               <Text style={styles.threadCardTime}>{timeAgo(thread.createdAt)}</Text>
             </View>

@@ -40,8 +40,9 @@ export function splitLeadingEmoji(raw: string): { emoji: string | null; title: s
   return { emoji: null, title: raw.trim() };
 }
 
-function replies(n?: number): string {
-  return typeof n === 'number' && n > 0 ? `💬 ${n} ${n === 1 ? 'reply' : 'replies'}` : '💬 No replies yet';
+// Reply count line; null at 0 so the card shows nothing until someone replies.
+function replies(n?: number): string | null {
+  return typeof n === 'number' && n > 0 ? `💬 ${n} ${n === 1 ? 'reply' : 'replies'}` : null;
 }
 
 export default function PillowTalk({
@@ -179,7 +180,7 @@ export default function PillowTalk({
             <Text style={styles.eyebrow}>Iris Has Thoughts</Text>
             <Text style={styles.cardTitle}>{iris.title}</Text>
             <Text style={styles.cardBody} numberOfLines={3}>{iris.body}</Text>
-            <Text style={styles.cardFoot}>{replies(iris.replyCount)}</Text>
+            {!!replies(iris.replyCount) && <Text style={styles.cardFoot}>{replies(iris.replyCount)}</Text>}
           </TouchableOpacity>
         )}
 
@@ -196,7 +197,7 @@ export default function PillowTalk({
                 <Text style={styles.cardTitle}>{d.title}</Text>
                 <Text style={styles.cardBody} numberOfLines={3}>{d.description}</Text>
                 <View style={styles.cardFooterRow}>
-                  <Text style={styles.cardFoot}>{replies(d.replyCount)}</Text>
+                  {!!replies(d.replyCount) && <Text style={styles.cardFoot}>{replies(d.replyCount)}</Text>}
                   <TouchableOpacity style={styles.smallButton} onPress={() => openThread(d.threadId)}>
                     <Text style={styles.primaryButtonText}>{d.buttonLabel?.trim() || 'Join the Conversation'}</Text>
                   </TouchableOpacity>
@@ -278,7 +279,7 @@ export default function PillowTalk({
                 {(bookClub.authorName ?? 'Iris') + ': '}{bookClub.body}
               </Text>
             )}
-            <Text style={styles.cardFoot}>{replies(bookClub.replyCount)}</Text>
+            {!!replies(bookClub.replyCount) && <Text style={styles.cardFoot}>{replies(bookClub.replyCount)}</Text>}
           </TouchableOpacity>
         )}
 

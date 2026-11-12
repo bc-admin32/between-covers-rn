@@ -381,7 +381,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>
                 {bookClub.replyCount > 0
                   ? `💬 ${bookClub.replyCount} ${bookClub.replyCount === 1 ? 'reply' : 'replies'}`
-                  : '💬 No replies yet'}
+                  : ''}
               </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
@@ -414,7 +414,7 @@ export default function LoungeScreen() {
               <Text style={styles.cardFooterNote}>
                 {typeof primary.replyCount === 'number' && primary.replyCount > 0
                   ? `💬 ${primary.replyCount} ${primary.replyCount === 1 ? 'reply' : 'replies'}`
-                  : '💬 No replies yet'}
+                  : ''}
               </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
@@ -443,7 +443,7 @@ export default function LoungeScreen() {
             >
               <Text style={styles.outlineButtonText}>Add Yours to the Mix</Text>
             </TouchableOpacity>
-            {typeof secondary.replyCount === 'number' && (
+            {typeof secondary.replyCount === 'number' && secondary.replyCount > 0 && (
               <Text style={styles.pollVoteCount}>
                 {secondary.replyCount} {secondary.replyCount === 1 ? 'reply' : 'replies'} ✦
               </Text>
@@ -470,7 +470,7 @@ export default function LoungeScreen() {
                 <Text style={styles.cardFooterNote}>
                   {typeof iris.replyCount === 'number' && iris.replyCount > 0
                     ? `${iris.replyCount} ${iris.replyCount === 1 ? 'reply' : 'replies'}`
-                    : 'No replies yet'}
+                    : ''}
                 </Text>
               </View>
               <TouchableOpacity

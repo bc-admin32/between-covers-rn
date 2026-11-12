@@ -102,7 +102,7 @@ function WeekRow({ week, onThreadClick }: { week: ArchiveWeek; onThreadClick: (t
           </View>
         </View>
         <View style={styles.weekHeaderRight}>
-          <Text style={styles.weekReplies}>{totalReplies} replies</Text>
+          {totalReplies > 0 && <Text style={styles.weekReplies}>{totalReplies} {totalReplies === 1 ? 'reply' : 'replies'}</Text>}
           <Text style={styles.weekChevron}>{open ? '▲' : '▼'}</Text>
         </View>
       </TouchableOpacity>
@@ -121,7 +121,7 @@ function WeekRow({ week, onThreadClick }: { week: ArchiveWeek; onThreadClick: (t
                   <View style={[styles.tag, { backgroundColor: style.bg }]}>
                     <Text style={[styles.tagText, { color: style.color }]}>{getThreadTypeLabel(thread.sectionType)}</Text>
                   </View>
-                  <Text style={styles.threadReplies}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</Text>
+                  <Text style={styles.threadReplies}>{thread.replyCount > 0 ? `${thread.replyCount} ${thread.replyCount === 1 ? 'reply' : 'replies'}` : ''}</Text>
                 </View>
                 <Text style={styles.threadLabel}>{thread.label}</Text>
                 {thread.body && <Text style={styles.threadBody} numberOfLines={2}>{thread.body}</Text>}
@@ -143,7 +143,7 @@ function BookClubCard({ club, onPress }: { club: ArchiveBookClub; onPress: () =>
         <View style={[styles.tag, { backgroundColor: style.bg }]}>
           <Text style={[styles.tagText, { color: style.color }]}>{getThreadTypeLabel('BOOK_CLUB')}</Text>
         </View>
-        <Text style={styles.threadReplies}>{club.replyCount} {club.replyCount === 1 ? 'reply' : 'replies'}</Text>
+        <Text style={styles.threadReplies}>{club.replyCount > 0 ? `${club.replyCount} ${club.replyCount === 1 ? 'reply' : 'replies'}` : ''}</Text>
       </View>
       <View style={styles.clubBook}>
         {club.book.coverUrl ? (
