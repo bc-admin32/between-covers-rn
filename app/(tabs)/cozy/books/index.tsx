@@ -112,8 +112,10 @@ export default function CozyBooksScreen() {
         setMonthThemes(response);
         const month = response?.[monthKey];
         const data: BookItem[] =
-          month?.sections?.BOOKS ??
-          month?.sections?.books ?? [];
+          // `books` is the per-reader ranked list (cozyHome v10); BOOKS is a
+          // legacy key, read only if `books` is missing.
+          month?.sections?.books ??
+          month?.sections?.BOOKS ?? [];
         setBooks(data);
         setBookOfMonth(
           month?.sections?.bookOfMonth ??
@@ -165,7 +167,10 @@ export default function CozyBooksScreen() {
   // each genre in that order; the API order is kept inside each heading.
   // Classic months keep the taxonomy order.
   const sections = useMemo(() => {
-    const list = bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books;
+    // The Book of the Month leads sections.books (for older builds) and is
+    // featured above the shelf, so it's left out of the groups and never
+    // sets the heading order.
+    const list = books.filter((b) => !b.isBookOfMonth && (!bookOfMonth || b.workId !== bookOfMonth.workId));
     const grouped = groupBooksBySubgenre(list);
     if (!isBetweenTheSheets) return grouped;
     return [...grouped].sort((a, b) => list.indexOf(a.books[0]) - list.indexOf(b.books[0]));
