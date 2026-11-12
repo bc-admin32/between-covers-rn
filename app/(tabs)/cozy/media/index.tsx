@@ -75,7 +75,30 @@ type MovieDetail = {
   vibes: string[];
   platforms: PlatformLink[];
   status: string | null;
+  tmdbId?: number | null;
+  spicy?: boolean | null;
+  releaseStatus?: string | null;
+  releaseDate?: string | null;
+  releaseDateType?: string | null;
 };
+
+// Streaming services for the viewer's country (GET /cozy/media/{movieId},
+// next to `movie`), from TMDB/JustWatch, in TMDB display order.
+type StreamingService = { providerId: string | number; name: string; logoUrl?: string | null; kind?: 'subscription' | 'free' | 'ads' | string };
+// services: [] = none in their country (hide the line); null = title not
+// linked to TMDB (keep the curated platforms).
+type Streaming = { services: StreamingService[] | null; link: string | null };
+
+function readStreaming(res: any): Streaming {
+  const raw = res?.streamingServices;
+  const services = Array.isArray(raw)
+    ? raw.filter((s: any): s is StreamingService => !!s && typeof s.name === 'string' && s.name.length > 0)
+    : null;
+  const link = typeof res?.streamingLink === 'string' && res.streamingLink ? res.streamingLink : null;
+  return { services, link };
+}
+
+const KIND_LABEL: Record<string, string> = { free: 'Free', ads: 'With ads' };
 
 const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: string }> = {
   trash: { emoji: '🗑️', label: 'say skip it', color: '#E57373' },
@@ -139,6 +162,8 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState<MovieDetail | null>(null);
+  // null until the detail answers (or if it fails): then the curated platforms show.
+  const [streaming, setStreaming] = useState<Streaming | null>(null);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(item.ratingSummary ?? null);
   const [userRating, setUserRating] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -150,10 +175,11 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
     if (!visible || !item.movieId) return;
     setLoadingDetail(true);
     setDetail(null);
+    setStreaming(null);
     apiGet(`/cozy/media/${item.movieId}`)
       .then((res: any) => {
-        console.log('[VisualEscapes] platforms from API:', JSON.stringify(res.movie?.platforms));
         setDetail(res.movie);
+        setStreaming(readStreaming(res));
         setRatingSummary(res.ratingSummary ?? null);
         setUserRating(res.userRating);
       })
@@ -264,8 +290,41 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
             </View>
           )}
 
-          {/* WHERE TO WATCH */}
-          {platforms.length > 0 && (
+          {/* WHERE TO WATCH (TMDB/JustWatch, viewer's country). Hidden when there
+              are none in their country; tapping opens the JustWatch page. */}
+          {!!streaming?.services && streaming.services.length > 0 && (
+            <View style={styles.sheetSection}>
+              <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Where to Watch</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={!streaming.link}
+                onPress={() => streaming.link && Linking.openURL(streaming.link)}
+                accessibilityRole={streaming.link ? 'link' : undefined}
+                accessibilityLabel={`Streaming on ${streaming.services.map((s) => s.name).join(', ')}${streaming.link ? '. Opens JustWatch' : ''}`}
+              >
+                <View style={styles.platformRow}>
+                  {streaming.services.map((s) => (
+                    <View key={`${s.providerId}-${s.kind ?? ''}`} style={styles.serviceItem}>
+                      <View style={[styles.serviceLogoWrap, playroom && prStyles.card]}>
+                        {s.logoUrl ? (
+                          <Image source={{ uri: s.logoUrl }} style={styles.serviceLogo} contentFit="cover" />
+                        ) : (
+                          <Text style={[styles.platformName, playroom && prStyles.heading]} numberOfLines={2}>{s.name}</Text>
+                        )}
+                      </View>
+                      {!!s.kind && !!KIND_LABEL[s.kind] && (
+                        <Text style={[styles.serviceKind, playroom && prStyles.body]}>{KIND_LABEL[s.kind]}</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+                <Text style={[styles.justWatch, playroom && prStyles.body]}>Streaming data from JustWatch</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* WHERE TO WATCH (curated): titles not linked to TMDB, or no answer yet. */}
+          {!loadingDetail && !streaming?.services && platforms.length > 0 && (
             <View style={styles.sheetSection}>
               <Text style={[styles.sheetSectionLabel, playroom && prStyles.eyebrow]}>Where to Watch</Text>
               <View style={styles.platformRow}>
@@ -542,6 +601,11 @@ const styles = StyleSheet.create({
   platformButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#D7E2E9', borderRadius: 12, padding: 10, shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   platformLogo: { height: 24, width: 80 },
   platformName: { fontSize: 12, fontWeight: '700', color: '#0F2A48' },
+  serviceItem: { alignItems: 'center', gap: 4, width: 52 },
+  serviceLogoWrap: { width: 48, height: 48, borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff', borderWidth: 1, borderColor: '#D7E2E9', alignItems: 'center', justifyContent: 'center' },
+  serviceLogo: { width: 48, height: 48 },
+  serviceKind: { fontSize: 9, fontWeight: '700', color: '#6A7A8C', textAlign: 'center' },
+  justWatch: { fontSize: 10, color: '#6A7A8C', marginTop: 10 },
   sheetDivider: { height: 1, backgroundColor: 'rgba(15,42,72,0.08)', marginHorizontal: spacing.lg, marginBottom: spacing.lg },
   ratingLine: { fontSize: 18, fontStyle: 'italic', color: '#0F2A48', lineHeight: 26 },
   ratingEmpty: { fontSize: 18, fontStyle: 'italic', color: '#A9C0D4' },
