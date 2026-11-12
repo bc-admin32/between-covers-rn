@@ -22,6 +22,7 @@ import { parseLocalEndOfDay } from '../../../../lib/dateUtils';
 import AffiliateDisclosure from '../../../../components/AffiliateDisclosure';
 import { OptimizedImage } from '../../../../components/OptimizedImage';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
+import { keepEmojiAttached } from '../../../../lib/emojiText';
 
 type LifestyleItem = {
   sk?: string;
@@ -98,7 +99,7 @@ function RecipeModal({ item, onClose }: { item: LifestyleItem; onClose: () => vo
           )}
 
           <Text style={[styles.recipeLabel, playroom && prStyles.eyebrow]}>🍽️ Recipe</Text>
-          <Text style={[styles.recipeTitle, playroom && prStyles.heading]}>{item.title}</Text>
+          <Text style={[styles.recipeTitle, playroom && prStyles.heading]}>{keepEmojiAttached(item.title)}</Text>
           <View style={styles.recipeDivider} />
 
           {item.description ? (
@@ -225,7 +226,7 @@ export default function CozyItemsScreen() {
       </TouchableOpacity>
 
       <View style={[styles.itemInfo, wide && styles.itemInfoWide]}>
-        <Text style={[styles.itemTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
+        <Text style={[styles.itemTitle, playroom && prStyles.heading]} numberOfLines={2}>{keepEmojiAttached(item.title)}</Text>
         {item.description && (
           <Text style={[styles.itemDescription, playroom && prStyles.body]} numberOfLines={2}>{item.description}</Text>
         )}

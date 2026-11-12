@@ -474,8 +474,9 @@ const styles = StyleSheet.create({
   countLine: { flex: 1, height: 1, backgroundColor: 'rgba(15,42,72,0.1)' },
   countText: { fontSize: 11, fontWeight: '700', color: '#A9C0D4', letterSpacing: 0.8, textTransform: 'uppercase' },
   gridContent: { paddingHorizontal: spacing.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  watchCard: { width: '45%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
+  // Two 48% cards pushed to the edges, so left and right margins match.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 },
+  watchCard: { width: '48%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#D7E2E9', shadowColor: '#0F2A48', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
   watchCover: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#D7E2E9', overflow: 'hidden' },
   watchCoverImage: { width: '100%', height: '100%' },
   watchCoverFallback: { alignItems: 'center', justifyContent: 'center' },

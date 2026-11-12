@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { apiGet, apiPatch, ApiError } from '../../../../lib/api';
-import { TROPES, prettifyEnum } from '../../../../lib/tagTaxonomy';
+import { TROPES, tropeLabel } from '../../../../lib/tagTaxonomy';
 import { spacing, colors } from '../../../../lib/theme';
 import { PF } from '../../../../lib/profileTheme';
 import {
@@ -57,6 +57,26 @@ function extraTropes(options: TropeOption[]): TropeOption[] {
     .filter((o) => !FAVORITE_TROPE_KEYS.has(o.key))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
+// Saved `tropes` may hold duplicates, blanks, non-strings, labels instead of
+// keys ("Slow Burn"), or lowercase keys. Clean them so the "N of 5" count only
+// counts picks that show as selected chips: label -> key, else KEY_FORMAT,
+// de-duplicated. The cleaned list is what gets saved next time.
+const labelToken = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const TROPE_KEY_BY_LABEL = new Map<string, string>(
+  [...FAVORITE_TROPE_OPTIONS, ...TROPES.map((t) => ({ key: t.key as string, label: t.label }))]
+    .map((o) => [labelToken(o.label), o.key])
+);
+function cleanSavedTropes(raw: unknown): string[] {
+  const out: string[] = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    if (typeof v !== 'string' || !v.trim()) continue;
+    const key = TROPE_KEY_BY_LABEL.get(labelToken(v))
+      ?? v.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (key && !out.includes(key)) out.push(key);
+  }
+  return out;
+}
+
 // Used until GET /taxonomy?type=TROPE answers, and kept if it fails.
 const EXTRA_TROPE_FALLBACK = extraTropes(TROPES.map((t) => ({ key: t.key as string, label: t.label })));
 
@@ -167,7 +187,7 @@ export default function ReadingPreferencesScreen() {
       setGenres(Array.isArray(data.genres) ? data.genres : []);
       setComfortBoundaries(Object.keys(data.comfortBoundaries ?? {}));
       setSpiceLevel(data.spiceLevel ?? null);
-      const savedTropes: string[] = Array.isArray(data.tropes) ? data.tropes : [];
+      const savedTropes = cleanSavedTropes(data.tropes);
       setFavoriteTropes(savedTropes);
       // A saved pick outside the 10 starts the "Explore more" group open so
       // it's visible.
@@ -195,8 +215,13 @@ export default function ReadingPreferencesScreen() {
     ...extraTropeOptions,
     ...favoriteTropes
       .filter((k) => !FAVORITE_TROPE_KEYS.has(k) && !extraTropeOptions.some((o) => o.key === k))
-      .map((k) => ({ key: k, label: prettifyEnum(k) })),
+      .map((k) => ({ key: k, label: tropeLabel(k) })),
   ];
+  // Collapsed ("Show fewer"), the extra group still shows its selected picks,
+  // so every pick in the count is on screen.
+  const visibleExtraTropeChips = showMoreTropes
+    ? extraTropeChips
+    : extraTropeChips.filter((o) => favoriteTropes.includes(o.key));
 
   const handleFinishedBookPromptToggle = async (v: boolean) => {
     Haptics.selectionAsync();
@@ -275,9 +300,9 @@ export default function ReadingPreferencesScreen() {
                 {showMoreTropes ? 'Show fewer' : "Don't see your favorite trope? Explore more →"}
               </Text>
             </TouchableOpacity>
-            {showMoreTropes && (
+            {visibleExtraTropeChips.length > 0 && (
               <MultiChipGroup
-                options={extraTropeChips}
+                options={visibleExtraTropeChips}
                 value={favoriteTropes}
                 max={MAX_FAVORITE_TROPES}
                 onChange={(v) => { Haptics.selectionAsync(); setFavoriteTropes(v); markUnsaved(); }}

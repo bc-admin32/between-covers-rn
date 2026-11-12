@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BookCardData } from '../cozy/BookCard';
-import { prettifyEnum } from '../../lib/tagTaxonomy';
+import { prettifyEnum, tropeLabel } from '../../lib/tagTaxonomy';
 import { PR } from '../../lib/playroomPage';
 import { spacing } from '../../lib/theme';
 
@@ -133,7 +133,7 @@ export default function NewbiesFilterSheet({ visible, sections, value, onChange,
                 {shownTropes.map((t) => (
                   <Chip
                     key={t}
-                    label={prettifyEnum(t)}
+                    label={tropeLabel(t)}
                     active={draft.tropes.includes(t)}
                     onPress={() => setDraft((d) => ({ ...d, tropes: toggle(d.tropes, t) }))}
                   />

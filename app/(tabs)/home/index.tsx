@@ -405,7 +405,9 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-      <View style={[styles.content, { paddingTop: insets.top + 12, paddingBottom: spacing.md }]}>
+      {/* Members see the My Escape pill (top right, ~30pt tall at insets.top + 8),
+          so the greeting starts below it instead of under it. */}
+      <View style={[styles.content, { paddingTop: insets.top + (isGuest === false ? 48 : 12), paddingBottom: spacing.md }]}>
 
         {/* GREETING */}
         <Text style={styles.greeting}>{data.greeting.text}</Text>

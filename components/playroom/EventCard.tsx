@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { spacing } from '../../lib/theme';
 import { parseLocalDate } from '../../lib/dateUtils';
+import { keepEmojiAttached } from '../../lib/emojiText';
 import { EVENT_STAGE_LABELS, eventStage, type CozyEvent } from '../../lib/cozyEvents';
 import { CHAMPAGNE, ROSE_GOLD, CARD_FILL, CARD_BORDER, FONT_CAPS, FONT_SERIF } from './playroomStyle';
 
@@ -61,7 +62,7 @@ export default function EventCard({ event, canOpenEvent = true, variant = 'defau
       {!!event.imageUrl && <Image source={{ uri: event.imageUrl }} style={styles.image} contentFit="cover" />}
       <View style={styles.body}>
         <Text style={[styles.stage, pr && playroom.stage]}>{EVENT_STAGE_LABELS[stage]}</Text>
-        <Text style={[styles.title, pr && playroom.title]} numberOfLines={2}>{event.title}</Text>
+        <Text style={[styles.title, pr && playroom.title]} numberOfLines={2}>{keepEmojiAttached(event.title)}</Text>
         {!!date && <Text style={[styles.date, pr && playroom.date]}>{date}</Text>}
         {!!event.description && (
           <Text style={[styles.description, pr && playroom.description]} numberOfLines={3}>{event.description}</Text>

@@ -288,8 +288,9 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: spacing.xs },
   sectionTitle: { fontSize: 15, fontWeight: '400', letterSpacing: 1.6, textTransform: 'uppercase', color: '#7a6e62' },
   sectionCount: { fontSize: 11, fontWeight: '700', color: '#A9C0D4' },
-  gridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  bookCard: { width: '45%' },
+  // Two 48% cards pushed to the edges, so left and right margins match.
+  gridInner: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 },
+  bookCard: { width: '48%' },
   playroomHeading: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 12, paddingHorizontal: spacing.xs },
   playroomHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingHorizontal: spacing.xs },
   playroomBlurb: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, marginBottom: 12, paddingHorizontal: spacing.xs },

@@ -484,6 +484,8 @@ export default function AccountSettingsScreen() {
                 thumbColor="#fff"
               />
             </View>
+            {/* Zone chips only when Automatic is off. */}
+            {timeZoneMode === 'MANUAL' && (
             <Field label="Select Time Zone">
               <View style={styles.tzOptions}>
                 {[
@@ -496,17 +498,17 @@ export default function AccountSettingsScreen() {
                 ].map((tz) => (
                   <TouchableOpacity
                     key={tz.value}
-                    style={[styles.tzOption, timeZone === tz.value && styles.tzOptionSelected, timeZoneMode === 'AUTO' && styles.tzOptionDisabled]}
-                    onPress={() => timeZoneMode === 'MANUAL' && setTimeZone(tz.value)}
-                    disabled={timeZoneMode === 'AUTO'}
+                    style={[styles.tzOption, timeZone === tz.value && styles.tzOptionSelected]}
+                    onPress={() => setTimeZone(tz.value)}
                   >
-                    <Text style={[styles.tzOptionText, timeZone === tz.value && styles.tzOptionTextSelected, timeZoneMode === 'AUTO' && styles.tzOptionTextDisabled]}>
+                    <Text style={[styles.tzOptionText, timeZone === tz.value && styles.tzOptionTextSelected]}>
                       {tz.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </Field>
+            )}
           </SectionCard>
 
           {/* NOTIFICATIONS */}
@@ -650,10 +652,8 @@ const styles = StyleSheet.create({
   tzOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tzOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: PF.inputBorder, backgroundColor: '#FFFFFF' },
   tzOptionSelected: { backgroundColor: PF.accent, borderColor: PF.accent },
-  tzOptionDisabled: { backgroundColor: PF.readOnly },
   tzOptionText: { fontSize: 12, color: PF.text },
   tzOptionTextSelected: { color: '#fff', fontWeight: '600' },
-  tzOptionTextDisabled: { color: PF.label },
   biometricLabelWrap: { flex: 1, marginRight: spacing.md },
   biometricHelper: { fontSize: 11, color: PF.secondary, marginTop: 4, lineHeight: 15 },
   deactivateButton: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: PF.inputBorder, alignItems: 'center', justifyContent: 'center' },

@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { prettifyEnum } from '../../lib/tagTaxonomy';
+import { prettifyEnum, tropeLabel } from '../../lib/tagTaxonomy';
 
 // Defensive normalization: a field typed string[] may arrive from backfilled
 // catalog data as a real array, a comma-joined string, or an array containing
@@ -68,7 +68,7 @@ export default function BookCardMeta({
         <View style={styles.tropeRow}>
           {shownTropes.map((t) => (
             <View key={t} style={styles.tropePill}>
-              <Text style={styles.tropePillText} numberOfLines={1}>{prettifyEnum(t)}</Text>
+              <Text style={styles.tropePillText} numberOfLines={2}>{tropeLabel(t)}</Text>
             </View>
           ))}
           {showMoreCount && hiddenTropes > 0 && (
@@ -95,8 +95,8 @@ export default function BookCardMeta({
 const styles = StyleSheet.create({
   spice: { marginTop: 5, fontSize: 11, letterSpacing: 1 },
   tropeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  // flexShrink lets a long trope end in "…" inside its column instead of
-  // running off the screen edge (Android doesn't shorten it otherwise).
+  // flexShrink + 2 lines: a long trope wraps inside its column instead of
+  // running off the screen edge or cutting off after one line.
   tropePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '100%', flexShrink: 1 },
   tropePillText: { fontSize: 9, fontWeight: '700', color: '#6E6255', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1 }, // 4.5:1 on the pill
   morePill: { backgroundColor: 'rgba(15,42,72,0.06)', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0 },

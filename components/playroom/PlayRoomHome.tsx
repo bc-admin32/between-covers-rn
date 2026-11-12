@@ -278,6 +278,8 @@ export default function PlayRoomHome({ month, offShelfCount = 0, isArchive = fal
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+      {/* Solid strip behind the status bar so content doesn't scroll under it. */}
+      <View pointerEvents="none" style={[styles.statusBacking, { height: insets.top }]} />
     </View>
   );
 }
@@ -288,6 +290,7 @@ const shadow = { textShadowColor: 'rgba(20,4,10,0.6)', textShadowOffset: { width
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: WINE },
   scrollContent: { paddingBottom: spacing.xl },
+  statusBacking: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: WINE },
 
   header: { alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.md, paddingHorizontal: SIDE },
   backButton: { alignSelf: 'flex-start', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: CARD_BORDER, backgroundColor: 'rgba(58,10,26,0.5)' },

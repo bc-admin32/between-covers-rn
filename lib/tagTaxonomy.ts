@@ -130,6 +130,12 @@ export const TROPES: Array<{ key: TropeKey; label: string; emoji: string }> = [
   { key: 'FORBIDDEN_LOVE',       label: 'Forbidden Love',        emoji: '🚫' },
 ];
 
+// Display label for a trope key: the curated TROPES label when there is one
+// (so BROTHERS_BEST_FRIEND reads "Brother's Best Friend"), else prettifyEnum.
+export function tropeLabel(key: string): string {
+  return TROPES.find((t) => t.key === key)?.label ?? prettifyEnum(key);
+}
+
 // Verdict ratings match what VerdictRating component already uses,
 // re-exported here as a const for the tag modal.
 export const RATINGS: Array<{ key: RatingKey; emoji: string; label: string }> = [
