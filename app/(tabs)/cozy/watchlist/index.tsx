@@ -24,8 +24,11 @@ function toVisualItem(m: WatchlistMovie): VisualItem {
     status: m.status ?? undefined,
     description: m.synopsis ?? undefined,
     bcGenres: m.bcGenres ?? null,
-    // Lets the sheet hide rating for Coming Soon titles before its detail loads.
+    // Coming Soon titles: the card shows the release date, and the sheet
+    // hides rating before its detail loads.
     releaseStatus: m.releaseStatus ?? null,
+    releaseDate: m.releaseDate ?? null,
+    releaseDateType: m.releaseDateType ?? null,
   };
 }
 
@@ -88,7 +91,13 @@ export default function WatchlistScreen() {
         ) : (
           <View style={styles.grid}>
             {shown.map((item) => (
-              <WatchCard key={item.movieId} item={item} onPress={() => { setSelectedItem(item); setSheetOpen(true); }} />
+              <WatchCard
+                key={item.movieId}
+                item={item}
+                // Unreleased: release date in place of the streaming line.
+                upcoming={item.releaseStatus === 'COMING_SOON'}
+                onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
+              />
             ))}
           </View>
         )}
