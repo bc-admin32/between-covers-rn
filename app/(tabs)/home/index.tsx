@@ -5,6 +5,8 @@ import {
   AccessibilityInfo, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { useLightStatusBarWhileFocused } from '../../../lib/statusBarTone';
 import { ImageSquare } from '../../../components/icons';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -142,6 +144,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
+  // The photo behind Home is usually dark: light status-bar icons once Home
+  // has loaded (the pink loading screen keeps the dark ones).
+  useLightStatusBarWhileFocused(!!data);
   // Init with DEFAULT_BG so cold start renders a generic, non-personalized
   // image (no leak across users) instead of flashing the previous user's
   // cached background. The setBgUrl call after the API resolves swaps in
@@ -280,7 +285,7 @@ export default function HomeScreen() {
 
   if (!data) {
     return (
-      <ImageBackground source={{ uri: DEFAULT_BG }} style={styles.loading} imageStyle={{ opacity: 0.75 }}>
+      <ImageBackground source={{ uri: DEFAULT_BG }} style={styles.loading}>
         <ActivityIndicator color="#B83255" />
       </ImageBackground>
     );
@@ -350,8 +355,19 @@ export default function HomeScreen() {
     <ImageBackground
       source={{ uri: bgUrl }}
       style={styles.container}
-      imageStyle={{ opacity: 0.75 }}
     >
+      {/* A soft dark band across the top so the status bar, greeting and My
+          Escape read on light photos too; on dark photos it barely shows. */}
+      <Svg pointerEvents="none" style={[styles.topScrim, { height: insets.top + 200 }]}>
+        <Defs>
+          <LinearGradient id="homeTopScrim" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#140A14" stopOpacity={0.55} />
+            <Stop offset="0.6" stopColor="#140A14" stopOpacity={0.3} />
+            <Stop offset="1" stopColor="#140A14" stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#homeTopScrim)" />
+      </Svg>
       <FeedbackModal visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} source="trial" />
       {/* My Escape: a small button that opens the Home background setting in
           Account & Settings (members only; that screen needs an account). */}
@@ -362,7 +378,7 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel="My Escape: change your Home background"
         >
-          <ImageSquare size={16} color="#0F2A48" weight="regular" />
+          <ImageSquare size={16} color="#FFFFFF" weight="regular" />
           <Text style={styles.escapeLabel}>My Escape</Text>
         </TouchableOpacity>
       )}
@@ -459,7 +475,7 @@ export default function HomeScreen() {
                     source={{ uri: iris.staticImageUrl ?? IRIS_AVATAR }}
                     style={[styles.irisAvatar, styles.irisAvatarRing]}
                   />
-                  <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
+                  <View style={styles.irisLabelPill}><Text style={styles.irisLabel}>Chat with Iris ✦</Text></View>
                 </TouchableOpacity>
               ) : (
                 <IrisPulseAvatar
@@ -480,7 +496,7 @@ export default function HomeScreen() {
                 source={{ uri: IRIS_AVATAR }}
                 style={[styles.irisAvatar, styles.irisAvatarRing]}
               />
-              <Text style={styles.irisLabel}>Chat with Iris ✦</Text>
+              <View style={styles.irisLabelPill}><Text style={styles.irisLabel}>Chat with Iris ✦</Text></View>
             </TouchableOpacity>
           )}
 
@@ -497,8 +513,10 @@ const styles = StyleSheet.create({
   retryButton: { paddingHorizontal: 28, paddingVertical: 10, borderRadius: 999, backgroundColor: '#B83255' },
   retryText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   content: { flex: 1, alignItems: 'center' },
-  escapeButton: { position: 'absolute', right: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.75)' },
-  escapeLabel: { fontSize: 11, color: '#0F2A48', fontWeight: '600' },
+  topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
+  // Dark glass pill: readable on light and dark photos (white 9.8:1 / 16:1).
+  escapeButton: { position: 'absolute', right: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(20,10,20,0.35)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.5)' },
+  escapeLabel: { fontSize: 11, color: '#FFFFFF', fontWeight: '600' },
   memberSignIn: {
     marginTop: spacing.sm,
     paddingHorizontal: 16,
@@ -513,9 +531,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
     fontFamily: 'DancingScript_400Regular',
   },
   center: {
@@ -577,14 +595,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  // A small dark pill so the label reads anywhere on the photo.
+  irisLabelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(20,10,20,0.45)' },
   irisLabel: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '300',
+    fontWeight: '600',
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
   },
   videoContainer: {
     width: 140,
