@@ -13,6 +13,7 @@ export default function CozyLayout() {
       <Stack.Screen name="new-releases/index" />
       <Stack.Screen name="off-shelf/index" />
       <Stack.Screen name="catalog/index" />
+      <Stack.Screen name="watchlist/index" />
     </Stack>
   );
 }

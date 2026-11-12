@@ -4,13 +4,14 @@ import {
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { CaretLeft } from '../../../../components/icons';
+import { BookmarksSimple, CaretLeft } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
 import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
+import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -21,6 +22,9 @@ import VerdictRating, { Verdict } from '../../../../components/rating/VerdictRat
 import RatingInfoButton from '../../../../components/rating/RatingInfoButton';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 import { ratingSummaryLine, type RatingSummary } from '../../../../lib/ratingSummary';
+import { prettifyEnum } from '../../../../lib/tagTaxonomy';
+import { loadWatchlist } from '../../../../lib/watchlist';
+import WatchlistButton from '../../../../components/cozy/WatchlistButton';
 
 const openSpotify = async (url: string) => {
   const spotifyUri = url
@@ -46,6 +50,8 @@ type VisualItem = {
   watchUrl?: string;
   deepLink?: string;
   ratingSummary?: RatingSummary | null;
+  // BC genres (cozyHome); bcGenres[0] is the title's display category.
+  bcGenres?: string[] | null;
   // Lifestyle/recipe fields used by the Cozy home consumer; optional so
   // movie/watch items that never set them are unaffected.
   affiliateLink?: string;
@@ -62,7 +68,10 @@ type MovieDetail = {
   synopsis: string | null;
   irisNote: string | null;
   trailerUrl: string | null;
+  // TMDB genre names: never shown to members (bcGenres is shown instead).
   genres: string[];
+  // BC genres; GET /cozy/media/{movieId} adds these with item 7.
+  bcGenres?: string[] | null;
   vibes: string[];
   platforms: PlatformLink[];
   status: string | null;
@@ -77,6 +86,52 @@ const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: str
 };
 
 export type { VisualItem, RatingSummary };
+
+// BC genres, cleaned. Keys like ROM_COM read "Rom Com"; labels pass through.
+export function bcGenreLabels(bcGenres: unknown): string[] {
+  if (!Array.isArray(bcGenres)) return [];
+  return bcGenres
+    .filter((g): g is string => typeof g === 'string' && g.trim().length > 0)
+    .map((g) => (/^[A-Z0-9_]+$/.test(g) ? prettifyEnum(g) : g.trim()));
+}
+
+// A title's display category: its first BC genre, or nothing.
+export function displayCategory(bcGenres: unknown): string | null {
+  return bcGenreLabels(bcGenres)[0] ?? null;
+}
+
+// One poster card in the Watch Me grid (also used by My Watchlist).
+export function WatchCard({ item, onPress }: { item: VisualItem; onPress: () => void }) {
+  const playroom = usePlayroom();
+  const rating = item.ratingSummary;
+  const verdict = rating ? VERDICT_DISPLAY[rating.topVerdict] : null;
+  const category = displayCategory(item.bcGenres);
+  return (
+    <TouchableOpacity style={[styles.watchCard, playroom && prStyles.card]} onPress={onPress}>
+      <View style={[styles.watchCover, playroom && prStyles.coverBg]}>
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.watchCoverImage} />
+        ) : (
+          <View style={[styles.watchCoverImage, styles.watchCoverFallback]}>
+            <Text style={{ fontSize: 28 }}>🎬</Text>
+          </View>
+        )}
+        {!!item.movieId && <WatchlistButton movieId={item.movieId} title={item.title} />}
+      </View>
+      <View style={styles.watchInfo}>
+        {!!category && <Text style={[styles.watchCategory, playroom && prStyles.eyebrow]} numberOfLines={1}>{category}</Text>}
+        <Text style={[styles.watchTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
+        {item.status && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{item.status}</Text>}
+        {verdict && rating && (
+          <View style={[styles.verdictBadge, { backgroundColor: `${verdict.color}18`, borderColor: `${verdict.color}40` }]}>
+            <Text style={styles.verdictBadgeEmoji}>{verdict.emoji}</Text>
+            <Text style={[styles.verdictBadgeText, { color: verdict.color }]}>{rating.topPct}% {verdict.label}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   item: VisualItem; visible: boolean; onClose: () => void;
@@ -128,7 +183,9 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
   const ratingLine = ratingSummaryLine(ratingSummary);
   const synopsis = detail?.synopsis ?? item.description ?? null;
   const irisNote = detail?.irisNote ?? null;
-  const genres = detail?.genres ?? [];
+  // BC genres only (never TMDB names): the detail's once it has them, else
+  // the Watch Me item's; none → the tag row is hidden.
+  const genres = bcGenreLabels(detail?.bcGenres ?? item.bcGenres);
   const vibes = detail?.vibes ?? [];
   const year = detail?.year ?? null;
   const type = detail?.type ?? 'MOVIE';
@@ -159,6 +216,9 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
                   <Text style={[styles.sheetTypeText, playroom && prStyles.eyebrow]}>{type === 'SHOW' ? 'TV Show' : 'Movie'}</Text>
                 </View>
               </View>
+              {!!item.movieId && (
+                <WatchlistButton movieId={item.movieId} title={item.title} variant="pill" beforeGate={onClose} style={{ marginBottom: 8 }} />
+              )}
               {genres.length > 0 && (
                 <View style={styles.tagRow}>
                   {genres.map((g) => (
@@ -300,6 +360,11 @@ export default function CozyMediaScreen() {
     load();
   }, [monthKey]);
 
+  // Saved state for the cards' bookmarks (members only).
+  const { isGuest } = useGuest();
+  useEffect(() => { loadWatchlist(); }, []);
+  const openWatchlist = () => router.push('/(tabs)/cozy/watchlist' as any);
+
   const handleRatingUpdate = useCallback((movieId: string, ratingSummary: RatingSummary | null) => {
     setWatchItems((prev) => prev.map((item) => item.movieId === movieId ? { ...item, ratingSummary } : item));
   }, []);
@@ -332,9 +397,16 @@ export default function CozyMediaScreen() {
             <Text style={[styles.headerTitle, playroom && prStyles.heading]}>{playroom ? tileLabel('watchMe') : 'Visual Escapes'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={[styles.irisButton, playroom && prStyles.cardBorder]} onPress={() => router.push('/iris/chat?from=cozy/media' as any)}>
-          <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {isGuest === false && (
+            <TouchableOpacity style={[styles.backButton, playroom && prStyles.softButton]} onPress={openWatchlist} accessibilityRole="button" accessibilityLabel="My Watchlist">
+              <BookmarksSimple size={20} color={playroom ? PR.heading : '#0F2A48'} weight="bold" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.irisButton, playroom && prStyles.cardBorder]} onPress={() => router.push('/iris/chat?from=cozy/media' as any)}>
+            <Image source={{ uri: IRIS_AVATAR }} style={styles.irisAvatar} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* IRIS NOTE */}
@@ -353,7 +425,18 @@ export default function CozyMediaScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.gridContent}>
         {playroom && (
           <>
-            <RoomHeader name={tileLabel('watchMe')} intro={ROOM_INTROS.watchMe} monthKey={monthKey} irisFrom="cozy/media" style={{ marginHorizontal: -spacing.md }} />
+            <RoomHeader
+              name={tileLabel('watchMe')}
+              intro={ROOM_INTROS.watchMe}
+              monthKey={monthKey}
+              irisFrom="cozy/media"
+              style={{ marginHorizontal: -spacing.md }}
+              right={isGuest === false ? (
+                <TouchableOpacity style={roomHeaderButton} onPress={openWatchlist} accessibilityRole="button" accessibilityLabel="My Watchlist">
+                  <BookmarksSimple size={20} color={CHAMPAGNE} weight="bold" />
+                </TouchableOpacity>
+              ) : undefined}
+            />
             <View style={{ marginHorizontal: -spacing.md }}>{countRow}</View>
           </>
         )}
@@ -367,37 +450,13 @@ export default function CozyMediaScreen() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {watchItems.map((item, i) => {
-              const rating = item.ratingSummary;
-              const verdict = rating ? VERDICT_DISPLAY[rating.topVerdict] : null;
-              return (
-                <TouchableOpacity
-                  key={item.sk ?? `watch-${i}`}
-                  style={[styles.watchCard, playroom && prStyles.card]}
-                  onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
-                >
-                  <View style={[styles.watchCover, playroom && prStyles.coverBg]}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.watchCoverImage} />
-                    ) : (
-                      <View style={[styles.watchCoverImage, styles.watchCoverFallback]}>
-                        <Text style={{ fontSize: 28 }}>🎬</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.watchInfo}>
-                    <Text style={[styles.watchTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
-                    {item.status && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{item.status}</Text>}
-                    {verdict && rating && (
-                      <View style={[styles.verdictBadge, { backgroundColor: `${verdict.color}18`, borderColor: `${verdict.color}40` }]}>
-                        <Text style={styles.verdictBadgeEmoji}>{verdict.emoji}</Text>
-                        <Text style={[styles.verdictBadgeText, { color: verdict.color }]}>{rating.topPct}% {verdict.label}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {watchItems.map((item, i) => (
+              <WatchCard
+                key={item.sk ?? `watch-${i}`}
+                item={item}
+                onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
+              />
+            ))}
           </View>
         )}
         <View style={{ height: spacing.xl }} />
@@ -419,6 +478,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F4F8' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   backButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(15,42,72,0.06)', alignItems: 'center', justifyContent: 'center' },
   backArrow: { fontSize: 18, color: '#0F2A48', fontWeight: '600' },
   headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4' },
@@ -439,6 +499,7 @@ const styles = StyleSheet.create({
   watchCoverImage: { width: '100%', height: '100%' },
   watchCoverFallback: { alignItems: 'center', justifyContent: 'center' },
   watchInfo: { padding: spacing.sm },
+  watchCategory: { fontSize: 9, fontWeight: '700', color: '#A9C0D4', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
   watchTitle: { fontSize: 15, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 20, marginBottom: 4 },
   watchStatus: { fontSize: 11, fontWeight: '300', color: '#A9C0D4', marginBottom: 6 },
   verdictBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-start' },
