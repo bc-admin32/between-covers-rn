@@ -100,6 +100,18 @@ function readStreaming(res: any): Streaming {
 
 const KIND_LABEL: Record<string, string> = { free: 'Free', ads: 'With ads' };
 
+// The reader's monthly movie pick (cozyHome sections.moviePick), stable for
+// the month; null when the month has no Watch Me titles. irisLine is shown as
+// written and hidden while absent/null. matchedGenres and score aren't shown.
+type MoviePick = { movie: VisualItem; irisLine: string | null };
+
+function readMoviePick(raw: any): MoviePick | null {
+  const movie = raw?.movie;
+  if (!movie || typeof movie.movieId !== 'string' || typeof movie.title !== 'string') return null;
+  const irisLine = typeof raw.irisLine === 'string' && raw.irisLine.trim() ? raw.irisLine.trim() : null;
+  return { movie, irisLine };
+}
+
 const VERDICT_DISPLAY: Record<string, { emoji: string; label: string; color: string }> = {
   trash: { emoji: '🗑️', label: 'say skip it', color: '#E57373' },
   meh: { emoji: '😐', label: "say it's just meh", color: '#B0BEC5' },
@@ -394,6 +406,7 @@ export default function CozyMediaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [watchItems, setWatchItems] = useState<VisualItem[]>([]);
+  const [moviePick, setMoviePick] = useState<MoviePick | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [selectedItem, setSelectedItem] = useState<VisualItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -412,6 +425,7 @@ export default function CozyMediaScreen() {
         setMonthThemes(response);
         const raw: VisualItem[] = response?.[monthKey]?.sections?.visual ?? [];
         setWatchItems(raw);
+        setMoviePick(readMoviePick(response?.[monthKey]?.sections?.moviePick));
       } catch {} finally {
         setLoaded(true);
       }
@@ -426,6 +440,7 @@ export default function CozyMediaScreen() {
 
   const handleRatingUpdate = useCallback((movieId: string, ratingSummary: RatingSummary | null) => {
     setWatchItems((prev) => prev.map((item) => item.movieId === movieId ? { ...item, ratingSummary } : item));
+    setMoviePick((prev) => (prev && prev.movie.movieId === movieId ? { ...prev, movie: { ...prev.movie, ratingSummary } } : prev));
   }, []);
 
   const countRow = (
@@ -508,6 +523,26 @@ export default function CozyMediaScreen() {
             <Text style={[styles.emptyText, playroom && prStyles.body]}>Iris is still picking this month's watches. Check back soon.</Text>
           </View>
         ) : (
+          <>
+          {/* PlayRoom, this month only: the reader's pick, before the grid
+              (it stays in the grid too), mirroring Between the Sheets. */}
+          {playroom && monthKey === 'active' && moviePick && (
+            <View style={styles.pickSection}>
+              <Text style={[styles.pickHeading, prStyles.heading]}>I Saw This Movie and Thought of You</Text>
+              {!!moviePick.irisLine && (
+                <>
+                  <Text style={[styles.pickLabel, prStyles.eyebrow]}>Iris's Pick for You</Text>
+                  <Text style={[styles.pickLine, prStyles.body]}>{moviePick.irisLine}</Text>
+                </>
+              )}
+              <View style={styles.grid}>
+                <WatchCard
+                  item={moviePick.movie}
+                  onPress={() => { setSelectedItem(moviePick.movie); setSheetOpen(true); }}
+                />
+              </View>
+            </View>
+          )}
           <View style={styles.grid}>
             {watchItems.map((item, i) => (
               <WatchCard
@@ -517,6 +552,7 @@ export default function CozyMediaScreen() {
               />
             ))}
           </View>
+          </>
         )}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
@@ -564,6 +600,10 @@ const styles = StyleSheet.create({
   verdictBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-start' },
   verdictBadgeEmoji: { fontSize: 11 },
   verdictBadgeText: { fontSize: 10, fontWeight: '700', lineHeight: 14 },
+  pickSection: { marginBottom: spacing.lg },
+  pickHeading: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 12, paddingHorizontal: spacing.xs },
+  pickLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 4, paddingHorizontal: spacing.xs },
+  pickLine: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, marginBottom: 12, paddingHorizontal: spacing.xs },
   emptyState: { alignItems: 'center', paddingTop: 64, gap: spacing.sm },
   emptyEmoji: { fontSize: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48' },
