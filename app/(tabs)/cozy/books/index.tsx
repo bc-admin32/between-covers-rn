@@ -6,7 +6,7 @@ import {
 import { CaretLeft, Funnel } from '../../../../components/icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet } from '../../../../lib/api';
+import { apiGet, hasSession } from '../../../../lib/api';
 import { cozyMonthKey, setMonthThemes } from '../../../../lib/cozyLayout';
 import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { PR, prStyles, usePlayroom } from '../../../../lib/playroomPage';
@@ -14,8 +14,9 @@ import { useLightStatusBarWhileFocused } from '../../../../lib/statusBarTone';
 import RoomHeader, { PlayRoomStatusStrip, ROOM_INTROS, roomHeaderButton } from '../../../../components/playroom/RoomHeader';
 import { tileLabel } from '../../../../components/playroom/tiles';
 import { spacing, radius, colors } from '../../../../lib/theme';
-import { groupBooksBySubgenre } from '../../../../lib/tagTaxonomy';
-import BookCard, { BookCardData } from '../../../../components/cozy/BookCard';
+import { groupBooksBySubgenre, TRIGGERS } from '../../../../lib/tagTaxonomy';
+import BookCard, { BookCardData, type BookCardBadge } from '../../../../components/cozy/BookCard';
+import type { LibraryStatus } from '../../../../lib/libraryStatus';
 import BookOfMonthCard, { type BookOfMonth } from '../../../../components/cozy/BookOfMonthCard';
 import { IRIS_AVATAR } from '../../../../lib/irisAvatar';
 
@@ -30,12 +31,44 @@ type BookItem = {
   primarySubgenre?: string | null;
   triggers?: string[];
   isBookOfMonth?: boolean;
+  // Per-user fields (sections.BOOKS and sections.spotlight.books). Read
+  // defensively: absent until the backend ships them, and then no badges.
+  matchesTropes?: boolean;
+  boundaryHits?: string[];
 };
+
+// Badges under the cover, in this order: library status (from GET /library),
+// "Matches your tropes", comfort-boundary flag. Only FINISHED and DNF get a
+// library badge; Wishlist and Currently Reading don't.
+function bookBadges(book: BookItem, libraryStatus: LibraryStatus | undefined): BookCardBadge[] {
+  const badges: BookCardBadge[] = [];
+  if (libraryStatus === 'FINISHED') badges.push({ label: 'In your library', tone: 'library' });
+  else if (libraryStatus === 'DNF') badges.push({ label: 'DNF', tone: 'library', accessibilityLabel: 'Did not finish' });
+  if (book.matchesTropes === true) badges.push({ label: 'Matches your tropes', tone: 'match' });
+  const hits = Array.isArray(book.boundaryHits)
+    ? book.boundaryHits.filter((h): h is string => typeof h === 'string' && h.length > 0)
+    : [];
+  if (hits.length > 0) {
+    const names = hits.map((h) => TRIGGERS.find((t) => t.key === h)?.label ?? h).join(', ');
+    badges.push({ label: '⚠️ Comfort boundary', tone: 'boundary', accessibilityLabel: `Hits your comfort boundaries: ${names}` });
+  }
+  return badges;
+}
+
+// spotlight.books (up to 3), else the single spotlight.book.
+function readSpotlight(spotlight: any): BookItem[] {
+  const list: unknown[] = Array.isArray(spotlight?.books)
+    ? spotlight.books
+    : spotlight?.book ? [spotlight.book] : [];
+  return list
+    .filter((b): b is BookItem => !!b && typeof (b as BookItem).workId === 'string')
+    .slice(0, 3);
+}
 
 // Books are grouped under genre headers on this screen, so primarySubgenre is
 // intentionally omitted from the card — the per-card genre line would be
 // redundant. Peppers, trope pills, and CW badges stay.
-function toCard(book: BookItem): BookCardData {
+function toCard(book: BookItem, withBadges = false, libraryStatus?: LibraryStatus): BookCardData {
   return {
     bookId: book.workId,
     title: book.title,
@@ -45,6 +78,7 @@ function toCard(book: BookItem): BookCardData {
     spiceLevel: book.spiceLevel,
     tropes: book.tropes,
     triggers: book.triggers,
+    badges: withBadges ? bookBadges(book, libraryStatus) : undefined,
   };
 }
 
@@ -65,7 +99,10 @@ export default function CozyBooksScreen() {
   const params = useLocalSearchParams<{ month?: string }>();
   const monthKey = cozyMonthKey(params.month);
   const iconColor = playroom ? PR.heading : '#0F2A48';
-  const [spotlight, setSpotlight] = useState<BookItem | null>(null);
+  const [spotlight, setSpotlight] = useState<BookItem[]>([]);
+  // workId → the member's library status, for the card badges. Empty for
+  // guests or if /library fails (then no library badges).
+  const [libraryStatus, setLibraryStatus] = useState<Record<string, LibraryStatus>>({});
   const [offShelf, setOffShelf] = useState<{ blurb?: string; books: BookCardData[] } | null>(null);
 
   useEffect(() => {
@@ -82,7 +119,7 @@ export default function CozyBooksScreen() {
           month?.sections?.bookOfMonth ??
           data.find((b) => b.isBookOfMonth) ?? null
         );
-        if (isBetweenTheSheets) setSpotlight(month?.sections?.spotlight?.book ?? null);
+        if (isBetweenTheSheets) setSpotlight(readSpotlight(month?.sections?.spotlight));
       } catch {} finally {
         setLoading(false);
       }
@@ -101,15 +138,38 @@ export default function CozyBooksScreen() {
       .catch(() => {});
   }, [isBetweenTheSheets, monthKey]);
 
-  const hasExtras = isBetweenTheSheets && (!!spotlight || !!offShelf);
+  useEffect(() => {
+    if (!isBetweenTheSheets) return;
+    let cancelled = false;
+    hasSession()
+      .then((signedIn) => (signedIn ? apiGet<{ items?: { workId?: string; status?: LibraryStatus }[] }>('/library') : null))
+      .then((res) => {
+        if (cancelled || !res) return;
+        const map: Record<string, LibraryStatus> = {};
+        for (const item of res.items ?? []) {
+          if (item?.workId && item.status) map[item.workId] = item.status;
+        }
+        setLibraryStatus(map);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isBetweenTheSheets]);
+
+  const hasExtras = isBetweenTheSheets && (spotlight.length > 0 || !!offShelf);
 
   // Group by primarySubgenre, ordered by the shared taxonomy so this screen's
   // genre order matches New Releases. Untagged books fall into "Other", last.
   // The Book of the Month is featured above the groups, so it's left out of them.
-  const sections = useMemo(
-    () => groupBooksBySubgenre(bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books),
-    [books, bookOfMonth],
-  );
+  // PlayRoom months: BOOKS arrive sorted per member (best match first,
+  // hard passes last), so the genre headings follow the first appearance of
+  // each genre in that order; the API order is kept inside each heading.
+  // Classic months keep the taxonomy order.
+  const sections = useMemo(() => {
+    const list = bookOfMonth ? books.filter((b) => b.workId !== bookOfMonth.workId) : books;
+    const grouped = groupBooksBySubgenre(list);
+    if (!isBetweenTheSheets) return grouped;
+    return [...grouped].sort((a, b) => list.indexOf(a.books[0]) - list.indexOf(b.books[0]));
+  }, [books, bookOfMonth, isBetweenTheSheets]);
 
   const countRow = (
     <View style={styles.countRow}>
@@ -211,11 +271,13 @@ export default function CozyBooksScreen() {
           <>
             {bookOfMonth && <BookOfMonthCard book={bookOfMonth} />}
             {/* PlayRoom: the personal pick comes right after the Book of the Month. */}
-            {isBetweenTheSheets && spotlight && (
+            {isBetweenTheSheets && spotlight.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.playroomHeading, prStyles.heading]}>I Saw This Book and Thought of You</Text>
                 <View style={styles.gridInner}>
-                  <BookCard book={toCard(spotlight)} style={styles.bookCard} />
+                  {spotlight.map((book) => (
+                    <BookCard key={book.workId} book={toCard(book, true, libraryStatus[book.workId])} style={styles.bookCard} />
+                  ))}
                 </View>
               </View>
             )}
@@ -232,7 +294,7 @@ export default function CozyBooksScreen() {
                   {section.books.map((book, i) => (
                     <BookCard
                       key={book.workId ?? i}
-                      book={toCard(book)}
+                      book={toCard(book, isBetweenTheSheets, libraryStatus[book.workId])}
                       style={styles.bookCard}
                     />
                   ))}

@@ -16,6 +16,15 @@ export type BookCardData = {
   tropes?: string[];
   primarySubgenre?: string | null;
   triggers?: string[];
+  // Optional badge row under the cover (Between the Sheets). Screens that
+  // don't pass it render exactly as before.
+  badges?: BookCardBadge[];
+};
+
+export type BookCardBadge = {
+  label: string;
+  tone: 'library' | 'match' | 'boundary';
+  accessibilityLabel?: string;
 };
 
 export default function BookCard({
@@ -49,6 +58,21 @@ export default function BookCard({
           </View>
         )}
       </View>
+
+      {!!book.badges?.length && (
+        <View style={styles.badgeRow}>
+          {book.badges.map((b) => (
+            <View
+              key={b.label}
+              style={[styles.badge, styles[`badge_${b.tone}`]]}
+              accessible
+              accessibilityLabel={b.accessibilityLabel ?? b.label}
+            >
+              <Text style={[styles.badgeText, styles[`badgeText_${b.tone}`]]} numberOfLines={2}>{b.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
       <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
@@ -93,4 +117,13 @@ const styles = StyleSheet.create({
   title: { marginTop: 10, fontSize: 13, fontWeight: '400', color: '#0F2A48', lineHeight: 18 },
   author: { fontSize: 11, color: '#6A5969', marginTop: 3, fontWeight: '300' },
   genre: { marginTop: 4, fontSize: 9, fontWeight: '700', color: '#A9C0D4', textTransform: 'uppercase', letterSpacing: 0.8 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 8 },
+  badge: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '100%', borderWidth: StyleSheet.hairlineWidth },
+  badgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+  badge_library: { backgroundColor: 'rgba(15,42,72,0.08)', borderColor: 'rgba(15,42,72,0.18)' },
+  badgeText_library: { color: '#0F2A48' },
+  badge_match: { backgroundColor: 'rgba(184,50,85,0.08)', borderColor: 'rgba(184,50,85,0.25)' },
+  badgeText_match: { color: '#8E2441' },
+  badge_boundary: { backgroundColor: 'rgba(196,122,20,0.10)', borderColor: 'rgba(196,122,20,0.35)' },
+  badgeText_boundary: { color: '#7A4A06' },
 });
