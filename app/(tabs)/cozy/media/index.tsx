@@ -14,7 +14,8 @@ import { tileLabel } from '../../../../components/playroom/tiles';
 import { CHAMPAGNE } from '../../../../components/playroom/playroomStyle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, hasSession } from '../../../../lib/api';
+import { parseLocalDate } from '../../../../lib/dateUtils';
 import { useGuest } from '../../../../lib/useGuest';
 import { spacing, radius, colors } from '../../../../lib/theme';
 import { getPlatform } from '../../../../lib/platforms';
@@ -52,6 +53,10 @@ type VisualItem = {
   ratingSummary?: RatingSummary | null;
   // BC genres (cozyHome); bcGenres[0] is the title's display category.
   bcGenres?: string[] | null;
+  // Coming Soon (GET /cozy/coming-soon) and movie detail.
+  releaseStatus?: string | null;
+  releaseDate?: string | null;
+  releaseDateType?: string | null;
   // Lifestyle/recipe fields used by the Cozy home consumer; optional so
   // movie/watch items that never set them are unaffected.
   affiliateLink?: string;
@@ -135,12 +140,32 @@ export function displayCategory(bcGenres: unknown): string | null {
   return bcGenreLabels(bcGenres)[0] ?? null;
 }
 
+// Coming Soon cards show the release date where streaming would be:
+// "Dec 12, 2026", or "Date TBA"; plus a small label for the kind of release.
+const RELEASE_TYPE_LABEL: Record<string, string> = {
+  digital: 'Digital release',
+  first_air: 'Series premiere',
+  next_episode: 'New season',
+};
+
+export function releaseLine(item: VisualItem): { when: string; kind: string | null } {
+  const iso = item.releaseDate;
+  const valid = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso);
+  const when = valid
+    ? parseLocalDate(iso!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Date TBA';
+  const kind = item.releaseDateType ? RELEASE_TYPE_LABEL[item.releaseDateType] ?? null : null;
+  return { when, kind };
+}
+
 // One poster card in the Watch Me grid (also used by My Watchlist).
-export function WatchCard({ item, onPress }: { item: VisualItem; onPress: () => void }) {
+// `upcoming` (Coming Soon) shows the release date instead of the streaming line.
+export function WatchCard({ item, onPress, upcoming = false }: { item: VisualItem; onPress: () => void; upcoming?: boolean }) {
   const playroom = usePlayroom();
   const rating = item.ratingSummary;
   const verdict = rating ? VERDICT_DISPLAY[rating.topVerdict] : null;
   const category = displayCategory(item.bcGenres);
+  const release = upcoming ? releaseLine(item) : null;
   return (
     <TouchableOpacity style={[styles.watchCard, playroom && prStyles.card]} onPress={onPress}>
       <View style={[styles.watchCover, playroom && prStyles.coverBg]}>
@@ -156,7 +181,14 @@ export function WatchCard({ item, onPress }: { item: VisualItem; onPress: () => 
       <View style={styles.watchInfo}>
         {!!category && <Text style={[styles.watchCategory, playroom && prStyles.eyebrow]} numberOfLines={1}>{category}</Text>}
         <Text style={[styles.watchTitle, playroom && prStyles.heading]} numberOfLines={2}>{item.title}</Text>
-        {item.status && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{item.status}</Text>}
+        {release ? (
+          <>
+            <Text style={[styles.watchRelease, playroom && prStyles.heading]}>{release.when}</Text>
+            {!!release.kind && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{release.kind}</Text>}
+          </>
+        ) : (
+          item.status && <Text style={[styles.watchStatus, playroom && prStyles.body]}>{item.status}</Text>
+        )}
         {verdict && rating && (
           <View style={[styles.verdictBadge, { backgroundColor: `${verdict.color}18`, borderColor: `${verdict.color}40` }]}>
             <Text style={styles.verdictBadgeEmoji}>{verdict.emoji}</Text>
@@ -219,6 +251,9 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
 
   const platforms = detail?.platforms ?? item.platforms ?? [];
   const ratingLine = ratingSummaryLine(ratingSummary);
+  // Unreleased (Coming Soon) titles can't be rated. The detail decides once
+  // it loads (null = rateable); until then the card's own status does.
+  const comingSoon = (detail ? detail.releaseStatus : item.releaseStatus) === 'COMING_SOON';
   const synopsis = detail?.synopsis ?? item.description ?? null;
   const irisNote = detail?.irisNote ?? null;
   // BC genres only (never TMDB names): the detail's once it has them, else
@@ -362,6 +397,9 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
             </View>
           )}
 
+          {/* Community verdict and rating: hidden for Coming Soon titles. */}
+          {!comingSoon && (
+          <>
           <View style={styles.sheetDivider} />
 
           {/* COMMUNITY VERDICT: "😍 72% Obsessed · 14 ratings", or the prompt
@@ -389,6 +427,8 @@ export function MovieDetailSheet({ item, visible, onClose, onRatingUpdate }: {
               </View>
             )}
           </View>
+          </>
+          )}
 
           <View style={{ height: spacing.xl }} />
         </ScrollView>
@@ -407,6 +447,8 @@ export default function CozyMediaScreen() {
   const insets = useSafeAreaInsets();
   const [watchItems, setWatchItems] = useState<VisualItem[]>([]);
   const [moviePick, setMoviePick] = useState<MoviePick | null>(null);
+  // Coming Soon: members only, not tied to a month (hidden on last month's page).
+  const [comingSoon, setComingSoon] = useState<VisualItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedItem, setSelectedItem] = useState<VisualItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -436,6 +478,18 @@ export default function CozyMediaScreen() {
   // Saved state for the cards' bookmarks (members only).
   const { isGuest } = useGuest();
   useEffect(() => { loadWatchlist(); }, []);
+  useEffect(() => {
+    if (monthKey === 'previous') { setComingSoon([]); return; }
+    let cancelled = false;
+    hasSession()
+      .then((signedIn) => (signedIn ? apiGet<{ items?: VisualItem[] }>('/cozy/coming-soon') : null))
+      .then((res) => {
+        if (cancelled || !res) return;
+        setComingSoon((res.items ?? []).filter((m) => !!m && typeof m.movieId === 'string' && typeof m.title === 'string'));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [monthKey]);
   const openWatchlist = () => router.push('/(tabs)/cozy/watchlist' as any);
 
   const handleRatingUpdate = useCallback((movieId: string, ratingSummary: RatingSummary | null) => {
@@ -516,12 +570,6 @@ export default function CozyMediaScreen() {
         )}
         {!loaded ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : watchItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🎬</Text>
-            <Text style={[styles.emptyTitle, playroom && prStyles.heading]}>Coming soon</Text>
-            <Text style={[styles.emptyText, playroom && prStyles.body]}>Iris is still picking this month's watches. Check back soon.</Text>
-          </View>
         ) : (
           <>
           {/* PlayRoom, this month only: the reader's pick, before the grid
@@ -543,6 +591,7 @@ export default function CozyMediaScreen() {
               </View>
             </View>
           )}
+          {watchItems.length > 0 && (
           <View style={styles.grid}>
             {watchItems.map((item, i) => (
               <WatchCard
@@ -552,6 +601,23 @@ export default function CozyMediaScreen() {
               />
             ))}
           </View>
+          )}
+          {/* COMING SOON: soonest first, date-TBA last (API order); nothing when empty. */}
+          {comingSoon.length > 0 && (
+            <View style={styles.comingSoonSection}>
+              <Text style={[styles.pickHeading, playroom && prStyles.heading]}>Coming Soon</Text>
+              <View style={styles.grid}>
+                {comingSoon.map((item) => (
+                  <WatchCard
+                    key={`soon-${item.movieId}`}
+                    item={item}
+                    upcoming
+                    onPress={() => { setSelectedItem(item); setSheetOpen(true); }}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
           </>
         )}
         <View style={{ height: spacing.xl }} />
@@ -597,6 +663,8 @@ const styles = StyleSheet.create({
   watchCategory: { fontSize: 9, fontWeight: '700', color: '#A9C0D4', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
   watchTitle: { fontSize: 15, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48', lineHeight: 20, marginBottom: 4 },
   watchStatus: { fontSize: 11, fontWeight: '300', color: '#A9C0D4', marginBottom: 6 },
+  watchRelease: { fontSize: 12, fontWeight: '700', color: '#0F2A48', marginBottom: 2 },
+  comingSoonSection: { marginTop: spacing.xl },
   verdictBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-start' },
   verdictBadgeEmoji: { fontSize: 11 },
   verdictBadgeText: { fontSize: 10, fontWeight: '700', lineHeight: 14 },
@@ -604,10 +672,6 @@ const styles = StyleSheet.create({
   pickHeading: { fontSize: 22, fontFamily: 'Cormorant_700Bold_Italic', color: '#0F2A48', marginBottom: 12, paddingHorizontal: spacing.xs },
   pickLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: '#A9C0D4', marginBottom: 4, paddingHorizontal: spacing.xs },
   pickLine: { fontSize: 14, fontStyle: 'italic', color: '#6A5969', lineHeight: 20, marginBottom: 12, paddingHorizontal: spacing.xs },
-  emptyState: { alignItems: 'center', paddingTop: 64, gap: spacing.sm },
-  emptyEmoji: { fontSize: 32 },
-  emptyTitle: { fontSize: 20, fontWeight: '600', fontStyle: 'italic', color: '#0F2A48' },
-  emptyText: { fontSize: 13, color: '#6A5969', textAlign: 'center', lineHeight: 20, paddingHorizontal: spacing.xl },
   sheetOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,42,72,0.55)', zIndex: 40 },
   sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#F1F4F8', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', zIndex: 50 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(15,42,72,0.15)', alignSelf: 'center', marginTop: 12, marginBottom: 4 },

@@ -24,6 +24,8 @@ function toVisualItem(m: WatchlistMovie): VisualItem {
     status: m.status ?? undefined,
     description: m.synopsis ?? undefined,
     bcGenres: m.bcGenres ?? null,
+    // Lets the sheet hide rating for Coming Soon titles before its detail loads.
+    releaseStatus: m.releaseStatus ?? null,
   };
 }
 
