@@ -81,7 +81,7 @@ async function takeReturnTo(): Promise<string | null> {
 }
 
 // Replaces router.replace(normalizeRoute(nextRoute)) at the points where an
-// authenticated user enters the app (redirect.tsx, onboarding L9Com). When the
+// authenticated user enters the app (redirect.tsx, onboarding L3Nam). When the
 // destination is Home and a guest gate stored a return-to, land on Home and
 // push the gated screen on top so Back still reaches Home. Any other
 // destination (onboarding, paywall) leaves the return-to for the next landing.

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
-import { track } from '../../lib/analytics';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -57,10 +56,8 @@ export default function AcceptanceScreen() {
         step: 'L2Acc',
         appVersion: Constants.expoConfig?.version ?? 'unknown',
       });
-      // Acceptance is the final onboarding step. Profile data (drinks, genres,
-      // tropes) was submitted in earlier steps and lives server-side; the
-      // backend can join it to this event by userId.
-      track('onboarding_completed', {});
+      // Acceptance is the second step (after Welcome). onboarding_completed
+      // fires from the name + genres form, the final step.
       if (res?.nextRoute) {
         router.replace(normalizeRoute(res.nextRoute) as any);
         return;

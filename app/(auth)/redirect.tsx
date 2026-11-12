@@ -224,7 +224,8 @@ export default function RedirectScreen() {
           // signup_completed fires exactly once per sign-in:
           //   existing account → here, now (accountType 'existing').
           //   new account (routed into onboarding) → held, and fired by
-          //     (onboarding)/about.tsx once L9Com completes (accountType 'new').
+          //     (onboarding)/name.tsx once the final L3Nam step completes
+          //     (accountType 'new').
           // The backend sends bare routes ("/onboarding/name"), so compare the
           // normalized route; the old includes('(onboarding)') never matched.
           // Provider rides on OAuth `state`, which round-trips on the redirect

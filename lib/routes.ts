@@ -3,13 +3,18 @@
  * to their corresponding expo-router file paths (e.g. "/(tabs)/home",
  * "/(auth)/hard-paywall", "/(onboarding)/name").
  *
- * Falls back to "/(auth)/login" for any unknown path — including a stray
- * "/door" from the backend, now that the soft-paywall screen is retired.
+ * "/door" (the retired soft paywall) goes to the hard paywall. Falls back to
+ * "/(auth)/login" for any other unknown path.
  */
 
 const ONBOARDING_SLUGS = new Set([
-  'about', 'acceptance', 'drinks', 'genre', 'legal',
-  'location', 'name', 'snacks', 'spicy', 'welcome',
+  'acceptance', 'legal', 'name', 'welcome',
+]);
+
+// Removed onboarding steps: a stray route to one lands on the final step,
+// the name + genres form.
+const REMOVED_ONBOARDING_SLUGS = new Set([
+  'about', 'drinks', 'genre', 'location', 'snacks', 'spicy',
 ]);
 
 const TAB_SLUGS = new Set([
@@ -46,6 +51,15 @@ export function normalizeRoute(apiRoute: string): string {
     const rest = segments.slice(1).join('/');
     const base = rest ? `/(tabs)/${first}/${rest}` : `/(tabs)/${first}`;
     return log(`${base}${queryStr}`, 'tab');
+  }
+
+  const onboardingSlug = first === 'onboarding' ? segments[1] : first;
+  if (onboardingSlug && REMOVED_ONBOARDING_SLUGS.has(onboardingSlug)) {
+    return log('/(onboarding)/name', 'onboarding-removed');
+  }
+
+  if (first === 'door') {
+    return log('/(auth)/hard-paywall', 'door');
   }
 
   if (first === 'onboarding' && segments[1] && ONBOARDING_SLUGS.has(segments[1])) {
