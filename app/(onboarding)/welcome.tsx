@@ -1,29 +1,68 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useEventListener } from 'expo';
 import { apiPost } from '../../lib/api';
 import { normalizeRoute } from '../../lib/routes';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-
+// The CTA stays hidden until 15s of the video have actually played (so
+// buffering doesn't count), then fades in. Nobody gets stuck: it shows
+// right away if the player errors, 30s after the play tap if playback
+// stalls, and 15s after the screen opens if play is never tapped.
+const REVEAL_AT_S = 15;
+const NO_PLAY_FALLBACK_MS = 15_000;
+const STALL_FALLBACK_MS = (REVEAL_AT_S + 15) * 1000;
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [hasStarted, setHasStarted] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [showButton, setShowButton] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
+  const noPlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stallTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const player = useVideoPlayer(
     'https://onboarding-videos-betweencovers.s3.us-east-1.amazonaws.com/Welcome.mp4',
     (p) => {
       p.loop = false;
+      // Default is 0 (event disabled). Must be non-zero for timeUpdate to fire.
+      p.timeUpdateEventInterval = 0.25;
     }
   );
 
+  const reveal = () => setShowButton(true);
+
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    if (currentTime >= REVEAL_AT_S) reveal();
+  });
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'error') reveal();
+  });
+
+  // Play never tapped: show the button 15s after the screen opens.
+  useEffect(() => {
+    noPlayTimer.current = setTimeout(reveal, NO_PLAY_FALLBACK_MS);
+    return () => {
+      if (noPlayTimer.current) clearTimeout(noPlayTimer.current);
+      if (stallTimer.current) clearTimeout(stallTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showButton) return;
+    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, [showButton, fade]);
+
   const handlePlay = () => {
     setHasStarted(true);
+    // From here the video-time rule applies, with a stall safety net.
+    if (noPlayTimer.current) clearTimeout(noPlayTimer.current);
+    stallTimer.current = setTimeout(reveal, STALL_FALLBACK_MS);
     player.play();
   };
 
@@ -58,17 +97,19 @@ export default function WelcomeScreen() {
         </TouchableOpacity>
       )}
 
-      <View style={[styles.buttonContainer, { bottom: insets.bottom + 8 }]}>
+      {showButton && (
+      <Animated.View style={[styles.buttonContainer, { bottom: insets.bottom + 8, opacity: fade }]}>
         <TouchableOpacity
           style={[styles.continueButton, locked && { opacity: 0.6 }]}
           onPress={handleContinue}
           disabled={locked}
         >
           <Text style={styles.continueText}>
-            {locked ? 'Entering…' : 'Step Inside'}
+            {locked ? 'Entering…' : "Let's Begin"}
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
+      )}
     </View>
   );
 }

@@ -130,7 +130,8 @@ export default function NameScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  // Same solid blue as Acceptance (covers the layout's shared image).
+  container: { flex: 1, backgroundColor: '#A9C0D4' },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
   card: {
     width: '100%',
